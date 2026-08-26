@@ -1,0 +1,26 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+ENV CI=1
+ENV EXPO_NO_TELEMETRY=1
+ENV EXPO_DEVTOOLS_LISTEN_ADDRESS=0.0.0.0
+
+COPY package.json package-lock.json ./
+COPY packages/shared/package.json packages/shared/package.json
+COPY packages/mobile/package.json packages/mobile/package.json
+
+RUN npm ci \
+      --workspace=@confidence-trivia/shared \
+      --workspace=@confidence-trivia/mobile \
+    && npm cache clean --force
+
+COPY tsconfig.json tsconfig.json
+COPY packages/shared packages/shared
+COPY packages/mobile packages/mobile
+
+WORKDIR /app/packages/mobile
+
+EXPOSE 8081 19000 19001 19002
+
+CMD ["npx", "expo", "start", "--tunnel", "--non-interactive"]

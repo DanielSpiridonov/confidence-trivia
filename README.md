@@ -49,3 +49,21 @@ the same command there, and update `EXPO_PUBLIC_SERVER_URL` to that server's
 address. If clients will connect over the public internet, also configure port
 forwarding and a firewall. A domain with a TLS reverse proxy is recommended so
 the app can use `wss://` instead of an unencrypted public WebSocket connection.
+
+## Fast Expo Go testing with Docker
+
+For quick testing with Expo Go, run the backend container and an Expo tunnel
+container together:
+
+```bash
+EXPO_PUBLIC_SERVER_URL=ws://<docker-host-LAN-IP>:2567 \
+  docker compose -f docker-compose.testing.yml up --build
+```
+
+Scan the Expo QR code from the `expo` container logs. If friends are on the
+same Wi-Fi network, use the Docker host's LAN IP for `EXPO_PUBLIC_SERVER_URL`.
+If friends are not on the same network, expose the backend separately with a
+public `wss://` URL and use that URL instead.
+
+This setup is for development only. For real distribution, build the iOS app
+with EAS/TestFlight and keep only the backend Docker image hosted.

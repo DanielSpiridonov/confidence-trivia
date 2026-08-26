@@ -1,0 +1,26 @@
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "2567:2567"
+    environment:
+      PORT: "2567"
+    restart: unless-stopped
+
+  expo:
+    build:
+      context: .
+      dockerfile: Dockerfile.expo
+    ports:
+      - "8081:8081"
+      - "19000:19000"
+      - "19001:19001"
+      - "19002:19002"
+    environment:
+      EXPO_PUBLIC_SERVER_URL: ${EXPO_PUBLIC_SERVER_URL}
+    depends_on:
+      - server
+    stdin_open: true
+    tty: true
