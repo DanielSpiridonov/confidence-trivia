@@ -6,6 +6,7 @@ import { Room } from "colyseus.js";
 import "./src/i18n";
 import i18n from "./src/i18n";
 import { BigButton, GAME_BACKGROUND, theme } from "./src/components/ui";
+import { PointsIcon } from "./src/components/PointsIcon";
 
 import { HomeScreen } from "./src/screens/HomeScreen";
 import { CreateGameScreen } from "./src/screens/CreateGameScreen";
@@ -17,7 +18,7 @@ import { ConfidenceBoardScreen } from "./src/screens/ConfidenceBoardScreen";
 import { RevealScreen } from "./src/screens/RevealScreen";
 import { FinalResultsScreen } from "./src/screens/FinalResultsScreen";
 import { SettingsScreen, VolumeControl } from "./src/screens/SettingsScreen";
-import { createRoom, joinPublicRoom, joinRoom, reconnectRoom, useRoomState } from "./src/network/client";
+import { createRoom, getPlayerLifetimePoints, joinPublicRoom, joinRoom, reconnectRoom, useRoomState } from "./src/network/client";
 import { prepareSoundEffects, setSoundEffectsVolume, stopAllSoundEffects } from "./src/audio/sounds";
 import { pauseMusicForBackground, prepareMusic, setMusicVolume as applyMusicVolume, startMenuMusic, stopMenuMusic } from "./src/audio/music";
 import { getOrCreateDeviceId } from "./src/utils/deviceId";
@@ -60,6 +61,15 @@ function AppFrame({ children, highContrast = false }: { children: React.ReactNod
   );
 }
 
+function PointsBadge({ points }: { points: number }) {
+  return (
+    <View pointerEvents="none" style={styles.pointsBadge}>
+      <PointsIcon />
+      <Text style={styles.pointsBadgeText}>{points}</Text>
+    </View>
+  );
+}
+
 export default function App() {
   const [nav, setNav] = useState<Nav>("home");
   const [room, setRoom] = useState<Room | null>(null);
@@ -69,6 +79,7 @@ export default function App() {
   const [musicVolume, setMusicVolume] = useState(0.5);
   const [defaultPlayerName, setDefaultPlayerName] = useState("");
   const [deviceId, setDeviceId] = useState<string | null>(null);
+  const [lifetimePoints, setLifetimePoints] = useState(0);
   const [hapticsEnabled, setHapticsEnabled] = useState(true);
   const [highContrastEnabled, setHighContrastEnabled] = useState(false);
   const [roomRecovery, setRoomRecovery] = useState<RoomRecoveryState | null>(null);
@@ -96,6 +107,9 @@ export default function App() {
           setHapticsEnabled(savedHaptics !== "false");
           setHighContrastEnabled(savedHighContrast === "true");
         }
+        void getPlayerLifetimePoints(storedDeviceId).then((points) => {
+          if (!cancelled && points !== null) setLifetimePoints(points);
+        });
         if (!cancelled && (saved === "en" || saved === "bg")) {
           setLocale(saved);
           await i18n.changeLanguage(saved);
@@ -130,6 +144,9 @@ export default function App() {
     if (deviceId) return deviceId;
     const storedDeviceId = await getOrCreateDeviceId();
     setDeviceId(storedDeviceId);
+    void getPlayerLifetimePoints(storedDeviceId).then((points) => {
+      if (points !== null) setLifetimePoints(points);
+    });
     return storedDeviceId;
   }
 
@@ -296,6 +313,7 @@ export default function App() {
           onChangeSoundEffectsVolume={handleSoundEffectsVolume}
           onChangeMusicVolume={handleMusicVolume}
           hapticsEnabled={hapticsEnabled}
+          onLifetimePointsChange={setLifetimePoints}
         />
       ) : (
         <>
@@ -327,6 +345,7 @@ export default function App() {
           )}
         </>
       )}
+      <PointsBadge points={lifetimePoints} />
     </AppFrame>
   );
 }
@@ -349,6 +368,7 @@ function InRoomRouter({
   onChangeSoundEffectsVolume,
   onChangeMusicVolume,
   hapticsEnabled,
+  onLifetimePointsChange,
 }: {
   room: Room;
   onExit: () => void;
@@ -361,11 +381,17 @@ function InRoomRouter({
   onChangeSoundEffectsVolume: (volume: number) => void;
   onChangeMusicVolume: (volume: number) => void;
   hapticsEnabled: boolean;
+  onLifetimePointsChange: (points: number) => void;
 }) {
   const { t } = i18n;
   const state = useRoomState<any>(room);
   const [gameMenuPanel, setGameMenuPanel] = useState<"menu" | "settings" | null>(null);
   const previousPhaseRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const points = state?.players?.get(room.sessionId)?.lifetimePoints;
+    if (typeof points === "number") onLifetimePointsChange(points);
+  }, [onLifetimePointsChange, room.sessionId, state?.players?.get(room.sessionId)?.lifetimePoints]);
 
   useEffect(() => {
     const phase = state?.phase as string | undefined;
@@ -523,10 +549,32 @@ const styles = StyleSheet.create({
   appContent: {
     flex: 1,
   },
-  menuButton: {
+  pointsBadge: {
     position: "absolute",
     top: 18,
     right: 18,
+    zIndex: 20,
+    minWidth: 76,
+    height: 40,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "rgba(31, 26, 51, 0.92)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.10)",
+  },
+  pointsBadgeText: {
+    color: theme.text,
+    fontSize: 17,
+    fontWeight: "900",
+  },
+  menuButton: {
+    position: "absolute",
+    top: 18,
+    right: 110,
     zIndex: 20,
     backgroundColor: "rgba(31, 26, 51, 0.9)",
     borderRadius: 18,

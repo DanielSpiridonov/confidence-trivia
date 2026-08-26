@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.upsertPlayer = upsertPlayer;
+exports.getPlayerLifetimePoints = getPlayerLifetimePoints;
 exports.saveCompletedMatch = saveCompletedMatch;
 const postgres_1 = __importDefault(require("postgres"));
 const databaseUrl = process.env.DATABASE_URL;
@@ -29,6 +30,22 @@ async function upsertPlayer(deviceId, displayName) {
     catch (error) {
         // Persistence must never prevent a player from joining a live game.
         console.error("Could not persist player profile", error);
+        return null;
+    }
+}
+async function getPlayerLifetimePoints(deviceId) {
+    if (!sql)
+        return null;
+    try {
+        const [player] = await sql `
+      select total_points
+      from public.players
+      where id = ${deviceId}
+    `;
+        return player?.total_points ?? 0;
+    }
+    catch (error) {
+        console.error("Could not load player points", error);
         return null;
     }
 }

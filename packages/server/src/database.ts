@@ -45,6 +45,22 @@ export async function upsertPlayer(deviceId: string, displayName: string): Promi
   }
 }
 
+export async function getPlayerLifetimePoints(deviceId: string): Promise<number | null> {
+  if (!sql) return null;
+
+  try {
+    const [player] = await sql<{ total_points: number }[]>`
+      select total_points
+      from public.players
+      where id = ${deviceId}
+    `;
+    return player?.total_points ?? 0;
+  } catch (error) {
+    console.error("Could not load player points", error);
+    return null;
+  }
+}
+
 export async function saveCompletedMatch(match: CompletedMatch): Promise<Map<string, number>> {
   const lifetimePoints = new Map<string, number>();
   if (!sql || match.players.length === 0) return lifetimePoints;

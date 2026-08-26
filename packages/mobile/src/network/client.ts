@@ -5,12 +5,24 @@ import { useEffect, useRef, useState } from "react";
 // testing on a physical device; localhost only reaches the device itself.
 export const SERVER_URL =
   process.env.EXPO_PUBLIC_SERVER_URL ?? "ws://localhost:2567";
+const HTTP_SERVER_URL = SERVER_URL.replace(/^ws/, "http").replace(/\/$/, "");
 const ROOM_REQUEST_TIMEOUT_MS = 10_000;
 
 let client: Client | null = null;
 export function getClient(): Client {
   if (!client) client = new Client(SERVER_URL);
   return client;
+}
+
+export async function getPlayerLifetimePoints(deviceId: string): Promise<number | null> {
+  try {
+    const response = await fetch(`${HTTP_SERVER_URL}/players/${encodeURIComponent(deviceId)}/points`);
+    if (!response.ok) return null;
+    const payload = await response.json() as { lifetimePoints?: unknown };
+    return typeof payload.lifetimePoints === "number" ? payload.lifetimePoints : null;
+  } catch {
+    return null;
+  }
 }
 
 async function withRoomRequestTimeout<T>(promise: Promise<T>): Promise<T> {
@@ -80,7 +92,12 @@ export async function listPublicRooms(): Promise<PublicRoomListing[]> {
     getClient().getAvailableRooms<PublicRoomMetadata>("confidence_trivia"),
   );
   return rooms
-    .filter((room) => room.clients < room.maxClients && Boolean(room.metadata?.leaderName))
+    .filter((room) => (
+      room.clients > 0
+      && room.clients < room.maxClients
+      && (room.metadata?.playerCount ?? 0) > 0
+      && Boolean(room.metadata?.leaderName)
+    ))
     .map((room) => ({
       roomId: room.roomId,
       leaderName: room.metadata?.leaderName ?? "",

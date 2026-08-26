@@ -8,10 +8,24 @@ const express_1 = __importDefault(require("express"));
 const colyseus_1 = require("colyseus");
 const ws_transport_1 = require("@colyseus/ws-transport");
 const GameRoom_1 = require("./rooms/GameRoom");
+const database_1 = require("./database");
 const port = Number(process.env.PORT ?? 2567);
 const app = (0, express_1.default)();
 app.use(express_1.default.json());
 app.get("/health", (_req, res) => res.json({ ok: true }));
+app.get("/players/:deviceId/points", async (req, res) => {
+    const deviceId = req.params.deviceId;
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(deviceId)) {
+        res.status(400).json({ error: "Invalid device ID" });
+        return;
+    }
+    const lifetimePoints = await (0, database_1.getPlayerLifetimePoints)(deviceId);
+    if (lifetimePoints === null) {
+        res.status(503).json({ error: "Points are temporarily unavailable" });
+        return;
+    }
+    res.json({ lifetimePoints });
+});
 const httpServer = http_1.default.createServer(app);
 const gameServer = new colyseus_1.Server({
     transport: new ws_transport_1.WebSocketTransport({ server: httpServer }),

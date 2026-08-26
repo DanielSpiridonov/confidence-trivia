@@ -87,7 +87,8 @@ class GameRoom extends colyseus_1.Room {
         // through this admission path. New players may only enter the lobby.
         return !this.state.gameStarted
             && isValidPlayerName(options.name)
-            && isValidDeviceId(options.deviceId);
+            && isValidDeviceId(options.deviceId)
+            && ![...this.deviceIds.values()].includes(options.deviceId);
     }
     onJoin(client, options = {}) {
         const player = new schema_1.PlayerSchema();
@@ -114,8 +115,15 @@ class GameRoom extends colyseus_1.Room {
         this.shortenConfidencePhaseIfEveryoneDecided();
         this.shortenSideBetPhaseIfEveryoneDecided();
         if (consented) {
+            const closesLobby = player.isHost && !this.state.gameStarted;
             this.deviceIds.delete(client.sessionId);
             this.state.players.delete(client.sessionId);
+            if (closesLobby) {
+                this.isPublic = false;
+                await this.setPrivate(true);
+                await this.disconnect();
+                return;
+            }
             this.reassignHostIfNeeded();
             void this.updateLobbyMetadata();
             return;
