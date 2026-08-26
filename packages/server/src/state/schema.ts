@@ -8,6 +8,7 @@ export class PlayerSchema extends Schema {
   @type("string") id: string = "";
   @type("string") name: string = "";
   @type("number") score: number = 0;
+  @type("number") lifetimePoints: number = 0;
   @type("number") streak: number = 0;
   @type("boolean") connected: boolean = true;
   @type("boolean") ready: boolean = false;

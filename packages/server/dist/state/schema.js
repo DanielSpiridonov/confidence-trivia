@@ -20,6 +20,7 @@ class PlayerSchema extends schema_1.Schema {
         this.id = "";
         this.name = "";
         this.score = 0;
+        this.lifetimePoints = 0;
         this.streak = 0;
         this.connected = true;
         this.ready = false;
@@ -40,6 +41,10 @@ __decorate([
     (0, schema_1.type)("number"),
     __metadata("design:type", Number)
 ], PlayerSchema.prototype, "score", void 0);
+__decorate([
+    (0, schema_1.type)("number"),
+    __metadata("design:type", Number)
+], PlayerSchema.prototype, "lifetimePoints", void 0);
 __decorate([
     (0, schema_1.type)("number"),
     __metadata("design:type", Number)

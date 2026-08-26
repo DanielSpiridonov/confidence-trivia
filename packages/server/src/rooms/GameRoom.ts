@@ -1,4 +1,5 @@
 import { Room, Client, matchMaker } from "colyseus";
+import { randomUUID } from "crypto";
 import {
   PHASE_DURATIONS_MS,
   QUESTION_ALL_ANSWERED_COUNTDOWN_MS,
@@ -24,7 +25,7 @@ import {
   RevealEntrySchema,
 } from "../state/schema";
 import { getLocalizedCorrectAnswer, getQuestionSet, localize, localizeAnswer, localizeAnswerItems } from "../content/questions";
-import { upsertPlayer } from "../database";
+import { saveCompletedMatch, upsertPlayer } from "../database";
 
 interface JoinOptions {
   deviceId?: string;
@@ -77,6 +78,9 @@ export class GameRoom extends Room<RoomStateSchema> {
   // Stable installation identifiers stay server-only. Connection-scoped
   // session IDs remain the room keys and public gameplay identifiers.
   private deviceIds = new Map<string, string>();
+  private readonly matchId = randomUUID();
+  private gameStartedAt = new Date();
+  private resultsPersisted = false;
 
   async onCreate(options: CreateOptions = {}) {
     if (options.gameMode === "friends") {
@@ -130,7 +134,11 @@ export class GameRoom extends Room<RoomStateSchema> {
     player.id = client.sessionId;
     player.name = isValidPlayerName(options.name) ? options.name.trim() : "Player";
     this.deviceIds.set(client.sessionId, options.deviceId ?? "");
-    void upsertPlayer(options.deviceId ?? "", player.name);
+    const deviceId = options.deviceId ?? "";
+    void upsertPlayer(deviceId, player.name).then((lifetimePoints) => {
+      const joinedPlayer = this.state.players.get(client.sessionId);
+      if (joinedPlayer && lifetimePoints !== null) joinedPlayer.lifetimePoints = lifetimePoints;
+    });
     player.isHost = this.state.players.size === 0;
     if (player.isHost) this.state.hostId = player.id;
     this.state.players.set(client.sessionId, player);
@@ -211,6 +219,7 @@ export class GameRoom extends Room<RoomStateSchema> {
     if (this.state.gameStarted) return;
     if (this.state.players.size < MIN_PLAYERS_TO_START) return;
     this.state.gameStarted = true;
+    this.gameStartedAt = new Date();
     this.isPublic = false;
     this.state.isPublic = false;
     void this.setPrivate(true);
@@ -525,5 +534,44 @@ export class GameRoom extends Room<RoomStateSchema> {
     this.state.phase = "final_results";
     this.state.gameEnded = true;
     if (this.phaseTimeout) clearTimeout(this.phaseTimeout);
+    void this.persistFinalResults();
+  }
+
+  private async persistFinalResults() {
+    if (this.resultsPersisted) return;
+    this.resultsPersisted = true;
+
+    const rankedPlayers = [...this.state.players.values()]
+      .sort((left, right) => right.score - left.score);
+    const completedPlayers = rankedPlayers.flatMap((player, index) => {
+      const deviceId = this.deviceIds.get(player.id);
+      if (!deviceId) return [];
+      const priorPlayer = rankedPlayers[index - 1];
+      const finalRank = priorPlayer && priorPlayer.score === player.score
+        ? rankedPlayers.findIndex((candidate) => candidate.score === player.score) + 1
+        : index + 1;
+      return [{
+        deviceId,
+        displayName: player.name,
+        finalScore: player.score,
+        finalRank,
+      }];
+    });
+
+    const lifetimePoints = await saveCompletedMatch({
+      id: this.matchId,
+      roomCode: this.state.code,
+      gameMode: this.state.gameMode,
+      locale: this.locale,
+      roundCount: this.state.totalRounds,
+      startedAt: this.gameStartedAt,
+      players: completedPlayers,
+    });
+
+    for (const player of this.state.players.values()) {
+      const deviceId = this.deviceIds.get(player.id);
+      const updatedPoints = deviceId ? lifetimePoints.get(deviceId) : undefined;
+      if (updatedPoints !== undefined) player.lifetimePoints = updatedPoints;
+    }
   }
 }

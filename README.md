@@ -107,7 +107,8 @@ The server can persist each installation's device ID and latest player name in
 Supabase PostgreSQL. Active games and scores remain in Colyseus memory.
 
 1. Create a Supabase project in a region close to the Render service.
-2. Run `supabase/migrations/001_create_players.sql` in the Supabase SQL Editor.
+2. Run the SQL files in `supabase/migrations` in filename order in the
+   Supabase SQL Editor. Already-applied migrations do not need to be rerun.
 3. In the Supabase project's **Connect** panel, copy the **Session pooler** URI
    and replace its password placeholder with the database password.
 4. In Render, add that complete URI as the secret environment variable
