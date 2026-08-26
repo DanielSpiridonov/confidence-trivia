@@ -101,6 +101,7 @@
   "final": {
     "title": "Финални резултати",
     "winner": "Победител",
+    "lifetimePoints": "{{count}} общо т.",
     "backToHome": "Обратно към началото"
   },
   "settings": {

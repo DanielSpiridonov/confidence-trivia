@@ -7,9 +7,17 @@ function generateDeviceId(): string {
   const bytes = new Uint8Array(16);
   const cryptoApi = globalThis.crypto;
 
+  let generatedSecurely = false;
   if (cryptoApi?.getRandomValues) {
-    cryptoApi.getRandomValues(bytes);
-  } else {
+    try {
+      cryptoApi.getRandomValues(bytes);
+      generatedSecurely = true;
+    } catch {
+      // Some React Native runtimes expose crypto without implementing it.
+    }
+  }
+
+  if (!generatedSecurely) {
     for (let index = 0; index < bytes.length; index += 1) {
       bytes[index] = Math.floor(Math.random() * 256);
     }

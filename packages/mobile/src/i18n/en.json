@@ -101,6 +101,7 @@
   "final": {
     "title": "Final Results",
     "winner": "Winner",
+    "lifetimePoints": "{{count}} lifetime pts",
     "backToHome": "Back to Home"
   },
   "settings": {

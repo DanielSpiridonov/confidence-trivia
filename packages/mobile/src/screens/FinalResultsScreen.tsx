@@ -14,6 +14,7 @@ export function FinalResultsScreen({ room, onExit }: { room: Room; onExit: () =>
     id: p.id,
     name: p.name,
     score: p.score,
+    lifetimePoints: p.lifetimePoints,
     streak: p.streak,
   })).sort((a, b) => b.score - a.score);
   const winner = players[0];
@@ -37,7 +38,10 @@ export function FinalResultsScreen({ room, onExit }: { room: Room; onExit: () =>
               <Text style={styles.name}>{item.name}{item.id === room.sessionId ? " (You)" : ""}</Text>
               {item.streak > 0 ? <Text style={styles.streak}>🔥 {item.streak}</Text> : null}
             </View>
-            <Text style={styles.score}>{item.score}</Text>
+            <View style={styles.pointsBlock}>
+              <Text style={styles.score}>{item.score}</Text>
+              <Text style={styles.lifetimePoints}>{t("final.lifetimePoints", { count: item.lifetimePoints })}</Text>
+            </View>
           </View>
         )}
       />
@@ -103,5 +107,13 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     minWidth: 48,
     textAlign: "right",
+  },
+  pointsBlock: {
+    alignItems: "flex-end",
+  },
+  lifetimePoints: {
+    color: theme.textDim,
+    fontSize: 11,
+    fontWeight: "600",
   },
 });

@@ -89,8 +89,6 @@ export default function App() {
           AsyncStorage.getItem(HAPTICS_STORAGE_KEY),
           AsyncStorage.getItem(HIGH_CONTRAST_STORAGE_KEY),
           getOrCreateDeviceId(),
-          prepareSoundEffects(),
-          prepareMusic(),
         ]);
         if (!cancelled) {
           setDefaultPlayerName(savedPlayerName ?? "");
@@ -117,6 +115,9 @@ export default function App() {
       } finally {
         if (!cancelled) setLocaleReady(true);
       }
+
+      // Audio is optional and must not block preferences or player identity.
+      await Promise.allSettled([prepareSoundEffects(), prepareMusic()]);
     }
 
     void loadLocale();
@@ -125,8 +126,15 @@ export default function App() {
     };
   }, []);
 
+  async function requireDeviceId(): Promise<string> {
+    if (deviceId) return deviceId;
+    const storedDeviceId = await getOrCreateDeviceId();
+    setDeviceId(storedDeviceId);
+    return storedDeviceId;
+  }
+
   async function handleCreate(name: string, rounds: number, gameMode: "classic" | "friends", visibility: "private" | "public") {
-    if (!deviceId) throw new Error("Player identity is still loading. Please try again.");
+    const currentDeviceId = await requireDeviceId();
     let recentQuestionIds: string[] = [];
     try {
       const saved = await AsyncStorage.getItem(RECENT_QUESTIONS_STORAGE_KEY);
@@ -135,7 +143,7 @@ export default function App() {
     } catch {
       // A corrupt local history should never prevent room creation.
     }
-    const r = await createRoom(deviceId, name, rounds, locale, gameMode, recentQuestionIds, visibility);
+    const r = await createRoom(currentDeviceId, name, rounds, locale, gameMode, recentQuestionIds, visibility);
     reconnectionTokenRef.current = r.reconnectionToken;
     setRoom(r);
     setRoomRecovery(null);
@@ -144,8 +152,8 @@ export default function App() {
   }
 
   async function handleJoin(code: string, name: string) {
-    if (!deviceId) throw new Error("Player identity is still loading. Please try again.");
-    const r = await joinRoom(code, deviceId, name);
+    const currentDeviceId = await requireDeviceId();
+    const r = await joinRoom(code, currentDeviceId, name);
     reconnectionTokenRef.current = r.reconnectionToken;
     setRoom(r);
     setRoomRecovery(null);
@@ -154,8 +162,8 @@ export default function App() {
   }
 
   async function handleJoinPublic(roomId: string, name: string) {
-    if (!deviceId) throw new Error("Player identity is still loading. Please try again.");
-    const r = await joinPublicRoom(roomId, deviceId, name);
+    const currentDeviceId = await requireDeviceId();
+    const r = await joinPublicRoom(roomId, currentDeviceId, name);
     reconnectionTokenRef.current = r.reconnectionToken;
     setRoom(r);
     setRoomRecovery(null);
