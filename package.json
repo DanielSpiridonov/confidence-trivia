@@ -10,6 +10,7 @@
     "predev:server": "npm run build:shared",
     "dev:server": "npm run dev --workspace=packages/server",
     "dev:mobile": "npm run start --workspace=packages/mobile",
+    "dev:mobile:tunnel": "npm run start:tunnel --workspace=packages/mobile",
     "build:shared": "npm run build --workspace=packages/shared"
   },
   "dependencies": {

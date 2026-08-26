@@ -1,2 +1,6 @@
 node_modules
 ./node_modules
+
+# Local Expo environment overrides. Keep shared defaults in .env.example.
+packages/mobile/.env.local
+packages/mobile/.env.*.local

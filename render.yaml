@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: confidence-trivia-test
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile.server
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production

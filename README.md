@@ -67,3 +67,36 @@ public `wss://` URL and use that URL instead.
 
 This setup is for development only. For real distribution, build the iOS app
 with EAS/TestFlight and keep only the backend Docker image hosted.
+
+## Shared test server with Expo Go
+
+Use the Render Blueprint in `render.yaml` when testers are not on the same
+network. In Render, create a new Blueprint, connect this repository, and deploy
+the `confidence-trivia-test` web service. Render builds `Dockerfile.server`,
+checks `/health`, and provides an HTTPS/WSS URL.
+
+Copy `packages/mobile/.env.example` to `packages/mobile/.env.local` and set the
+deployed URL using `wss://`:
+
+```dotenv
+EXPO_PUBLIC_SERVER_URL=wss://confidence-trivia-test.onrender.com
+```
+
+Restart Expo after changing an `EXPO_PUBLIC_` variable. For testers outside
+your local network, start Expo in tunnel mode and share its QR code:
+
+```bash
+npm run dev:mobile:tunnel
+```
+
+The `.env.local` file is ignored by Git, so each developer can switch between
+a LAN server and the shared server without changing committed configuration.
+
+The free Render instance is suitable for testing but can take roughly a minute
+to wake after being idle. Open `https://confidence-trivia-test.onrender.com/health`
+before a test session to wake it and confirm that it returns `{ "ok": true }`.
+
+The game server currently stores active rooms in memory. Keep the test service
+at one instance, and avoid deploying during a game because a restart ends all
+active rooms. This constraint can be addressed with shared state and presence
+when production scaling is needed.
