@@ -5,6 +5,7 @@ const colyseus_1 = require("colyseus");
 const shared_1 = require("@confidence-trivia/shared");
 const schema_1 = require("../state/schema");
 const questions_1 = require("../content/questions");
+const database_1 = require("../database");
 const PLAYER_NAME_PATTERN = /^[\p{L}\p{N} ]+$/u;
 const DEVICE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 function isValidPlayerName(name) {
@@ -89,6 +90,7 @@ class GameRoom extends colyseus_1.Room {
         player.id = client.sessionId;
         player.name = isValidPlayerName(options.name) ? options.name.trim() : "Player";
         this.deviceIds.set(client.sessionId, options.deviceId ?? "");
+        void (0, database_1.upsertPlayer)(options.deviceId ?? "", player.name);
         player.isHost = this.state.players.size === 0;
         if (player.isHost)
             this.state.hostId = player.id;

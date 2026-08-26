@@ -100,3 +100,22 @@ The game server currently stores active rooms in memory. Keep the test service
 at one instance, and avoid deploying during a game because a restart ends all
 active rooms. This constraint can be addressed with shared state and presence
 when production scaling is needed.
+
+## Supabase player persistence
+
+The server can persist each installation's device ID and latest player name in
+Supabase PostgreSQL. Active games and scores remain in Colyseus memory.
+
+1. Create a Supabase project in a region close to the Render service.
+2. Run `supabase/migrations/001_create_players.sql` in the Supabase SQL Editor.
+3. In the Supabase project's **Connect** panel, copy the **Session pooler** URI
+   and replace its password placeholder with the database password.
+4. In Render, add that complete URI as the secret environment variable
+   `DATABASE_URL`, then redeploy the service.
+
+Render is IPv4-only, so use the Session pooler URI rather than Supabase's
+IPv6-only direct connection. Never put `DATABASE_URL` or a database password in
+an `EXPO_PUBLIC_` variable or commit it to Git.
+
+The database integration is optional locally. Without `DATABASE_URL`, the
+server runs normally but skips player persistence.

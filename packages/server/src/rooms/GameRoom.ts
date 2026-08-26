@@ -24,6 +24,7 @@ import {
   RevealEntrySchema,
 } from "../state/schema";
 import { getLocalizedCorrectAnswer, getQuestionSet, localize, localizeAnswer, localizeAnswerItems } from "../content/questions";
+import { upsertPlayer } from "../database";
 
 interface JoinOptions {
   deviceId?: string;
@@ -129,6 +130,7 @@ export class GameRoom extends Room<RoomStateSchema> {
     player.id = client.sessionId;
     player.name = isValidPlayerName(options.name) ? options.name.trim() : "Player";
     this.deviceIds.set(client.sessionId, options.deviceId ?? "");
+    void upsertPlayer(options.deviceId ?? "", player.name);
     player.isHost = this.state.players.size === 0;
     if (player.isHost) this.state.hostId = player.id;
     this.state.players.set(client.sessionId, player);
