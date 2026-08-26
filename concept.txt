@@ -1,0 +1,1682 @@
+# PROJECT: Multiplayer Mobile Party Game — Confidence Trivia
+
+## 1. ROLE
+
+You are an expert full-stack mobile game developer, multiplayer/backend engineer, UI/UX designer, and product architect.
+
+Your job is to help me build a **real, playable mobile multiplayer game** based on the specification below.
+
+Do not redesign the core game concept unless I explicitly ask you to.
+
+You may make sensible technical and UX decisions where the specification leaves room for them, but preserve the gameplay rules, scoring philosophy, and multiplayer flow described here.
+
+The goal is to build a polished **mobile-first multiplayer game for friend groups**, initially targeting approximately 4–12+ simultaneous players.
+
+The game should eventually be capable of expanding to PC/web, but **do not build the PC/web client yet**. However, choose a backend/game-state architecture that will make adding a web client later straightforward.
+
+---
+
+# 2. GAME CONCEPT
+
+The core idea is:
+
+> **Knowing the answer is only half the game. Knowing how confident you should be is the other half.**
+
+Players answer questions simultaneously.
+
+After answering, they can optionally commit a confidence level.
+
+Confidence increases the reward for being correct, but also increases the penalty for being wrong.
+
+Players then briefly see **everyone else's confidence levels**, without seeing their answers.
+
+Each player can make **one optional side bet** on another player's answer.
+
+The correct answer is revealed.
+
+Scores, confidence results, side bets, and streaks are processed.
+
+Then the next round begins.
+
+The game should feel:
+
+* Fast
+* Competitive
+* Social
+* Easy to understand
+* Slightly chaotic
+* Strategic without being complicated
+* Fun with both knowledgeable and average players
+* Particularly fun with a recurring friend group
+
+The game should NOT feel like a slow traditional board game where players take individual turns.
+
+Almost all actions should happen simultaneously.
+
+---
+
+# 3. TARGET PLATFORM
+
+## Version 1
+
+Build for:
+
+* Mobile phones
+* Preferably cross-platform iOS + Android
+* Portrait-oriented UI unless there is a compelling reason otherwise
+* Touch-first controls
+
+The game is primarily an online multiplayer game.
+
+Players should be able to join the same room/game session using a simple room code.
+
+Example:
+
+> ROOM CODE: K7X92
+
+Each player uses their own phone.
+
+There should NOT be a requirement for one person to act as a permanent "game master" using their phone.
+
+The server/backend should control the authoritative game state.
+
+---
+
+# 4. FUTURE PLATFORM
+
+Do not implement the PC/web version yet.
+
+However, design the backend and game logic so that eventually:
+
+* Mobile clients
+* PC/web clients
+
+can connect to the same multiplayer game.
+
+Avoid unnecessarily coupling the core game logic to mobile-only UI code.
+
+Keep game state, scoring, round logic, player state, question data, and room state cleanly separated from the presentation layer.
+
+---
+
+# 5. PLAYER COUNT
+
+Target:
+
+* Minimum: approximately 4 players
+* Ideal: 5–10 players
+* Support: 10+ players if technically practical
+
+The game should remain fast with 10 players.
+
+Do NOT implement sequential player turns for the core gameplay.
+
+---
+
+# 6. GAME LENGTH
+
+Default game:
+
+## 10 rounds
+
+Target:
+
+## Approximately 1 minute per round
+
+Target total:
+
+## Approximately 10 minutes per game
+
+The game may eventually support:
+
+* Quick game
+* Standard game
+* Long game
+
+But the first implementation should focus on:
+
+## Standard = 10 rounds
+
+The exact duration can be adjusted after playtesting.
+
+The game should prioritize fast transitions and minimal waiting.
+
+---
+
+# 7. CORE ROUND LOOP
+
+Every normal round follows this structure:
+
+### STEP 1 — QUESTION
+
+All players receive the same question.
+
+Example:
+
+> Which planet is closest to the Sun?
+
+Players answer privately.
+
+Depending on the question type, the answer may be:
+
+* Multiple choice
+* Text input
+* Number
+* Ordering
+* True/false
+* Word/letter input
+* Image-based selection
+* Other supported question formats
+
+---
+
+### STEP 2 — OPTIONAL CONFIDENCE
+
+After answering, players can optionally choose a confidence level.
+
+Available confidence values:
+
+> **1 / 3 / 5 / 6**
+
+There is also:
+
+> **NO CONFIDENCE**
+
+Confidence is optional.
+
+A player who does not want to risk points can skip confidence entirely.
+
+IMPORTANT:
+
+Do not automatically assign confidence 1.
+
+"No confidence" and "confidence 1" are separate choices.
+
+The UI should make this distinction very clear.
+
+---
+
+# 8. CONFIDENCE SCORING
+
+Use the following initial scoring system:
+
+| Confidence    | Correct | Wrong |
+| ------------- | ------: | ----: |
+| No confidence |      +1 |    +0 |
+| 1             |      +1 |    -1 |
+| 3             |      +2 |    -2 |
+| 5             |      +3 |    -4 |
+| 6             |      +4 |    -5 |
+
+This is the initial balancing configuration.
+
+Do not arbitrarily change these values.
+
+However, structure the code so these values are configurable later for balancing and playtesting.
+
+For example, they should come from a central configuration rather than being scattered throughout the codebase.
+
+---
+
+# 9. INTERPRETATION OF CONFIDENCE
+
+Confidence represents:
+
+> "How strongly am I willing to stand behind my answer?"
+
+It is not merely a bonus multiplier.
+
+Players should feel that choosing 6 is a genuine gamble.
+
+Examples:
+
+### No confidence
+
+Correct:
+
+> +1
+
+Wrong:
+
+> +0
+
+Meaning:
+
+> "I don't want to risk anything."
+
+### Confidence 1
+
+Correct:
+
+> +1
+
+Wrong:
+
+> -1
+
+Small risk.
+
+### Confidence 3
+
+Correct:
+
+> +2
+
+Wrong:
+
+> -2
+
+Moderate commitment.
+
+### Confidence 5
+
+Correct:
+
+> +3
+
+Wrong:
+
+> -4
+
+Serious commitment.
+
+### Confidence 6
+
+Correct:
+
+> +4
+
+Wrong:
+
+> -5
+
+Maximum confidence / maximum gamble.
+
+---
+
+# 10. BASE SCORING
+
+For the initial game:
+
+A normal correct answer with no confidence:
+
+> +1
+
+A wrong answer with no confidence:
+
+> +0
+
+Confidence modifies this according to the table above.
+
+Some special question types may have a different base value, such as +2 for particularly difficult or special questions.
+
+Do not introduce complicated scoring multipliers unless explicitly requested.
+
+The scoring system should remain easy for players to understand.
+
+---
+
+# 11. CONFIDENCE BOARD
+
+Once all players have locked their answers and confidence decisions, display a short social interaction screen.
+
+Show:
+
+* Player names
+* Player avatars if available
+* Their confidence values
+* Confidence visual indicator
+
+DO NOT show their answers yet.
+
+Example:
+
+> ### CONFIDENCE
+>
+> Alex — 6
+> Sarah — 3
+> John — 5
+> Maria — No confidence
+> Mike — 6
+
+This screen should be quick.
+
+It is NOT a separate long gameplay phase.
+
+Avoid unnecessary animations or waiting.
+
+The purpose is to let players think:
+
+> "Why did John choose 5?"
+
+> "Sarah only chose 3?"
+
+> "Mike chose 6 again?"
+
+This is an important social/psychological component of the game.
+
+---
+
+# 12. SIDE BETTING
+
+Each player may make:
+
+## ONE optional side bet per round.
+
+The player can select another player from the confidence board.
+
+They then choose:
+
+> **CORRECT**
+
+or
+
+> **WRONG**
+
+The side bet always has a value of:
+
+> **+1 / -1**
+
+Example:
+
+Player selects:
+
+> John — Confidence 5
+
+Then chooses:
+
+> WRONG
+
+If John is wrong:
+
+> Side bettor gets +1
+
+If John is correct:
+
+> Side bettor gets -1
+
+If the player predicts CORRECT:
+
+John correct:
+
+> +1
+
+John wrong:
+
+> -1
+
+---
+
+# 13. SIDE BET RULES
+
+Important:
+
+* Side betting is optional.
+* Maximum one side bet per player per round.
+* A player cannot side bet themselves.
+* A player may skip the side bet.
+* Side bets should be extremely fast.
+* Do NOT create a separate "challenge phase".
+* Do NOT make players wait through sequential turns.
+* Do NOT require confirmation screens unless necessary to prevent accidental taps.
+
+The side bet should feel like:
+
+> "I think you're bluffing."
+
+rather than a complicated secondary game.
+
+---
+
+# 14. WHY SIDE BETTING EXISTS
+
+Side betting serves two purposes:
+
+### Strategic purpose
+
+It provides a small additional way to gain or lose points.
+
+### Social purpose
+
+It forces players to pay attention to the other players.
+
+The game should encourage players to develop opinions such as:
+
+> "John always overestimates his confidence."
+
+> "Sarah only chooses 6 when she actually knows."
+
+> "Mike is bluffing again."
+
+This should emerge naturally from repeated games.
+
+---
+
+# 15. CONFIDENCE STREAKS
+
+Add a lightweight streak system.
+
+A confidence streak is created when a player:
+
+> Chooses confidence 5 or 6 AND answers correctly.
+
+Examples:
+
+5 → Correct:
+
+> 🔥 Streak 1
+
+6 → Correct:
+
+> 🔥 Streak 2
+
+3 → Correct:
+
+> Streak remains 2
+
+6 → Wrong:
+
+> Streak resets
+
+No-confidence answers do not increase the streak.
+
+Confidence 1 does not increase the streak.
+
+Only successful high-confidence answers count.
+
+---
+
+# 16. STREAK DESIGN
+
+The streak system should NOT become a huge secondary scoring system.
+
+Its purpose is:
+
+* Excitement
+* Risk/reward
+* Recognition
+* Small bonuses
+* Encouraging confident play
+
+Initial concept:
+
+### Streak 2
+
+Next successful high-confidence answer can receive:
+
+> +1 streak bonus
+
+### Streak 3
+
+Potentially unlock a small defensive benefit such as:
+
+> Reduce the next confidence penalty by 1.
+
+Higher streaks can primarily be cosmetic/status-based initially.
+
+IMPORTANT:
+
+Keep the streak implementation configurable.
+
+We should be able to disable/change streak rewards during playtesting without rewriting the game.
+
+If playtesting shows the streak rewards make the game too snowbally, reduce or remove the mechanical rewards while keeping the visual streak.
+
+---
+
+# 17. NO TARGET SCORE
+
+There is NO target score.
+
+Do not implement:
+
+> First player to 50 wins.
+
+Instead:
+
+The game ends after the predetermined number of rounds.
+
+Default:
+
+> 10 rounds
+
+The player with the highest score at the end wins.
+
+---
+
+# 18. COMEBACK PHILOSOPHY
+
+Do not artificially rubber-band the game.
+
+If someone is bad:
+
+> They can lose.
+
+If someone is extremely good:
+
+> They can perform well.
+
+However, because confidence is optional and high-confidence plays can produce large swings, a player who is behind can still recover.
+
+For example:
+
+A player who successfully gets multiple confidence-5/6 answers can rapidly change the leaderboard.
+
+This is intentional.
+
+Do not introduce:
+
+* Automatic catch-up bonuses
+* Losing-player multipliers
+* Forced handicaps
+* Artificial score equalization
+
+unless later playtesting demonstrates a serious balance problem.
+
+---
+
+# 19. KNOWLEDGE VS CONFIDENCE
+
+The game should reward two different skills:
+
+### Knowledge
+
+Knowing the correct answer.
+
+### Risk assessment
+
+Knowing when to trust yourself.
+
+A player who is extremely knowledgeable but always chooses no confidence should still score well, but should leave potential points on the table.
+
+A less knowledgeable player who correctly recognizes when they know an answer can compete.
+
+This is intentional.
+
+The game is not simply:
+
+> "Who knows the most trivia?"
+
+It is:
+
+> "Who plays the best?"
+
+---
+
+# 20. QUESTION TYPES
+
+The core gameplay should remain consistent while question formats change.
+
+Initial question types should include:
+
+### Multiple choice
+
+Example:
+
+> Which planet is closest to the Sun?
+
+### True / False
+
+Example:
+
+> Bananas are technically berries.
+
+### Numeric estimation
+
+Example:
+
+> How many bones are in the adult human body?
+
+Players enter a number.
+
+### Closest answer
+
+Players submit a number and the closest answer wins.
+
+### Ordering
+
+Example:
+
+> Put these countries in order of population.
+
+### Word / letter questions
+
+Example:
+
+> Complete the word:
+>
+> _ A _ _ E T
+
+### Visual questions
+
+Example:
+
+> Identify this landmark.
+
+### General trivia
+
+History, science, geography, sports, movies, music, technology, food, animals, etc.
+
+More question types can be added later.
+
+---
+
+# 21. QUESTION DESIGN PHILOSOPHY
+
+Do not make every round complicated.
+
+Approximately:
+
+> 60–70% straightforward questions
+
+and:
+
+> 30–40% alternative formats/special rounds
+
+The game should feel like the same game throughout.
+
+The variety should come from the content, not from constantly changing the rules.
+
+---
+
+# 22. ROUND VARIETY
+
+A 10-round game should ideally contain a mixture of question types.
+
+Example:
+
+Round 1:
+Trivia
+
+Round 2:
+Estimation
+
+Round 3:
+True/False
+
+Round 4:
+Multiple choice
+
+Round 5:
+Closest answer
+
+Round 6:
+Ordering
+
+Round 7:
+Word
+
+Round 8:
+Visual
+
+Round 9:
+Special question
+
+Round 10:
+Final question
+
+Do not make the final round unnecessarily complicated.
+
+The leaderboard itself creates enough tension.
+
+---
+
+# 23. FINAL ROUND
+
+The final round should be psychologically important but mechanically simple.
+
+Show the leaderboard before the final question.
+
+Example:
+
+> ### FINAL QUESTION
+>
+> Alex — 24
+>
+> Sarah — 23
+>
+> John — 21
+>
+> Maria — 19
+
+Then provide the final question normally.
+
+Confidence still uses:
+
+> No confidence / 1 / 3 / 5 / 6
+
+Do not automatically double all points or create an extremely powerful final-round mechanic.
+
+The goal is to allow a comeback without making the previous nine rounds irrelevant.
+
+---
+
+# 24. GAME MODES
+
+## MODE 1 — CLASSIC
+
+This is the primary mode and should be built first.
+
+It works with any group.
+
+Players do not need to know one another.
+
+Question categories include:
+
+* General knowledge
+* History
+* Geography
+* Science
+* Sports
+* Movies
+* Music
+* Pop culture
+* Food
+* Animals
+* Technology
+* Logic
+* Words
+* Estimation
+* Visual questions
+
+---
+
+# 25. MODE 2 — FRIENDS
+
+This should be planned architecturally but can be implemented after the Classic mode is playable.
+
+Friends Mode uses the same core gameplay system but introduces questions about the people in the room.
+
+Examples:
+
+> Who would survive longest in a zombie apocalypse?
+
+> Who would spend €500 on something completely useless?
+
+> Who would be most likely to become famous?
+
+This mode is specifically for groups who know each other.
+
+Do not let Friends Mode complicate the Classic Mode.
+
+---
+
+# 26. MULTILINGUAL SUPPORT
+
+This is an important requirement.
+
+The game must support multiple languages from the beginning.
+
+Initial languages:
+
+## English
+
+## Bulgarian
+
+Do NOT hardcode user-facing text directly into UI components.
+
+Use a localization/i18n system.
+
+All of the following should be localizable:
+
+* Buttons
+* Menus
+* Error messages
+* System messages
+* Round labels
+* Confidence labels
+* Score labels
+* Side-bet labels
+* Streak labels
+* Lobby text
+* Player status text
+* Settings
+* Tutorial/onboarding
+* Game results
+* Question categories
+* Question content
+* Answer options
+* Explanations
+
+The architecture should make adding a third language later straightforward.
+
+For example:
+
+English:
+
+> "How confident are you?"
+
+Bulgarian:
+
+> "Колко си уверен?"
+
+The game should allow the player to choose their language.
+
+Ideally, language selection should be available from the initial onboarding/settings.
+
+---
+
+# 27. LANGUAGE CONSIDERATIONS FOR QUESTIONS
+
+Question content needs special consideration.
+
+Do not simply machine-translate every question at runtime.
+
+Questions should have language-specific content.
+
+For example, a question should have:
+
+* Question ID
+* Category
+* Difficulty
+* Question type
+* English version
+* Bulgarian version
+* English answers/options
+* Bulgarian answers/options
+* Correct answer
+* Explanation in English
+* Explanation in Bulgarian
+
+The backend should know which localized version to send to each player.
+
+For the initial implementation, assume everyone in a room uses the same language if that simplifies synchronization.
+
+However, structure the system so mixed-language rooms could theoretically be supported later.
+
+---
+
+# 28. LANGUAGE SETTINGS
+
+Add a language setting:
+
+> English
+>
+> Български
+
+The selected language should persist locally.
+
+The default can be determined from the device/system language, but the player must be able to manually change it.
+
+Changing language should not affect game state.
+
+---
+
+# 29. MULTIPLAYER ARCHITECTURE
+
+The server should be authoritative.
+
+The client should NOT be trusted to determine:
+
+* Correct answers
+* Scores
+* Confidence results
+* Side-bet results
+* Streaks
+* Round transitions
+* Winner
+* Timer completion
+* Player readiness
+
+The server should validate all gameplay actions.
+
+Clients should primarily:
+
+* Display state
+* Send player actions
+* Animate transitions
+* Handle input
+
+---
+
+# 30. ROOM SYSTEM
+
+Players should be able to:
+
+1. Create a room
+2. Receive a short room code
+3. Share the code
+4. Other players enter the code
+5. Players appear in the lobby
+6. Host starts the game
+7. Everyone receives the game simultaneously
+
+Room state should include:
+
+* Room ID
+* Room code
+* Host
+* Players
+* Player readiness
+* Selected game mode
+* Selected language
+* Current round
+* Current question
+* Round state
+* Scores
+* Confidence choices
+* Answers
+* Side bets
+* Streaks
+* Connection state
+
+---
+
+# 31. PLAYER CONNECTIONS
+
+Handle:
+
+* Player joining
+* Player leaving
+* Temporary disconnect
+* Reconnection
+* App backgrounding
+* Network interruptions
+* Host disconnecting
+* Player timing out
+
+Do not allow one disconnected player to permanently freeze the entire game.
+
+The game should continue according to a sensible timeout policy.
+
+For example:
+
+If a player does not answer before the timer expires:
+
+> Treat as no answer / no confidence.
+
+Do not invent complicated behavior unless necessary.
+
+---
+
+# 32. SYNCHRONIZATION
+
+All players should see the same:
+
+* Question
+* Timer
+* Round
+* Reveal
+* Correct answer
+* Leaderboard
+
+Use server-authoritative timing.
+
+Avoid relying exclusively on each phone's local clock.
+
+The client can interpolate/display the timer, but the server determines when the round actually ends.
+
+---
+
+# 33. TIMING
+
+A normal round should aim for approximately:
+
+### Question / answering:
+
+20–30 seconds
+
+### Confidence:
+
+5–10 seconds
+
+### Confidence board / side bet:
+
+5–10 seconds
+
+### Reveal / scoring:
+
+5–10 seconds
+
+Then automatically proceed to the next round.
+
+The exact timings should be configurable.
+
+Do not create long forced waiting periods.
+
+---
+
+# 34. MOBILE UX
+
+The interface should be:
+
+* Clean
+* Large touch targets
+* Easy to read
+* Fast
+* Responsive
+* Minimal text where possible
+* Designed for one-handed phone use where practical
+
+Avoid clutter.
+
+The most important information should always be obvious:
+
+1. Current question
+2. Timer
+3. Answer
+4. Confidence
+5. Score
+6. Other players
+7. Round number
+
+---
+
+# 35. CORE SCREENS
+
+Build at least the following screens:
+
+## Home
+
+Options:
+
+* Create Game
+* Join Game
+* Settings
+
+---
+
+## Create Game
+
+Options such as:
+
+* Classic
+* Friends (if implemented)
+* Number of rounds
+* Possibly question categories later
+
+Generate room code.
+
+---
+
+## Join Game
+
+Enter:
+
+> Room Code
+
+Then join lobby.
+
+---
+
+## Lobby
+
+Show:
+
+* Room code
+* Players
+* Player count
+* Host
+* Ready status
+* Start button for host
+
+---
+
+## Question Screen
+
+Show:
+
+* Round number
+* Timer
+* Question
+* Answer controls
+
+---
+
+## Confidence Screen
+
+Show:
+
+> No confidence
+>
+> 1
+>
+> 3
+>
+> 5
+>
+> 6
+
+Display potential outcome clearly.
+
+---
+
+## Confidence Board / Side Bet
+
+Show:
+
+* Player names
+* Confidence levels
+* Optional streak indicators
+
+Allow:
+
+> Select player → Correct / Wrong
+
+And:
+
+> Skip
+
+---
+
+## Reveal Screen
+
+Show:
+
+* Correct answer
+* Each player's answer
+* Correct/wrong status
+* Confidence
+* Points gained/lost
+* Side-bet results
+* Streak changes
+
+Keep it quick and satisfying.
+
+---
+
+## Leaderboard
+
+Show:
+
+* Current ranking
+* Scores
+* Streaks
+* Round number
+
+The leaderboard should update after every round.
+
+---
+
+## Final Results
+
+Show:
+
+* Winner
+* Final rankings
+* Scores
+* Interesting stats
+
+Potential stats:
+
+* Highest confidence
+* Biggest successful gamble
+* Biggest failed gamble
+* Longest streak
+* Most side bets won
+
+---
+
+# 36. VISUAL STYLE
+
+Do not overcomplicate the visual design.
+
+Aim for:
+
+* Modern
+* Playful
+* Competitive
+* Slightly humorous
+* High readability
+* Strong visual feedback
+
+Avoid making it look like a corporate quiz application.
+
+It should feel like a **party game**.
+
+Use animations sparingly but effectively:
+
+* Confidence selection
+* Correct answer
+* Wrong answer
+* Score changes
+* Streak activation
+* Leaderboard movement
+
+---
+
+# 37. SCORE FEEDBACK
+
+When scores change, make the reason obvious.
+
+Example:
+
+> **+3**
+>
+> Correct + Confidence 5
+
+Or:
+
+> **-4**
+>
+> Wrong — Confidence 5
+
+Side bet:
+
+> **+1**
+>
+> John was wrong
+
+Streak:
+
+> 🔥 STREAK 3
+
+Players should never wonder why their score changed.
+
+---
+
+# 38. CONTENT SYSTEM
+
+Questions should be stored in a structured database/content system rather than hardcoded directly into game logic.
+
+Each question should have something conceptually similar to:
+
+* ID
+* Type
+* Category
+* Difficulty
+* Language
+* Question text
+* Answers/options
+* Correct answer
+* Explanation
+* Media asset if applicable
+* Tags
+* Enabled/disabled
+* Version
+
+The exact database schema can be determined by the chosen stack.
+
+---
+
+# 39. QUESTION RANDOMIZATION
+
+Avoid repeating the same question to players unnecessarily.
+
+Questions should be selected based on:
+
+* Game mode
+* Category
+* Difficulty
+* Question type
+* Language
+* Previously used questions
+
+The first version does not need an advanced recommendation algorithm.
+
+Simple randomization with duplicate prevention is enough.
+
+---
+
+# 40. QUESTION DIFFICULTY
+
+Questions should have difficulty metadata such as:
+
+* Easy
+* Medium
+* Hard
+
+Eventually the game can use this to create a balanced sequence.
+
+Do not make every question extremely difficult.
+
+The game is about confidence, so questions need enough uncertainty to make risk decisions interesting.
+
+---
+
+# 41. ANTI-CHEAT / FAIRNESS
+
+Because the game is competitive:
+
+The client should never receive the correct answer before the reveal.
+
+Do not send unnecessary hidden answer data to the client.
+
+The server should calculate scores.
+
+Players should not be able to modify:
+
+* Confidence
+* Answers
+* Scores
+* Side bets
+* Timer
+* Streaks
+
+through normal client requests.
+
+Use server-side validation.
+
+---
+
+# 42. DEVELOPMENT APPROACH
+
+Do NOT try to build every feature at once.
+
+Build in stages.
+
+## PHASE 1 — Playable multiplayer prototype
+
+Implement:
+
+* Create room
+* Join room
+* Lobby
+* 4+ players
+* One question type
+* Simultaneous answering
+* Confidence
+* Confidence board
+* Side bet
+* Reveal
+* Scoring
+* Leaderboard
+* 10-round game
+* Winner
+
+This should be playable end-to-end.
+
+---
+
+## PHASE 2 — Question variety
+
+Add:
+
+* Multiple choice
+* True/false
+* Estimation
+* Ordering
+* Word questions
+* Visual questions
+
+---
+
+## PHASE 3 — Streak system
+
+Implement and test:
+
+* High-confidence streaks
+* Streak visuals
+* Small streak rewards
+
+---
+
+## PHASE 4 — Localization
+
+Implement complete:
+
+* English
+* Bulgarian
+
+localization.
+
+Ensure the architecture supports additional languages.
+
+---
+
+## PHASE 5 — Polish
+
+Improve:
+
+* Animations
+* Sounds
+* Transitions
+* Feedback
+* Error handling
+* Reconnection
+* Loading states
+* Accessibility
+* Mobile responsiveness
+
+---
+
+## PHASE 6 — Friends Mode
+
+Only after Classic Mode is stable.
+
+---
+
+# 43. TECH STACK
+
+Choose a modern, maintainable technology stack appropriate for:
+
+* Cross-platform mobile development
+* Real-time multiplayer
+* Persistent game state
+* Authentication/anonymous accounts if needed
+* Database
+* Content management
+* Localization
+
+You may recommend the specific technologies.
+
+Prioritize:
+
+1. Fast development
+2. Low initial cost
+3. Easy deployment
+4. Good AI-assisted development support
+5. Reliable real-time multiplayer
+6. Maintainability
+7. Future web/PC expansion
+
+Do not over-engineer the infrastructure for millions of players on day one.
+
+The initial target is a small friend group and eventual gradual scaling.
+
+Before implementation, explain the proposed stack briefly and why it fits.
+
+---
+
+# 44. CODE QUALITY
+
+Keep the project:
+
+* Modular
+* Typed where practical
+* Easy to debug
+* Well organized
+* Configurable
+* Documented where useful
+
+Do not create giant files containing all game logic.
+
+Separate:
+
+* UI
+* Game state
+* Networking
+* Scoring
+* Question handling
+* Localization
+* Room/lobby logic
+* Configuration
+
+---
+
+# 45. CONFIGURATION
+
+Make these values configurable:
+
+* Number of rounds
+* Round timer
+* Confidence values
+* Confidence rewards
+* Confidence penalties
+* Base question rewards
+* Side bet reward/penalty
+* Streak requirements
+* Streak rewards
+* Player limits
+
+Do not hardcode these across multiple files.
+
+---
+
+# 46. IMPORTANT GAMEPLAY PRINCIPLES
+
+These are non-negotiable unless I explicitly change them:
+
+### Principle 1
+
+**Simultaneous gameplay.**
+
+Avoid sequential turns.
+
+### Principle 2
+
+**Confidence is optional.**
+
+Players can always choose no confidence.
+
+### Principle 3
+
+**Confidence is a risk/reward mechanic.**
+
+Higher confidence means greater potential reward and greater potential loss.
+
+### Principle 4
+
+**Answers remain hidden until reveal.**
+
+Other players only see confidence before the reveal.
+
+### Principle 5
+
+**Side bets are fast and optional.**
+
+One per player per round.
+
+### Principle 6
+
+**No target score.**
+
+Games end after the set number of rounds.
+
+### Principle 7
+
+**No artificial rubber-banding.**
+
+Good players can win. Bad players can lose.
+
+### Principle 8
+
+**Comebacks are created through risk.**
+
+A player behind can recover through successful high-confidence plays.
+
+### Principle 9
+
+**The game should be fast.**
+
+Target approximately one minute per round.
+
+### Principle 10
+
+**The game should be easy to understand.**
+
+Players should understand the core game after one round.
+
+---
+
+# 47. CURRENT SCORE SYSTEM — REFERENCE
+
+Treat this as the canonical initial scoring table:
+
+| Choice        | Correct | Wrong |
+| ------------- | ------: | ----: |
+| No confidence |      +1 |    +0 |
+| Confidence 1  |      +1 |    -1 |
+| Confidence 3  |      +2 |    -2 |
+| Confidence 5  |      +3 |    -4 |
+| Confidence 6  |      +4 |    -5 |
+| Side bet      |      +1 |    -1 |
+
+This table should be easy to modify later for balancing.
+
+---
+
+# 48. WHAT I WANT FROM YOU
+
+Start by proposing the technical architecture and stack.
+
+Then explain:
+
+1. Project structure
+2. Multiplayer architecture
+3. Database/content structure
+4. Localization approach
+5. Game-state model
+6. Scoring implementation
+7. Room/lobby system
+8. How the mobile client communicates with the backend
+9. How the future web client could reuse the backend
+10. Development milestones
+
+After that, begin implementing the project.
+
+Do not spend excessive time discussing theoretical possibilities.
+
+I want to get to a **working playable prototype quickly**.
+
+When making technical decisions, favor simple, robust solutions over unnecessary complexity.
+
+If something is not specified here, make a sensible engineering decision and clearly state it rather than repeatedly asking me for minor decisions.
+
+However, if a decision would materially change the gameplay concept, stop and ask me before implementing it.
+
+---
+
+# 49. IMPORTANT: DO NOT CHANGE THE GAME
+
+Do not turn this into:
+
+* A normal trivia game
+* Kahoot
+* A traditional betting game
+* A turn-based board game
+* A social deduction game
+* A complicated card game
+* A game with dozens of abilities
+* A game with excessive currencies
+* A game with a target score
+
+The simplicity of the core loop is intentional.
+
+The depth should come from:
+
+> **Questions + Confidence + Reading Players + Side Bets + Risk**
+
+not from adding dozens of mechanics.
+
+---
+
+# 50. LONG-TERM VISION
+
+The initial product is a mobile multiplayer party game.
+
+Eventually, it may become:
+
+* Mobile + PC/web cross-platform
+* Larger player counts
+* More languages
+* More question categories
+* More game modes
+* Friends Mode
+* User-created questions
+* Private rooms
+* Public matchmaking
+* Player statistics
+* Profiles
+* Seasonal content
+* Leaderboards
+
+But do NOT build all of this now.
+
+Build the **small, excellent core game first**.
+
+The immediate goal is:
+
+> **I can send the app to 5–10 friends, they join a room on their phones, play approximately 10 rounds in about 10 minutes, laugh at each other's confidence choices, side-bet on each other, and have a clear winner at the end.**
+
+That is the first milestone.

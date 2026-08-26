@@ -1,0 +1,153 @@
+{
+  "home": {
+    "title": "Confidence Trivia",
+    "tagline": "Knowing the answer is only half the game.",
+    "createGame": "Create Game",
+    "joinGame": "Join Game",
+    "settings": "Settings"
+  },
+  "join": {
+    "roomCode": "Room Code",
+    "yourName": "Your Name",
+    "join": "Join",
+    "joining": "Joining...",
+    "codeTab": "Enter code",
+    "browseTab": "Public rooms",
+    "searchLeader": "Search by lobby leader",
+    "loadingRooms": "Finding public rooms...",
+    "noRooms": "No matching public rooms",
+    "roomMeta": "{{players}} / {{max}} players · {{rounds}} rounds"
+  },
+  "create": {
+    "yourName": "Your Name",
+    "rounds": "Rounds",
+    "mode": "Game Mode",
+    "classic": "Classic",
+    "friends": "Friends",
+    "comingSoon": "Coming Soon",
+    "visibility": "Lobby Access",
+    "private": "Private",
+    "public": "Public",
+    "create": "Create Room",
+    "creating": "Creating room..."
+  },
+  "lobby": {
+    "roomCode": "ROOM CODE",
+    "players": "Players",
+    "waitingForHost": "Waiting for the host to start...",
+    "start": "Start Game",
+    "startingTitle": "Game starting",
+    "startingMessage": "Get ready...",
+    "ready": "Ready",
+    "notReady": "Not Ready",
+    "tapToCopy": "Tap to copy",
+    "copied": "Copied",
+    "partyPublic": "Public party",
+    "partyPrivate": "Private party"
+  },
+  "question": {
+    "round": "Round {{current}} / {{total}}",
+    "basePoints_one": "{{count}} point",
+    "basePoints_other": "{{count}} points",
+    "locked": "Answer locked in - waiting for others...",
+    "answerLabel": "Your answer",
+    "orderingHint": "Drag the answer cards to rearrange them. Dropping on another card swaps them.",
+    "orderingEmpty": "Your selected order will appear here.",
+    "orderingAvailable": "Available items",
+    "orderingPlaceholder": "Drop answer #{{position}} here",
+    "moveUp": "Move Up",
+    "moveDown": "Move Down",
+    "removeFromOrder": "Remove",
+    "submit": "Lock Answer",
+    "resetOrder": "Reset Order",
+    "estimatePlaceholder": "Enter a number",
+    "wordPlaceholder": "Type your answer"
+  },
+  "confidence": {
+    "title": "How confident are you?",
+    "none": "No confidence",
+    "lockedNone": "No confidence locked in.",
+    "lockedValue": "Confidence {{value}} locked in.",
+    "submit": "Lock In"
+  },
+  "difficulty": {
+    "easy": "Easy",
+    "medium": "Medium",
+    "hard": "Hard"
+  },
+  "board": {
+    "title": "Side Bet",
+    "sideBetPrompt": "Predict their answer (tap the player again to remove)",
+    "correct": "Correct",
+    "wrong": "Wrong",
+    "skip": "Skip",
+    "waitingReveal": "Waiting for the reveal..."
+  },
+  "reveal": {
+    "correctAnswer": "Correct answer",
+    "answer": "Answer",
+    "currentScore": "Current score",
+    "confidence": "Confidence",
+    "noAnswer": "No answer",
+    "streak": "Streak",
+    "closestTimelineTitle": "From farthest to closest",
+    "farthest": "Farthest",
+    "closest": "Closest",
+    "result": "Result"
+  },
+  "leaderboard": {
+    "title": "Leaderboard"
+  },
+  "final": {
+    "title": "Final Results",
+    "winner": "Winner",
+    "backToHome": "Back to Home"
+  },
+  "settings": {
+    "title": "Settings",
+    "profile": "Profile",
+    "sounds": "Sounds",
+    "haptics": "Haptics",
+    "language": "Language",
+    "accessibility": "Accessibility",
+    "appearance": "Appearance",
+    "defaultName": "Default player name",
+    "hapticsEnabled": "Haptic feedback",
+    "highContrast": "High contrast",
+    "appearanceComingSoon": "Themes and background options are coming soon.",
+    "english": "English",
+    "bulgarian": "Bulgarian",
+    "soundEffects": "Sound Effects",
+    "music": "Music",
+    "musicComingSoon": "Ready for future music"
+  },
+  "common": {
+    "back": "Back"
+  },
+  "validation": {
+    "nameSpecialCharacters": "Player names can only contain letters, numbers, and spaces."
+  },
+  "network": {
+    "unknownError": "Unknown error",
+    "createFailed": "Could not create room: {{message}}",
+    "joinFailed": "Could not join room: {{message}}"
+  },
+  "connection": {
+    "reconnectingTitle": "Reconnecting",
+    "reconnectingMessage": "Connection lost. Trying to rejoin your game...",
+    "reconnectFailedTitle": "Connection lost",
+    "reconnectFailedMessage": "Could not rejoin this game.",
+    "reconnectMissing": "This room can no longer be resumed.",
+    "retry": "Try Again"
+  },
+  "leave": {
+    "title": "Return to main menu",
+    "message": "Are you sure you want to return to the main menu?",
+    "cancel": "Cancel",
+    "confirm": "Main Menu"
+  },
+  "gameMenu": {
+    "title": "Game Menu",
+    "continue": "Continue Game"
+  }
+}

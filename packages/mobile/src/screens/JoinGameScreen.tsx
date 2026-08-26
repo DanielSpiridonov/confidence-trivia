@@ -1,0 +1,172 @@
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { useTranslation } from "react-i18next";
+import { BackIconButton, Screen, Title, BigButton, theme } from "../components/ui";
+import { listPublicRooms, PublicRoomListing } from "../network/client";
+import { isValidPlayerName } from "../utils/playerName";
+
+export function JoinGameScreen({
+  onJoin,
+  onJoinPublic,
+  initialName,
+  onBack,
+}: {
+  onJoin: (code: string, name: string) => Promise<void>;
+  onJoinPublic: (roomId: string, name: string) => Promise<void>;
+  initialName: string;
+  onBack: () => void;
+}) {
+  const { t } = useTranslation();
+  const [code, setCode] = useState("");
+  const [name, setName] = useState(initialName);
+  const [search, setSearch] = useState("");
+  const [rooms, setRooms] = useState<PublicRoomListing[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [joiningRoomId, setJoiningRoomId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const trimmedName = name.trim();
+  const hasInvalidNameCharacters = trimmedName.length > 0 && !isValidPlayerName(trimmedName);
+
+  const refreshRooms = useCallback(async (showSpinner = false) => {
+    if (showSpinner) setRefreshing(true);
+    try {
+      setRooms(await listPublicRooms());
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("network.unknownError"));
+    } finally {
+      if (showSpinner) setRefreshing(false);
+    }
+  }, [t]);
+
+  useEffect(() => {
+    void refreshRooms(true);
+    const interval = setInterval(() => void refreshRooms(), 4_000);
+    return () => clearInterval(interval);
+  }, [refreshRooms]);
+
+  const visibleRooms = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase();
+    return query ? rooms.filter((room) => room.leaderName.toLocaleLowerCase().includes(query)) : rooms;
+  }, [rooms, search]);
+
+  async function joinWithCode() {
+    if (joiningRoomId || code.length !== 6 || !isValidPlayerName(name)) return;
+    try {
+      setJoiningRoomId("code");
+      setError(null);
+      await onJoin(code, trimmedName);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("network.unknownError"));
+      setJoiningRoomId(null);
+    }
+  }
+
+  async function joinListedRoom(roomId: string) {
+    if (joiningRoomId || !isValidPlayerName(name)) return;
+    try {
+      setJoiningRoomId(roomId);
+      setError(null);
+      await onJoinPublic(roomId, trimmedName);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("network.unknownError"));
+      setJoiningRoomId(null);
+      void refreshRooms();
+    }
+  }
+
+  return (
+    <Screen style={styles.screen}>
+      <BackIconButton label={t("common.back")} onPress={onBack} disabled={Boolean(joiningRoomId)} />
+      <Title>{t("home.joinGame")}</Title>
+      <View style={styles.columns}>
+        <View style={styles.leftColumn}>
+          <TextInput
+            style={styles.input}
+            placeholder={t("join.yourName") as string}
+            placeholderTextColor={theme.textDim}
+            value={name}
+            onChangeText={(value) => { setName(value); setError(null); }}
+            maxLength={20}
+          />
+          <TextInput
+            style={[styles.input, styles.codeInput]}
+            placeholder={t("join.roomCode") as string}
+            placeholderTextColor={theme.textDim}
+            value={code}
+            onChangeText={(value) => { setCode(value.replace(/\D/g, "").slice(0, 6)); setError(null); }}
+            keyboardType="number-pad"
+            maxLength={6}
+          />
+          {hasInvalidNameCharacters ? <Text style={styles.validationError}>{t("validation.nameSpecialCharacters")}</Text> : null}
+          {error ? <Text numberOfLines={2} style={styles.error}>{t("network.joinFailed", { message: error })}</Text> : null}
+          <BigButton
+            label={joiningRoomId === "code" ? t("join.joining") : t("join.join")}
+            onPress={joinWithCode}
+            disabled={code.length !== 6 || !isValidPlayerName(name) || Boolean(joiningRoomId)}
+            style={styles.actionButton}
+          />
+        </View>
+
+        <View style={styles.rightColumn}>
+          <TextInput
+            style={styles.searchInput}
+            placeholder={t("join.searchLeader") as string}
+            placeholderTextColor={theme.textDim}
+            value={search}
+            onChangeText={setSearch}
+          />
+          <FlatList
+            style={styles.roomList}
+            contentContainerStyle={visibleRooms.length === 0 ? styles.emptyList : styles.roomListContent}
+            data={visibleRooms}
+            keyExtractor={(room) => room.roomId}
+            refreshing={refreshing}
+            onRefresh={() => void refreshRooms(true)}
+            showsVerticalScrollIndicator
+            ListEmptyComponent={<Text style={styles.emptyText}>{refreshing ? t("join.loadingRooms") : t("join.noRooms")}</Text>}
+            renderItem={({ item }) => (
+              <View style={styles.roomRow}>
+                <View style={styles.roomInfo}>
+                  <Text numberOfLines={1} style={styles.leaderName}>{item.leaderName}</Text>
+                  <Text style={styles.roomMeta}>{t("join.roomMeta", { players: item.playerCount, max: item.maxClients, rounds: item.roundCount })}</Text>
+                </View>
+                <Pressable
+                  onPress={() => void joinListedRoom(item.roomId)}
+                  disabled={!isValidPlayerName(name) || Boolean(joiningRoomId)}
+                  style={[styles.joinRoomButton, (!isValidPlayerName(name) || Boolean(joiningRoomId)) && styles.disabled]}
+                >
+                  <Text style={styles.joinRoomText}>{joiningRoomId === item.roomId ? t("join.joining") : t("join.join")}</Text>
+                </Pressable>
+              </View>
+            )}
+          />
+        </View>
+      </View>
+    </Screen>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: { justifyContent: "flex-start", paddingTop: 10 },
+  columns: { flex: 1, minHeight: 0, width: "100%", flexDirection: "row", gap: 24, alignItems: "stretch" },
+  leftColumn: { width: "38%", minWidth: 0, justifyContent: "center" },
+  rightColumn: { flex: 1, minWidth: 0 },
+  input: { width: "100%", minHeight: 54, backgroundColor: theme.surface, color: theme.text, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, marginBottom: 10 },
+  codeInput: { letterSpacing: 2, textAlign: "center" },
+  searchInput: { width: "100%", color: theme.text, backgroundColor: "transparent", paddingHorizontal: 4, paddingVertical: 8, fontSize: 14, marginBottom: 4 },
+  roomList: { flex: 1, minHeight: 0, width: "100%" },
+  roomListContent: { paddingBottom: 6 },
+  emptyList: { flexGrow: 1, justifyContent: "center" },
+  emptyText: { color: theme.textDim, textAlign: "center", fontSize: 14 },
+  roomRow: { minHeight: 54, flexDirection: "row", alignItems: "center", backgroundColor: theme.surface, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7, marginBottom: 7 },
+  roomInfo: { flex: 1, minWidth: 0, paddingRight: 12 },
+  leaderName: { color: theme.text, fontSize: 15, fontWeight: "800" },
+  roomMeta: { color: theme.textDim, fontSize: 11, marginTop: 2 },
+  joinRoomButton: { minWidth: 92, backgroundColor: theme.primary, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 9, alignItems: "center" },
+  joinRoomText: { color: theme.text, fontSize: 13, fontWeight: "800" },
+  disabled: { opacity: 0.4 },
+  actionButton: { width: "100%", minWidth: 0 },
+  error: { color: theme.danger, marginBottom: 2, textAlign: "center", fontSize: 12 },
+  validationError: { color: theme.danger, marginBottom: 4, textAlign: "center", fontSize: 12 },
+});

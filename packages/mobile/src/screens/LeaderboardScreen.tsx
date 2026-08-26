@@ -1,0 +1,73 @@
+import React from "react";
+import { View, Text, FlatList, Platform, StyleSheet } from "react-native";
+import { useTranslation } from "react-i18next";
+import { theme } from "../components/ui";
+
+interface PlayerRow {
+  id: string;
+  name: string;
+  score: number;
+  streak: number;
+}
+
+/** Compact leaderboard embedded in the between-round reveal screen. */
+export function LeaderboardStrip({
+  players,
+  myPlayerId,
+}: {
+  players: PlayerRow[];
+  myPlayerId?: string;
+}) {
+  const { t } = useTranslation();
+  const ranked = [...players].sort((a, b) => b.score - a.score);
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>{t("leaderboard.title")}</Text>
+      <FlatList
+        style={styles.playerList}
+        data={ranked}
+        keyExtractor={(player) => player.id}
+        nestedScrollEnabled
+        scrollEnabled
+        contentContainerStyle={styles.playerListContent}
+        showsVerticalScrollIndicator={ranked.length > 4}
+        renderItem={({ item: player, index }) => (
+          <View style={styles.row}>
+            <Text style={styles.rank}>#{index + 1}</Text>
+            <Text
+              numberOfLines={Platform.OS === "android" ? 1 : undefined}
+              adjustsFontSizeToFit={Platform.OS === "android"}
+              minimumFontScale={0.75}
+              style={styles.name}
+            >
+              {player.name}{player.id === myPlayerId ? " (You)" : ""}
+            </Text>
+            {player.streak > 0 ? <Text style={styles.streak}>🔥{player.streak}</Text> : null}
+            <Text style={styles.score}>{player.score}</Text>
+          </View>
+        )}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    minHeight: 0,
+    backgroundColor: theme.surface,
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 12,
+    overflow: "hidden",
+  },
+  title: { color: theme.textDim, fontWeight: "700", marginBottom: 8, fontSize: Platform.OS === "android" ? 11 : 13 },
+  playerList: { flex: 1, minHeight: 0 },
+  playerListContent: { paddingBottom: 8 },
+  row: { flexDirection: "row", alignItems: "center", paddingVertical: 6 },
+  rank: { color: theme.textDim, width: 26, fontSize: Platform.OS === "android" ? 11 : 14, fontWeight: "700" },
+  name: { color: theme.text, flex: 1, flexShrink: 1, fontSize: Platform.OS === "android" ? 11 : 14, fontWeight: "600", paddingRight: 6 },
+  streak: { color: "#FFB84D", marginRight: 6, fontSize: Platform.OS === "android" ? 11 : 14, fontWeight: "700" },
+  score: { color: theme.primary, fontSize: Platform.OS === "android" ? 12 : 14, fontWeight: "800", width: 36, textAlign: "right" },
+});

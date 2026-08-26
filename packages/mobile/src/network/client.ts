@@ -1,0 +1,135 @@
+import { Client, Room } from "colyseus.js";
+import { useEffect, useRef, useState } from "react";
+
+// Set this through EXPO_PUBLIC_SERVER_URL. Use the Docker host's LAN IP when
+// testing on a physical device; localhost only reaches the device itself.
+export const SERVER_URL =
+  process.env.EXPO_PUBLIC_SERVER_URL ?? "ws://localhost:2567";
+const ROOM_REQUEST_TIMEOUT_MS = 10_000;
+
+let client: Client | null = null;
+export function getClient(): Client {
+  if (!client) client = new Client(SERVER_URL);
+  return client;
+}
+
+async function withRoomRequestTimeout<T>(promise: Promise<T>): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  const timeoutPromise = new Promise<T>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(`Server did not respond within ${ROOM_REQUEST_TIMEOUT_MS / 1000}s. Check the server and SERVER_URL.`));
+    }, ROOM_REQUEST_TIMEOUT_MS);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
+export async function createRoom(
+  playerName: string,
+  roundCount: number,
+  locale: "en" | "bg",
+  gameMode: "classic" | "friends",
+  excludeQuestionIds: string[] = [],
+  visibility: "private" | "public" = "private",
+) {
+  const room = await withRoomRequestTimeout(
+    getClient().create("confidence_trivia", {
+      roundCount,
+      locale,
+      gameMode,
+      excludeQuestionIds,
+      name: playerName,
+      visibility,
+    })
+  );
+  return room;
+}
+
+export async function joinRoom(roomCode: string, playerName: string) {
+  const room = await withRoomRequestTimeout(getClient().joinById(roomCode, { name: playerName }));
+  return room;
+}
+
+export interface PublicRoomListing {
+  roomId: string;
+  leaderName: string;
+  playerCount: number;
+  maxClients: number;
+  roundCount: number;
+  locale: "en" | "bg";
+  gameMode: "classic" | "friends";
+}
+
+interface PublicRoomMetadata {
+  leaderName?: string;
+  playerCount?: number;
+  roundCount?: number;
+  locale?: "en" | "bg";
+  gameMode?: "classic" | "friends";
+}
+
+export async function listPublicRooms(): Promise<PublicRoomListing[]> {
+  const rooms = await withRoomRequestTimeout(
+    getClient().getAvailableRooms<PublicRoomMetadata>("confidence_trivia"),
+  );
+  return rooms
+    .filter((room) => room.clients < room.maxClients && Boolean(room.metadata?.leaderName))
+    .map((room) => ({
+      roomId: room.roomId,
+      leaderName: room.metadata?.leaderName ?? "",
+      playerCount: room.clients,
+      maxClients: room.maxClients,
+      roundCount: room.metadata?.roundCount ?? 0,
+      locale: room.metadata?.locale ?? "en",
+      gameMode: room.metadata?.gameMode ?? "classic",
+    }));
+}
+
+export async function joinPublicRoom(roomId: string, playerName: string) {
+  return withRoomRequestTimeout(getClient().joinById(roomId, { name: playerName }));
+}
+
+export async function reconnectRoom(reconnectionToken: string) {
+  const room = await withRoomRequestTimeout(getClient().reconnect(reconnectionToken));
+  return room;
+}
+
+/**
+ * Subscribes a component to a Colyseus room's synced state. Colyseus
+ * mutates the same state object in place and emits onChange — we clone
+ * into a plain object on every change so React's shallow-compare re-render
+ * behaves predictably.
+ */
+export function useRoomState<T>(room: Room | null): T | null {
+  const [, forceRender] = useState(0);
+  const stateRef = useRef<T | null>(null);
+
+  useEffect(() => {
+    if (!room) {
+      stateRef.current = null;
+      return;
+    }
+
+    const syncState = (nextState = room.state) => {
+      stateRef.current = nextState ? nextState as unknown as T : null;
+      forceRender((n) => n + 1);
+    };
+
+    const onChange = (nextState: unknown) => syncState(nextState);
+    room.onStateChange(onChange);
+    // Close the render-to-effect race if the initial snapshot arrived just
+    // before this listener was attached.
+    syncState();
+    return () => {
+      room.onStateChange.remove(onChange);
+    };
+  }, [room]);
+
+  if (room?.state) stateRef.current = room.state as unknown as T;
+  return stateRef.current;
+}

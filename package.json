@@ -1,0 +1,19 @@
+{
+  "name": "confidence-trivia",
+  "private": true,
+  "workspaces": [
+    "packages/shared",
+    "packages/server",
+    "packages/mobile"
+  ],
+  "scripts": {
+    "predev:server": "npm run build:shared",
+    "dev:server": "npm run dev --workspace=packages/server",
+    "dev:mobile": "npm run start --workspace=packages/mobile",
+    "build:shared": "npm run build --workspace=packages/shared"
+  },
+  "dependencies": {
+    "@types/react": "~19.1.10",
+    "expo": "^54.0.0"
+  }
+}

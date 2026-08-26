@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "Confidence Trivia",
+    "slug": "confidence-trivia",
+    "version": "0.1.0",
+    "orientation": "landscape",
+    "backgroundColor": "#14101F",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": false
+    },
+    "android": {},
+    "plugins": [
+      "expo-audio"
+    ]
+  }
+}

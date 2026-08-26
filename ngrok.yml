@@ -1,0 +1,10 @@
+version: "3"
+agent:
+    authtoken: 2dmgnW5gTYfWVPaZkmHVInRzlgq_6rbxeNAcaprfrruLsEhhN
+tunnels:
+    api:
+        proto: http
+        addr: 8081
+    signaling:
+        proto: http
+        addr: 2567

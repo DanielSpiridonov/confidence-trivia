@@ -1,0 +1,153 @@
+{
+  "home": {
+    "title": "Confidence Trivia",
+    "tagline": "Да знаеш отговора е само половината игра.",
+    "createGame": "Създай игра",
+    "joinGame": "Присъедини се",
+    "settings": "Настройки"
+  },
+  "join": {
+    "roomCode": "Код на стаята",
+    "yourName": "Твоето име",
+    "join": "Присъедини се",
+    "joining": "Присъединяване...",
+    "codeTab": "Въведи код",
+    "browseTab": "Публични стаи",
+    "searchLeader": "Търси по име на домакина",
+    "loadingRooms": "Търсене на публични стаи...",
+    "noRooms": "Няма съвпадащи публични стаи",
+    "roomMeta": "{{players}} / {{max}} играчи · {{rounds}} рунда"
+  },
+  "create": {
+    "yourName": "Твоето име",
+    "rounds": "Рундове",
+    "mode": "Режим",
+    "classic": "Класически",
+    "friends": "Приятели",
+    "comingSoon": "Очаквайте скоро",
+    "visibility": "Достъп до стаята",
+    "private": "Затворена",
+    "public": "Публична",
+    "create": "Създай стая",
+    "creating": "Създаване на стая..."
+  },
+  "lobby": {
+    "roomCode": "КОД НА СТАЯТА",
+    "players": "Играчи",
+    "waitingForHost": "Изчакване домакинът да започне...",
+    "start": "Започни играта",
+    "startingTitle": "Играта започва",
+    "startingMessage": "Пригответе се...",
+    "ready": "Готов",
+    "notReady": "Не съм готов",
+    "tapToCopy": "Докосни за копиране",
+    "copied": "Копирано",
+    "partyPublic": "Публична стая",
+    "partyPrivate": "Затворена стая"
+  },
+  "question": {
+    "round": "Рунд {{current}} / {{total}}",
+    "basePoints_one": "{{count}} точка",
+    "basePoints_other": "{{count}} точки",
+    "locked": "Отговорът е заключен - чакаме останалите...",
+    "answerLabel": "Твоят отговор",
+    "orderingHint": "Плъзни картите, за да ги размествaш. Пускане върху друга карта ги разменя.",
+    "orderingEmpty": "Избраният от теб ред ще се покаже тук.",
+    "orderingAvailable": "Налични елементи",
+    "orderingPlaceholder": "Пусни отговор №{{position}} тук",
+    "moveUp": "Нагоре",
+    "moveDown": "Надолу",
+    "removeFromOrder": "Премахни",
+    "submit": "Заключи отговора",
+    "resetOrder": "Изчисти реда",
+    "estimatePlaceholder": "Въведи число",
+    "wordPlaceholder": "Напиши отговора"
+  },
+  "confidence": {
+    "title": "Колко си уверен?",
+    "none": "Без увереност",
+    "lockedNone": "Заключи без увереност.",
+    "lockedValue": "Увереност {{value}} е заключена.",
+    "submit": "Заключи"
+  },
+  "difficulty": {
+    "easy": "Лесен",
+    "medium": "Среден",
+    "hard": "Труден"
+  },
+  "board": {
+    "title": "Страничен залог",
+    "sideBetPrompt": "Избери играч, после предположи",
+    "correct": "Вярно",
+    "wrong": "Грешно",
+    "skip": "Пропусни",
+    "waitingReveal": "Изчакване на разкриването..."
+  },
+  "reveal": {
+    "correctAnswer": "Верен отговор",
+    "answer": "Отговор",
+    "currentScore": "Текущ резултат",
+    "confidence": "Увереност",
+    "noAnswer": "Без отговор",
+    "streak": "Серия",
+    "closestTimelineTitle": "От най-далечния до най-близкия",
+    "farthest": "Най-далеч",
+    "closest": "Най-близо",
+    "result": "Резултат"
+  },
+  "leaderboard": {
+    "title": "Класиране"
+  },
+  "final": {
+    "title": "Финални резултати",
+    "winner": "Победител",
+    "backToHome": "Обратно към началото"
+  },
+  "settings": {
+    "title": "Настройки",
+    "profile": "Профил",
+    "sounds": "Звуци",
+    "haptics": "Вибрации",
+    "language": "Език",
+    "accessibility": "Достъпност",
+    "appearance": "Външен вид",
+    "defaultName": "Име по подразбиране",
+    "hapticsEnabled": "Вибрации",
+    "highContrast": "Висок контраст",
+    "appearanceComingSoon": "Темите и фоновете ще бъдат добавени по-късно.",
+    "english": "Английски",
+    "bulgarian": "Български",
+    "soundEffects": "Звукови ефекти",
+    "music": "Музика",
+    "musicComingSoon": "Готово за бъдещата музика"
+  },
+  "common": {
+    "back": "Назад"
+  },
+  "validation": {
+    "nameSpecialCharacters": "Имената могат да съдържат само букви, цифри и интервали."
+  },
+  "network": {
+    "unknownError": "Непозната грешка",
+    "createFailed": "Неуспешно създаване на стая: {{message}}",
+    "joinFailed": "Неуспешно присъединяване към стая: {{message}}"
+  },
+  "connection": {
+    "reconnectingTitle": "Повторно свързване",
+    "reconnectingMessage": "Връзката беше прекъсната. Опит за повторно влизане в играта...",
+    "reconnectFailedTitle": "Връзката е прекъсната",
+    "reconnectFailedMessage": "Неуспешно повторно влизане в тази игра.",
+    "reconnectMissing": "Тази стая вече не може да бъде продължена.",
+    "retry": "Опитай отново"
+  },
+  "leave": {
+    "title": "Към главното меню",
+    "message": "Сигурен ли си, че искаш да се върнеш в главното меню?",
+    "cancel": "Отказ",
+    "confirm": "Главно меню"
+  },
+  "gameMenu": {
+    "title": "Меню на играта",
+    "continue": "Продължи играта"
+  }
+}
