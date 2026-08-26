@@ -3,6 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.getDatabaseStatus = getDatabaseStatus;
 exports.upsertPlayer = upsertPlayer;
 exports.getPlayerLifetimePoints = getPlayerLifetimePoints;
 exports.saveCompletedMatch = saveCompletedMatch;
@@ -13,6 +14,18 @@ const databaseUrl = process.env.DATABASE_URL;
 const sql = databaseUrl
     ? (0, postgres_1.default)(databaseUrl, { max: 3, idle_timeout: 20 })
     : null;
+async function getDatabaseStatus() {
+    if (!sql)
+        return "not_configured";
+    try {
+        await sql `select 1`;
+        return "connected";
+    }
+    catch (error) {
+        console.error("Database health check failed", error);
+        return "unavailable";
+    }
+}
 async function upsertPlayer(deviceId, displayName) {
     if (!sql)
         return null;

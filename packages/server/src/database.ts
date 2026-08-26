@@ -8,6 +8,19 @@ const sql = databaseUrl
   ? postgres(databaseUrl, { max: 3, idle_timeout: 20 })
   : null;
 
+export type DatabaseStatus = "connected" | "not_configured" | "unavailable";
+
+export async function getDatabaseStatus(): Promise<DatabaseStatus> {
+  if (!sql) return "not_configured";
+  try {
+    await sql`select 1`;
+    return "connected";
+  } catch (error) {
+    console.error("Database health check failed", error);
+    return "unavailable";
+  }
+}
+
 export interface CompletedMatchPlayer {
   deviceId: string;
   displayName: string;

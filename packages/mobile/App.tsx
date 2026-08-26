@@ -345,7 +345,7 @@ export default function App() {
           )}
         </>
       )}
-      <PointsBadge points={lifetimePoints} />
+      {nav !== "in-room" ? <PointsBadge points={lifetimePoints} /> : null}
     </AppFrame>
   );
 }

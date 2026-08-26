@@ -3,13 +3,16 @@ import express from "express";
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { GameRoom } from "./rooms/GameRoom";
-import { getPlayerLifetimePoints } from "./database";
+import { getDatabaseStatus, getPlayerLifetimePoints } from "./database";
 
 const port = Number(process.env.PORT ?? 2567);
 const app = express();
 app.use(express.json());
 
-app.get("/health", (_req, res) => res.json({ ok: true }));
+app.get("/health", async (_req, res) => {
+  const database = await getDatabaseStatus();
+  res.json({ ok: true, database });
+});
 app.get("/players/:deviceId/points", async (req, res) => {
   const deviceId = req.params.deviceId;
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(deviceId)) {

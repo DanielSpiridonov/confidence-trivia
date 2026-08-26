@@ -12,7 +12,10 @@ const database_1 = require("./database");
 const port = Number(process.env.PORT ?? 2567);
 const app = (0, express_1.default)();
 app.use(express_1.default.json());
-app.get("/health", (_req, res) => res.json({ ok: true }));
+app.get("/health", async (_req, res) => {
+    const database = await (0, database_1.getDatabaseStatus)();
+    res.json({ ok: true, database });
+});
 app.get("/players/:deviceId/points", async (req, res) => {
     const deviceId = req.params.deviceId;
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(deviceId)) {
