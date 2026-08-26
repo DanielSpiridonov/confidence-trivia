@@ -25,7 +25,12 @@ import {
 } from "../state/schema";
 import { getLocalizedCorrectAnswer, getQuestionSet, localize, localizeAnswer, localizeAnswerItems } from "../content/questions";
 
-interface CreateOptions {
+interface JoinOptions {
+  deviceId?: string;
+  name?: string;
+}
+
+interface CreateOptions extends JoinOptions {
   roundCount?: number;
   locale?: Locale;
   gameMode?: GameMode;
@@ -33,16 +38,17 @@ interface CreateOptions {
   visibility?: "private" | "public";
 }
 
-interface JoinOptions {
-  name?: string;
-}
-
 const PLAYER_NAME_PATTERN = /^[\p{L}\p{N} ]+$/u;
+const DEVICE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function isValidPlayerName(name: unknown): name is string {
   if (typeof name !== "string") return false;
   const trimmed = name.trim();
   return trimmed.length > 0 && trimmed.length <= 20 && PLAYER_NAME_PATTERN.test(trimmed);
+}
+
+function isValidDeviceId(deviceId: unknown): deviceId is string {
+  return typeof deviceId === "string" && DEVICE_ID_PATTERN.test(deviceId);
 }
 
 /**
@@ -67,6 +73,9 @@ export class GameRoom extends Room<RoomStateSchema> {
   private roundSideBets = new Map<string, SideBet>();
   private roundSideBetDecisions = new Set<string>();
   private phaseTimeout?: NodeJS.Timeout;
+  // Stable installation identifiers stay server-only. Connection-scoped
+  // session IDs remain the room keys and public gameplay identifiers.
+  private deviceIds = new Map<string, string>();
 
   async onCreate(options: CreateOptions = {}) {
     if (options.gameMode === "friends") {
@@ -110,13 +119,16 @@ export class GameRoom extends Room<RoomStateSchema> {
   onAuth(_client: Client, options: JoinOptions = {}) {
     // Reconnecting players use Colyseus' reconnection flow and do not pass
     // through this admission path. New players may only enter the lobby.
-    return !this.state.gameStarted && isValidPlayerName(options.name);
+    return !this.state.gameStarted
+      && isValidPlayerName(options.name)
+      && isValidDeviceId(options.deviceId);
   }
 
   onJoin(client: Client, options: JoinOptions = {}) {
     const player = new PlayerSchema();
     player.id = client.sessionId;
     player.name = isValidPlayerName(options.name) ? options.name.trim() : "Player";
+    this.deviceIds.set(client.sessionId, options.deviceId ?? "");
     player.isHost = this.state.players.size === 0;
     if (player.isHost) this.state.hostId = player.id;
     this.state.players.set(client.sessionId, player);
@@ -131,6 +143,7 @@ export class GameRoom extends Room<RoomStateSchema> {
     this.shortenSideBetPhaseIfEveryoneDecided();
 
     if (consented) {
+      this.deviceIds.delete(client.sessionId);
       this.state.players.delete(client.sessionId);
       this.reassignHostIfNeeded();
       void this.updateLobbyMetadata();
@@ -146,6 +159,7 @@ export class GameRoom extends Room<RoomStateSchema> {
       player.connected = true;
       void this.updateLobbyMetadata();
     } catch {
+      this.deviceIds.delete(client.sessionId);
       this.state.players.delete(client.sessionId);
       this.reassignHostIfNeeded();
       void this.updateLobbyMetadata();

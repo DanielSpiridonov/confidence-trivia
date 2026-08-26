@@ -20,6 +20,7 @@ import { SettingsScreen, VolumeControl } from "./src/screens/SettingsScreen";
 import { createRoom, joinPublicRoom, joinRoom, reconnectRoom, useRoomState } from "./src/network/client";
 import { prepareSoundEffects, setSoundEffectsVolume, stopAllSoundEffects } from "./src/audio/sounds";
 import { pauseMusicForBackground, prepareMusic, setMusicVolume as applyMusicVolume, startMenuMusic, stopMenuMusic } from "./src/audio/music";
+import { getOrCreateDeviceId } from "./src/utils/deviceId";
 
 type Nav = "home" | "create" | "join" | "settings" | "in-room";
 type RoomRecoveryState = "reconnecting" | "failed";
@@ -67,6 +68,7 @@ export default function App() {
   const [soundEffectsVolume, setSoundEffectsVolumeState] = useState(1);
   const [musicVolume, setMusicVolume] = useState(0.5);
   const [defaultPlayerName, setDefaultPlayerName] = useState("");
+  const [deviceId, setDeviceId] = useState<string | null>(null);
   const [hapticsEnabled, setHapticsEnabled] = useState(true);
   const [highContrastEnabled, setHighContrastEnabled] = useState(false);
   const [roomRecovery, setRoomRecovery] = useState<RoomRecoveryState | null>(null);
@@ -79,18 +81,20 @@ export default function App() {
 
     async function loadLocale() {
       try {
-        const [saved, savedSfxVolume, savedMusicVolume, savedPlayerName, savedHaptics, savedHighContrast] = await Promise.all([
+        const [saved, savedSfxVolume, savedMusicVolume, savedPlayerName, savedHaptics, savedHighContrast, storedDeviceId] = await Promise.all([
           AsyncStorage.getItem(LANGUAGE_STORAGE_KEY),
           AsyncStorage.getItem(SFX_VOLUME_STORAGE_KEY),
           AsyncStorage.getItem(MUSIC_VOLUME_STORAGE_KEY),
           AsyncStorage.getItem(PLAYER_NAME_STORAGE_KEY),
           AsyncStorage.getItem(HAPTICS_STORAGE_KEY),
           AsyncStorage.getItem(HIGH_CONTRAST_STORAGE_KEY),
+          getOrCreateDeviceId(),
           prepareSoundEffects(),
           prepareMusic(),
         ]);
         if (!cancelled) {
           setDefaultPlayerName(savedPlayerName ?? "");
+          setDeviceId(storedDeviceId);
           setHapticsEnabled(savedHaptics !== "false");
           setHighContrastEnabled(savedHighContrast === "true");
         }
@@ -122,6 +126,7 @@ export default function App() {
   }, []);
 
   async function handleCreate(name: string, rounds: number, gameMode: "classic" | "friends", visibility: "private" | "public") {
+    if (!deviceId) throw new Error("Player identity is still loading. Please try again.");
     let recentQuestionIds: string[] = [];
     try {
       const saved = await AsyncStorage.getItem(RECENT_QUESTIONS_STORAGE_KEY);
@@ -130,7 +135,7 @@ export default function App() {
     } catch {
       // A corrupt local history should never prevent room creation.
     }
-    const r = await createRoom(name, rounds, locale, gameMode, recentQuestionIds, visibility);
+    const r = await createRoom(deviceId, name, rounds, locale, gameMode, recentQuestionIds, visibility);
     reconnectionTokenRef.current = r.reconnectionToken;
     setRoom(r);
     setRoomRecovery(null);
@@ -139,7 +144,8 @@ export default function App() {
   }
 
   async function handleJoin(code: string, name: string) {
-    const r = await joinRoom(code, name);
+    if (!deviceId) throw new Error("Player identity is still loading. Please try again.");
+    const r = await joinRoom(code, deviceId, name);
     reconnectionTokenRef.current = r.reconnectionToken;
     setRoom(r);
     setRoomRecovery(null);
@@ -148,7 +154,8 @@ export default function App() {
   }
 
   async function handleJoinPublic(roomId: string, name: string) {
-    const r = await joinPublicRoom(roomId, name);
+    if (!deviceId) throw new Error("Player identity is still loading. Please try again.");
+    const r = await joinPublicRoom(roomId, deviceId, name);
     reconnectionTokenRef.current = r.reconnectionToken;
     setRoom(r);
     setRoomRecovery(null);

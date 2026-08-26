@@ -30,6 +30,7 @@ async function withRoomRequestTimeout<T>(promise: Promise<T>): Promise<T> {
 }
 
 export async function createRoom(
+  deviceId: string,
   playerName: string,
   roundCount: number,
   locale: "en" | "bg",
@@ -43,6 +44,7 @@ export async function createRoom(
       locale,
       gameMode,
       excludeQuestionIds,
+      deviceId,
       name: playerName,
       visibility,
     })
@@ -50,8 +52,8 @@ export async function createRoom(
   return room;
 }
 
-export async function joinRoom(roomCode: string, playerName: string) {
-  const room = await withRoomRequestTimeout(getClient().joinById(roomCode, { name: playerName }));
+export async function joinRoom(roomCode: string, deviceId: string, playerName: string) {
+  const room = await withRoomRequestTimeout(getClient().joinById(roomCode, { deviceId, name: playerName }));
   return room;
 }
 
@@ -90,8 +92,8 @@ export async function listPublicRooms(): Promise<PublicRoomListing[]> {
     }));
 }
 
-export async function joinPublicRoom(roomId: string, playerName: string) {
-  return withRoomRequestTimeout(getClient().joinById(roomId, { name: playerName }));
+export async function joinPublicRoom(roomId: string, deviceId: string, playerName: string) {
+  return withRoomRequestTimeout(getClient().joinById(roomId, { deviceId, name: playerName }));
 }
 
 export async function reconnectRoom(reconnectionToken: string) {

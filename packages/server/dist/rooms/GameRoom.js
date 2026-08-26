@@ -6,11 +6,15 @@ const shared_1 = require("@confidence-trivia/shared");
 const schema_1 = require("../state/schema");
 const questions_1 = require("../content/questions");
 const PLAYER_NAME_PATTERN = /^[\p{L}\p{N} ]+$/u;
+const DEVICE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 function isValidPlayerName(name) {
     if (typeof name !== "string")
         return false;
     const trimmed = name.trim();
     return trimmed.length > 0 && trimmed.length <= 20 && PLAYER_NAME_PATTERN.test(trimmed);
+}
+function isValidDeviceId(deviceId) {
+    return typeof deviceId === "string" && DEVICE_ID_PATTERN.test(deviceId);
 }
 /**
  * One GameRoom instance = one room-code game session. This class is the
@@ -33,6 +37,9 @@ class GameRoom extends colyseus_1.Room {
         this.roundConfidenceDecisions = new Set();
         this.roundSideBets = new Map();
         this.roundSideBetDecisions = new Set();
+        // Stable installation identifiers stay server-only. Connection-scoped
+        // session IDs remain the room keys and public gameplay identifiers.
+        this.deviceIds = new Map();
     }
     async onCreate(options = {}) {
         if (options.gameMode === "friends") {
@@ -73,12 +80,15 @@ class GameRoom extends colyseus_1.Room {
     onAuth(_client, options = {}) {
         // Reconnecting players use Colyseus' reconnection flow and do not pass
         // through this admission path. New players may only enter the lobby.
-        return !this.state.gameStarted && isValidPlayerName(options.name);
+        return !this.state.gameStarted
+            && isValidPlayerName(options.name)
+            && isValidDeviceId(options.deviceId);
     }
     onJoin(client, options = {}) {
         const player = new schema_1.PlayerSchema();
         player.id = client.sessionId;
         player.name = isValidPlayerName(options.name) ? options.name.trim() : "Player";
+        this.deviceIds.set(client.sessionId, options.deviceId ?? "");
         player.isHost = this.state.players.size === 0;
         if (player.isHost)
             this.state.hostId = player.id;
@@ -93,6 +103,7 @@ class GameRoom extends colyseus_1.Room {
         this.shortenConfidencePhaseIfEveryoneDecided();
         this.shortenSideBetPhaseIfEveryoneDecided();
         if (consented) {
+            this.deviceIds.delete(client.sessionId);
             this.state.players.delete(client.sessionId);
             this.reassignHostIfNeeded();
             void this.updateLobbyMetadata();
@@ -108,6 +119,7 @@ class GameRoom extends colyseus_1.Room {
             void this.updateLobbyMetadata();
         }
         catch {
+            this.deviceIds.delete(client.sessionId);
             this.state.players.delete(client.sessionId);
             this.reassignHostIfNeeded();
             void this.updateLobbyMetadata();
