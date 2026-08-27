@@ -101,6 +101,9 @@
   "final": {
     "title": "Final Results",
     "winner": "Winner",
+    "starsEarned": "+{{count}} stars earned",
+    "dailyStarLimit": "Daily star limit reached",
+    "rewardedGamesToday": "Rewarded games today: {{count}}/5",
     "backToHome": "Back to Home"
   },
   "settings": {

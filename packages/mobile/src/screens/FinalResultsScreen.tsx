@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Room } from "colyseus.js";
 import { ANDROID_GAME_UI_SCALE, Screen, Title, Subtitle, BigButton, theme } from "../components/ui";
 import { useRoomState } from "../network/client";
+import { PointsIcon } from "../components/PointsIcon";
 
 export function FinalResultsScreen({ room, onExit }: { room: Room; onExit: () => void }) {
   const { t } = useTranslation();
@@ -17,11 +18,30 @@ export function FinalResultsScreen({ room, onExit }: { room: Room; onExit: () =>
     streak: p.streak,
   })).sort((a, b) => b.score - a.score);
   const winner = players[0];
+  const currentPlayer = state.players.get(room.sessionId) as any;
+  const starsEarned = currentPlayer?.starsEarnedThisGame ?? 0;
+  const rewardedGamesToday = currentPlayer?.rewardedGamesToday ?? 0;
 
   return (
     <Screen style={styles.screen} androidScale={ANDROID_GAME_UI_SCALE}>
       <Subtitle>{t("final.winner")}</Subtitle>
       <Title>🏆 {winner?.name ?? "—"}</Title>
+
+      {rewardedGamesToday > 0 ? (
+        <View style={styles.rewardBanner}>
+          <PointsIcon />
+          <View style={styles.rewardTextBlock}>
+            <Text style={styles.rewardTitle}>
+              {starsEarned > 0
+                ? t("final.starsEarned", { count: starsEarned })
+                : t("final.dailyStarLimit")}
+            </Text>
+            <Text style={styles.rewardSubtitle}>
+              {t("final.rewardedGamesToday", { count: rewardedGamesToday })}
+            </Text>
+          </View>
+        </View>
+      ) : null}
 
       <FlatList
         style={styles.list}
@@ -57,6 +77,33 @@ const styles = StyleSheet.create({
     minHeight: 0,
     width: "100%",
     marginTop: 12,
+  },
+  rewardBanner: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255, 184, 77, 0.14)",
+    borderColor: "#FFB84D",
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    marginTop: 8,
+  },
+  rewardTextBlock: {
+    marginLeft: 9,
+  },
+  rewardTitle: {
+    color: "#FFCF75",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  rewardSubtitle: {
+    color: theme.textDim,
+    fontSize: 11,
+    fontWeight: "700",
+    marginTop: 1,
   },
   listContent: {
     paddingBottom: 12,

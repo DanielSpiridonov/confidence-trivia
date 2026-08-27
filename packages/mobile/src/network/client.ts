@@ -14,12 +14,12 @@ export function getClient(): Client {
   return client;
 }
 
-export async function getPlayerLifetimePoints(deviceId: string): Promise<number | null> {
+export async function getPlayerStars(deviceId: string): Promise<number | null> {
   try {
-    const response = await fetch(`${HTTP_SERVER_URL}/players/${encodeURIComponent(deviceId)}/points`);
+    const response = await fetch(`${HTTP_SERVER_URL}/players/${encodeURIComponent(deviceId)}/stars`);
     if (!response.ok) return null;
-    const payload = await response.json() as { lifetimePoints?: unknown };
-    return typeof payload.lifetimePoints === "number" ? payload.lifetimePoints : null;
+    const payload = await response.json() as { stars?: unknown };
+    return typeof payload.stars === "number" ? payload.stars : null;
   } catch {
     return null;
   }

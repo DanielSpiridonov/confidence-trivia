@@ -5,9 +5,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getDatabaseStatus = getDatabaseStatus;
 exports.upsertPlayer = upsertPlayer;
-exports.getPlayerLifetimePoints = getPlayerLifetimePoints;
+exports.getPlayerStars = getPlayerStars;
 exports.saveCompletedMatch = saveCompletedMatch;
 const postgres_1 = __importDefault(require("postgres"));
+const crypto_1 = require("crypto");
 const databaseUrl = process.env.DATABASE_URL;
 // A missing database is allowed during local gameplay development. Render gets
 // DATABASE_URL as a secret, never as a value committed to the repository.
@@ -36,9 +37,9 @@ async function upsertPlayer(deviceId, displayName) {
       on conflict (id) do update
       set display_name = excluded.display_name,
           last_seen_at = excluded.last_seen_at
-      returning total_points
+      returning stars
     `;
-        return player?.total_points ?? 0;
+        return player?.stars ?? 0;
     }
     catch (error) {
         // Persistence must never prevent a player from joining a live game.
@@ -46,26 +47,26 @@ async function upsertPlayer(deviceId, displayName) {
         return null;
     }
 }
-async function getPlayerLifetimePoints(deviceId) {
+async function getPlayerStars(deviceId) {
     if (!sql)
         return null;
     try {
         const [player] = await sql `
-      select total_points
+      select stars
       from public.players
       where id = ${deviceId}
     `;
-        return player?.total_points ?? 0;
+        return player?.stars ?? 0;
     }
     catch (error) {
-        console.error("Could not load player points", error);
+        console.error("Could not load player stars", error);
         return null;
     }
 }
 async function saveCompletedMatch(match) {
-    const lifetimePoints = new Map();
+    const progressUpdates = new Map();
     if (!sql || match.players.length === 0)
-        return lifetimePoints;
+        return progressUpdates;
     try {
         await sql.begin(async (transaction) => {
             const insertedMatches = await transaction `
@@ -97,16 +98,55 @@ async function saveCompletedMatch(match) {
             ${player.finalScore}, ${player.finalRank}
           )
         `;
-                const [updatedPlayer] = await transaction `
+                await transaction `
           update public.players
-          set total_points = total_points + ${player.finalScore},
-              games_played = games_played + 1,
+          set games_played = games_played + 1,
               wins = wins + ${player.finalRank === 1 ? 1 : 0}
           where id = ${player.deviceId}
-          returning total_points
         `;
-                if (updatedPlayer)
-                    lifetimePoints.set(player.deviceId, updatedPlayer.total_points);
+                // Serialize currency decisions per player so two matches finishing at
+                // the same time cannot both claim the fifth daily reward slot.
+                await transaction `
+          select id from public.players where id = ${player.deviceId} for update
+        `;
+                const [dailyCount] = await transaction `
+          select count(*)::int as count
+          from public.star_transactions
+          where player_id = ${player.deviceId}
+            and reason = 'game_completion'
+            and created_at >= (date_trunc('day', now() at time zone 'UTC') at time zone 'UTC')
+            and created_at < (date_trunc('day', now() at time zone 'UTC') at time zone 'UTC') + interval '1 day'
+        `;
+                let starsEarned = 0;
+                let rewardedGamesToday = dailyCount?.count ?? 0;
+                if (rewardedGamesToday < 5) {
+                    const insertedRewards = await transaction `
+            insert into public.star_transactions (
+              id, player_id, amount, reason, source_match_id
+            ) values (
+              ${(0, crypto_1.randomUUID)()}, ${player.deviceId}, 10, 'game_completion', ${match.id}
+            )
+            on conflict (player_id, reason, source_match_id) do nothing
+            returning id
+          `;
+                    if (insertedRewards.length > 0) {
+                        starsEarned = 10;
+                        rewardedGamesToday += 1;
+                        await transaction `
+              update public.players set stars = stars + 10 where id = ${player.deviceId}
+            `;
+                    }
+                }
+                const [updatedPlayer] = await transaction `
+          select stars from public.players where id = ${player.deviceId}
+        `;
+                if (updatedPlayer) {
+                    progressUpdates.set(player.deviceId, {
+                        stars: updatedPlayer.stars,
+                        starsEarned,
+                        rewardedGamesToday,
+                    });
+                }
             }
         });
     }
@@ -114,5 +154,5 @@ async function saveCompletedMatch(match) {
         // Final results remain valid in-room even when persistence is unavailable.
         console.error("Could not persist completed match", error);
     }
-    return lifetimePoints;
+    return progressUpdates;
 }

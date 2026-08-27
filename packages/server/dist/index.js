@@ -16,18 +16,18 @@ app.get("/health", async (_req, res) => {
     const database = await (0, database_1.getDatabaseStatus)();
     res.json({ ok: true, database });
 });
-app.get("/players/:deviceId/points", async (req, res) => {
+app.get("/players/:deviceId/stars", async (req, res) => {
     const deviceId = req.params.deviceId;
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(deviceId)) {
         res.status(400).json({ error: "Invalid device ID" });
         return;
     }
-    const lifetimePoints = await (0, database_1.getPlayerLifetimePoints)(deviceId);
-    if (lifetimePoints === null) {
-        res.status(503).json({ error: "Points are temporarily unavailable" });
+    const stars = await (0, database_1.getPlayerStars)(deviceId);
+    if (stars === null) {
+        res.status(503).json({ error: "Stars are temporarily unavailable" });
         return;
     }
-    res.json({ lifetimePoints });
+    res.json({ stars });
 });
 const httpServer = http_1.default.createServer(app);
 const gameServer = new colyseus_1.Server({

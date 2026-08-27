@@ -101,6 +101,9 @@
   "final": {
     "title": "Финални резултати",
     "winner": "Победител",
+    "starsEarned": "+{{count}} спечелени звезди",
+    "dailyStarLimit": "Дневният лимит за звезди е достигнат",
+    "rewardedGamesToday": "Наградени игри днес: {{count}}/5",
     "backToHome": "Обратно към началото"
   },
   "settings": {

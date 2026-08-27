@@ -18,7 +18,7 @@ import { ConfidenceBoardScreen } from "./src/screens/ConfidenceBoardScreen";
 import { RevealScreen } from "./src/screens/RevealScreen";
 import { FinalResultsScreen } from "./src/screens/FinalResultsScreen";
 import { SettingsScreen, VolumeControl } from "./src/screens/SettingsScreen";
-import { createRoom, getPlayerLifetimePoints, joinPublicRoom, joinRoom, reconnectRoom, useRoomState } from "./src/network/client";
+import { createRoom, getPlayerStars, joinPublicRoom, joinRoom, reconnectRoom, useRoomState } from "./src/network/client";
 import { prepareSoundEffects, setSoundEffectsVolume, stopAllSoundEffects } from "./src/audio/sounds";
 import { pauseMusicForBackground, prepareMusic, setMusicVolume as applyMusicVolume, startMenuMusic, stopMenuMusic } from "./src/audio/music";
 import { getOrCreateDeviceId } from "./src/utils/deviceId";
@@ -61,11 +61,11 @@ function AppFrame({ children, highContrast = false }: { children: React.ReactNod
   );
 }
 
-function PointsBadge({ points }: { points: number }) {
+function StarsBadge({ stars }: { stars: number }) {
   return (
     <View pointerEvents="none" style={styles.pointsBadge}>
       <PointsIcon />
-      <Text style={styles.pointsBadgeText}>{points}</Text>
+      <Text style={styles.pointsBadgeText}>{stars}</Text>
     </View>
   );
 }
@@ -79,7 +79,7 @@ export default function App() {
   const [musicVolume, setMusicVolume] = useState(0.5);
   const [defaultPlayerName, setDefaultPlayerName] = useState("");
   const [deviceId, setDeviceId] = useState<string | null>(null);
-  const [lifetimePoints, setLifetimePoints] = useState(0);
+  const [stars, setStars] = useState(0);
   const [hapticsEnabled, setHapticsEnabled] = useState(true);
   const [highContrastEnabled, setHighContrastEnabled] = useState(false);
   const [roomRecovery, setRoomRecovery] = useState<RoomRecoveryState | null>(null);
@@ -107,8 +107,8 @@ export default function App() {
           setHapticsEnabled(savedHaptics !== "false");
           setHighContrastEnabled(savedHighContrast === "true");
         }
-        void getPlayerLifetimePoints(storedDeviceId).then((points) => {
-          if (!cancelled && points !== null) setLifetimePoints(points);
+        void getPlayerStars(storedDeviceId).then((storedStars) => {
+          if (!cancelled && storedStars !== null) setStars(storedStars);
         });
         if (!cancelled && (saved === "en" || saved === "bg")) {
           setLocale(saved);
@@ -144,8 +144,8 @@ export default function App() {
     if (deviceId) return deviceId;
     const storedDeviceId = await getOrCreateDeviceId();
     setDeviceId(storedDeviceId);
-    void getPlayerLifetimePoints(storedDeviceId).then((points) => {
-      if (points !== null) setLifetimePoints(points);
+    void getPlayerStars(storedDeviceId).then((storedStars) => {
+      if (storedStars !== null) setStars(storedStars);
     });
     return storedDeviceId;
   }
@@ -313,7 +313,7 @@ export default function App() {
           onChangeSoundEffectsVolume={handleSoundEffectsVolume}
           onChangeMusicVolume={handleMusicVolume}
           hapticsEnabled={hapticsEnabled}
-          onLifetimePointsChange={setLifetimePoints}
+          onStarsChange={setStars}
         />
       ) : (
         <>
@@ -345,7 +345,7 @@ export default function App() {
           )}
         </>
       )}
-      {nav !== "in-room" ? <PointsBadge points={lifetimePoints} /> : null}
+      {nav !== "in-room" ? <StarsBadge stars={stars} /> : null}
     </AppFrame>
   );
 }
@@ -368,7 +368,7 @@ function InRoomRouter({
   onChangeSoundEffectsVolume,
   onChangeMusicVolume,
   hapticsEnabled,
-  onLifetimePointsChange,
+  onStarsChange,
 }: {
   room: Room;
   onExit: () => void;
@@ -381,7 +381,7 @@ function InRoomRouter({
   onChangeSoundEffectsVolume: (volume: number) => void;
   onChangeMusicVolume: (volume: number) => void;
   hapticsEnabled: boolean;
-  onLifetimePointsChange: (points: number) => void;
+  onStarsChange: (stars: number) => void;
 }) {
   const { t } = i18n;
   const state = useRoomState<any>(room);
@@ -389,9 +389,9 @@ function InRoomRouter({
   const previousPhaseRef = useRef<string | null>(null);
 
   useEffect(() => {
-    const points = state?.players?.get(room.sessionId)?.lifetimePoints;
-    if (typeof points === "number") onLifetimePointsChange(points);
-  }, [onLifetimePointsChange, room.sessionId, state?.players?.get(room.sessionId)?.lifetimePoints]);
+    const playerStars = state?.players?.get(room.sessionId)?.stars;
+    if (typeof playerStars === "number") onStarsChange(playerStars);
+  }, [onStarsChange, room.sessionId, state?.players?.get(room.sessionId)?.stars]);
 
   useEffect(() => {
     const phase = state?.phase as string | undefined;

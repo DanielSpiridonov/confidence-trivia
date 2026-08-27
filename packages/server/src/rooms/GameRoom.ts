@@ -136,9 +136,9 @@ export class GameRoom extends Room<RoomStateSchema> {
     player.name = isValidPlayerName(options.name) ? options.name.trim() : "Player";
     this.deviceIds.set(client.sessionId, options.deviceId ?? "");
     const deviceId = options.deviceId ?? "";
-    void upsertPlayer(deviceId, player.name).then((lifetimePoints) => {
+    void upsertPlayer(deviceId, player.name).then((stars) => {
       const joinedPlayer = this.state.players.get(client.sessionId);
-      if (joinedPlayer && lifetimePoints !== null) joinedPlayer.lifetimePoints = lifetimePoints;
+      if (joinedPlayer && stars !== null) joinedPlayer.stars = stars;
     });
     player.isHost = this.state.players.size === 0;
     if (player.isHost) this.state.hostId = player.id;
@@ -566,7 +566,7 @@ export class GameRoom extends Room<RoomStateSchema> {
       }];
     });
 
-    const lifetimePoints = await saveCompletedMatch({
+    const progressUpdates = await saveCompletedMatch({
       id: this.matchId,
       roomCode: this.state.code,
       gameMode: this.state.gameMode,
@@ -578,8 +578,12 @@ export class GameRoom extends Room<RoomStateSchema> {
 
     for (const player of this.state.players.values()) {
       const deviceId = this.deviceIds.get(player.id);
-      const updatedPoints = deviceId ? lifetimePoints.get(deviceId) : undefined;
-      if (updatedPoints !== undefined) player.lifetimePoints = updatedPoints;
+      const update = deviceId ? progressUpdates.get(deviceId) : undefined;
+      if (update) {
+        player.stars = update.stars;
+        player.starsEarnedThisGame = update.starsEarned;
+        player.rewardedGamesToday = update.rewardedGamesToday;
+      }
     }
   }
 }
