@@ -17,6 +17,7 @@ import {
   QuestionRecord,
   Locale,
   GameMode,
+  DIFFICULTY_REWARDS,
 } from "@confidence-trivia/shared";
 import {
   RoomStateSchema,
@@ -475,6 +476,7 @@ export class GameRoom extends Room<RoomStateSchema> {
 
   private resolveDamageRound() {
     const record = this.questionSet[this.state.currentRoundIndex % this.questionSet.length];
+    const damageValue = DIFFICULTY_REWARDS[record.difficulty];
     const correctAnswer = getLocalizedCorrectAnswer(record, this.locale);
     const closestValues = record.type === "closest_answer" ? this.getClosestAnswerWinningValues(correctAnswer) : null;
     const isWinningAnswer = (value: unknown) => record.type === "closest_answer"
@@ -492,7 +494,7 @@ export class GameRoom extends Room<RoomStateSchema> {
         continue;
       }
 
-      attacks.set(player.id, record.basePoints);
+      attacks.set(player.id, damageValue);
       if (!player.shieldPending) {
         player.damageStreak += 1;
         if (player.damageStreak >= 3) {

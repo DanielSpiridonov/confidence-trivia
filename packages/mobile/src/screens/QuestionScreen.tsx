@@ -457,7 +457,7 @@ const styles = StyleSheet.create({
     marginTop: 0,
     paddingVertical: 10,
   },
-  damageOptionButton: { height: 76, paddingVertical: 2, borderRadius: 10 },
+  damageOptionButton: { height: 82, paddingVertical: 3, borderRadius: 10 },
   optionButtonTwoUp: {
     width: "34%",
     height: 96,
@@ -505,7 +505,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     overflow: "hidden",
   },
-  damageOrderSlot: { minHeight: 56, maxHeight: 56 },
+  damageOrderSlot: { minHeight: 62, maxHeight: 62 },
   orderCardWrap: {
     width: "100%",
     height: "100%",
@@ -522,7 +522,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: theme.primary,
   },
-  damageOrderCard: { minHeight: 52, paddingVertical: 3 },
+  damageOrderCard: { minHeight: 58, paddingVertical: 4 },
   orderCardPlaced: {
     width: "100%",
   },

@@ -434,6 +434,7 @@ class GameRoom extends colyseus_1.Room {
     }
     resolveDamageRound() {
         const record = this.questionSet[this.state.currentRoundIndex % this.questionSet.length];
+        const damageValue = shared_1.DIFFICULTY_REWARDS[record.difficulty];
         const correctAnswer = (0, questions_1.getLocalizedCorrectAnswer)(record, this.locale);
         const closestValues = record.type === "closest_answer" ? this.getClosestAnswerWinningValues(correctAnswer) : null;
         const isWinningAnswer = (value) => record.type === "closest_answer"
@@ -450,7 +451,7 @@ class GameRoom extends colyseus_1.Room {
                     player.damageStreak = 0;
                 continue;
             }
-            attacks.set(player.id, record.basePoints);
+            attacks.set(player.id, damageValue);
             if (!player.shieldPending) {
                 player.damageStreak += 1;
                 if (player.damageStreak >= 3) {
