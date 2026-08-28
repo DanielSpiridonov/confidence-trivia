@@ -1416,6 +1416,8 @@ Ensure the architecture supports additional languages.
 
 ## PHASE 5 — Polish
 
+Status: Complete after multiplayer playtesting on Android and iPhone.
+
 Improve:
 
 * Animations
@@ -1433,6 +1435,56 @@ Improve:
 ## PHASE 6 — Friends Mode
 
 Only after Classic Mode is stable.
+
+---
+
+## PHASE 7 — Persistent player progression
+
+Status: In progress. Persistent stars and completion rewards are implemented; daily claims are the current step.
+
+Build on the device-based player profile and persistent stars system:
+
+* Daily star reward with one server-authoritative claim per calendar day
+* Daily reward status and next-claim time in the profile/home UI
+* Star transaction history that prevents duplicate rewards
+* A migration path from anonymous device profiles to accounts before ranked play
+
+The daily reward is separate from stars earned by completing games.
+
+---
+
+## PHASE 8 — Damage Mode
+
+Add an optional game mode where correct answers and confidence decisions deal damage.
+
+Before implementation, define and playtest:
+
+* Starting health
+* How a target is selected
+* How answer correctness and confidence determine damage
+* Whether wrong high-confidence answers cause self-damage
+* Elimination, recovery, and disconnected-player rules
+* Whether eliminated players spectate or continue with reduced influence
+
+Keep combat rules server-authoritative and separate from Classic scoring so Classic Mode remains unchanged.
+
+---
+
+## PHASE 9 — Ranked Mode
+
+Add competitive matchmaking and a persistent rating such as LP only after the core game is stable and player identity is secured.
+
+Required foundations:
+
+* Persistent authenticated accounts rather than device ID alone
+* Ranked queue and matchmaking rules
+* Placement matches and provisional rating
+* Server-authoritative LP gains and losses
+* Rank tiers, seasons, and leaderboard
+* Disconnect, abandonment, boosting, and duplicate-account protections
+* Match history and rating audit records
+
+Ranked balance should use telemetry from stable Classic games before LP formulas are finalized.
 
 ---
 

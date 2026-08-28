@@ -1,7 +1,7 @@
 import React from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
-import { BackIconButton, Screen, Title, BigButton, theme } from "../components/ui";
+import { ANDROID_COMPACT_MENU_UI_SCALE, BackIconButton, Screen, Title, BigButton, theme } from "../components/ui";
 import { isValidPlayerName } from "../utils/playerName";
 
 type SettingsSection = "profile" | "sounds" | "haptics" | "language" | "accessibility" | "appearance";
@@ -166,7 +166,7 @@ export function SettingsScreen({
   }
 
   return (
-    <Screen style={styles.screen}>
+    <Screen style={styles.screen} androidScale={ANDROID_COMPACT_MENU_UI_SCALE}>
       <BackIconButton label={t("common.back")} onPress={onBack} />
       <Title>{t("settings.title")}</Title>
       <View style={styles.settingsLayout}>

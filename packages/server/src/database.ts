@@ -1,5 +1,6 @@
 import postgres from "postgres";
 import { randomUUID } from "crypto";
+import { DAILY_STAR_REWARD } from "@confidence-trivia/shared";
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -45,6 +46,19 @@ export interface PlayerProgressUpdate {
   rewardedGamesToday: number;
 }
 
+export interface DailyRewardStatus {
+  stars: number;
+  available: boolean;
+  amount: number;
+  nextClaimAt: string;
+}
+
+function nextUtcDayIso(): string {
+  const next = new Date();
+  next.setUTCHours(24, 0, 0, 0);
+  return next.toISOString();
+}
+
 export async function upsertPlayer(deviceId: string, displayName: string): Promise<number | null> {
   if (!sql) return null;
 
@@ -77,6 +91,78 @@ export async function getPlayerStars(deviceId: string): Promise<number | null> {
     return player?.stars ?? 0;
   } catch (error) {
     console.error("Could not load player stars", error);
+    return null;
+  }
+}
+
+export async function getDailyRewardStatus(deviceId: string): Promise<DailyRewardStatus | null> {
+  if (!sql) return null;
+
+  try {
+    const [player] = await sql<{ stars: number; claimed: boolean }[]>`
+      select p.stars,
+        exists (
+          select 1 from public.star_transactions st
+          where st.player_id = p.id
+            and st.reason = 'daily_claim'
+            and st.reward_day = (now() at time zone 'UTC')::date
+        ) as claimed
+      from public.players p
+      where p.id = ${deviceId}
+    `;
+    return {
+      stars: player?.stars ?? 0,
+      available: !player?.claimed,
+      amount: DAILY_STAR_REWARD,
+      nextClaimAt: nextUtcDayIso(),
+    };
+  } catch (error) {
+    console.error("Could not load daily reward status", error);
+    return null;
+  }
+}
+
+export async function claimDailyReward(deviceId: string, displayName: string): Promise<DailyRewardStatus | null> {
+  if (!sql) return null;
+
+  try {
+    return await sql.begin(async (transaction) => {
+      await transaction`
+        insert into public.players (id, display_name, last_seen_at)
+        values (${deviceId}, ${displayName || "Player"}, now())
+        on conflict (id) do update set last_seen_at = excluded.last_seen_at
+      `;
+      await transaction`select id from public.players where id = ${deviceId} for update`;
+
+      const inserted = await transaction<{ id: string }[]>`
+        insert into public.star_transactions (
+          id, player_id, amount, reason, reward_day
+        ) values (
+          ${randomUUID()}, ${deviceId}, ${DAILY_STAR_REWARD}, 'daily_claim',
+          (now() at time zone 'UTC')::date
+        )
+        on conflict do nothing
+        returning id
+      `;
+
+      if (inserted.length > 0) {
+        await transaction`
+          update public.players set stars = stars + ${DAILY_STAR_REWARD} where id = ${deviceId}
+        `;
+      }
+
+      const [player] = await transaction<{ stars: number }[]>`
+        select stars from public.players where id = ${deviceId}
+      `;
+      return {
+        stars: player?.stars ?? 0,
+        available: false,
+        amount: DAILY_STAR_REWARD,
+        nextClaimAt: nextUtcDayIso(),
+      };
+    });
+  } catch (error) {
+    console.error("Could not claim daily reward", error);
     return null;
   }
 }

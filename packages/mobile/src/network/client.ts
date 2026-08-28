@@ -25,6 +25,37 @@ export async function getPlayerStars(deviceId: string): Promise<number | null> {
   }
 }
 
+export interface DailyRewardStatus {
+  stars: number;
+  available: boolean;
+  amount: number;
+  nextClaimAt: string;
+}
+
+export async function getDailyRewardStatus(deviceId: string): Promise<DailyRewardStatus | null> {
+  try {
+    const response = await fetch(`${HTTP_SERVER_URL}/players/${encodeURIComponent(deviceId)}/daily-reward`);
+    if (!response.ok) return null;
+    return await response.json() as DailyRewardStatus;
+  } catch {
+    return null;
+  }
+}
+
+export async function claimDailyReward(deviceId: string, displayName: string): Promise<DailyRewardStatus | null> {
+  try {
+    const response = await fetch(`${HTTP_SERVER_URL}/players/${encodeURIComponent(deviceId)}/daily-reward/claim`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ displayName }),
+    });
+    if (!response.ok) return null;
+    return await response.json() as DailyRewardStatus;
+  } catch {
+    return null;
+  }
+}
+
 async function withRoomRequestTimeout<T>(promise: Promise<T>): Promise<T> {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
 

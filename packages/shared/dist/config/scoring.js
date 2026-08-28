@@ -7,7 +7,7 @@ exports.DIFFICULTY_REWARDS = exports.DEFAULT_BASE_POINTS = exports.SIDE_BET_SCOR
  * Everything reads from here; nothing hardcodes points elsewhere.
  */
 exports.CONFIDENCE_SCORING = {
-    none: { correct: 1, wrong: 0 },
+    none: { correct: 0, wrong: 0 },
     1: { correct: 1, wrong: -1 },
     3: { correct: 2, wrong: -2 },
     5: { correct: 3, wrong: -4 },

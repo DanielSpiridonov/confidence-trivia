@@ -3,7 +3,7 @@ import express from "express";
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { GameRoom } from "./rooms/GameRoom";
-import { getDatabaseStatus, getPlayerStars } from "./database";
+import { claimDailyReward, getDailyRewardStatus, getDatabaseStatus, getPlayerStars } from "./database";
 
 const port = Number(process.env.PORT ?? 2567);
 const app = express();
@@ -26,6 +26,37 @@ app.get("/players/:deviceId/stars", async (req, res) => {
     return;
   }
   res.json({ stars });
+});
+
+function isDeviceId(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+app.get("/players/:deviceId/daily-reward", async (req, res) => {
+  if (!isDeviceId(req.params.deviceId)) {
+    res.status(400).json({ error: "Invalid device ID" });
+    return;
+  }
+  const status = await getDailyRewardStatus(req.params.deviceId);
+  if (!status) {
+    res.status(503).json({ error: "Daily reward is temporarily unavailable" });
+    return;
+  }
+  res.json(status);
+});
+
+app.post("/players/:deviceId/daily-reward/claim", async (req, res) => {
+  if (!isDeviceId(req.params.deviceId)) {
+    res.status(400).json({ error: "Invalid device ID" });
+    return;
+  }
+  const displayName = typeof req.body?.displayName === "string" ? req.body.displayName.trim().slice(0, 20) : "";
+  const status = await claimDailyReward(req.params.deviceId, displayName);
+  if (!status) {
+    res.status(503).json({ error: "Daily reward is temporarily unavailable" });
+    return;
+  }
+  res.json(status);
 });
 
 const httpServer = http.createServer(app);

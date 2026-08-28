@@ -9,6 +9,8 @@ export const GAME_BACKGROUND = require("../../assets/game-background.png");
 const ANDROID_DESIGN_WIDTH = 844;
 const ANDROID_DESIGN_HEIGHT = 390;
 const ANDROID_UI_SCALE = 0.94;
+export const ANDROID_MENU_UI_SCALE = ANDROID_UI_SCALE * 0.95;
+export const ANDROID_COMPACT_MENU_UI_SCALE = ANDROID_MENU_UI_SCALE * 0.95;
 export const ANDROID_GAME_UI_SCALE = 0.82;
 
 function AndroidDesignCanvas({ children, style, uiScale }: { children: React.ReactNode; style?: ViewStyle; uiScale: number }) {
@@ -203,13 +205,18 @@ const styles = StyleSheet.create({
     top: 10,
     left: 12,
     zIndex: 10,
-    width: 38,
-    height: 38,
+    width: Platform.OS === "android" ? 46 : 38,
+    height: Platform.OS === "android" ? 46 : 38,
     alignItems: "center",
     justifyContent: "center",
   },
   backIconButtonPressed: { opacity: 0.65 },
-  backIconText: { color: COLORS.text, fontSize: 28, lineHeight: 30, fontWeight: "700" },
+  backIconText: {
+    color: COLORS.text,
+    fontSize: Platform.OS === "android" ? 38 : 28,
+    lineHeight: Platform.OS === "android" ? 40 : 30,
+    fontWeight: "700",
+  },
   button: {
     backgroundColor: COLORS.primary,
     paddingVertical: Platform.OS === "android" ? 12 : 16,

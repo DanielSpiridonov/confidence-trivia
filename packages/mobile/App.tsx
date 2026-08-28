@@ -18,7 +18,7 @@ import { ConfidenceBoardScreen } from "./src/screens/ConfidenceBoardScreen";
 import { RevealScreen } from "./src/screens/RevealScreen";
 import { FinalResultsScreen } from "./src/screens/FinalResultsScreen";
 import { SettingsScreen, VolumeControl } from "./src/screens/SettingsScreen";
-import { createRoom, getPlayerStars, joinPublicRoom, joinRoom, reconnectRoom, useRoomState } from "./src/network/client";
+import { claimDailyReward, createRoom, DailyRewardStatus, getDailyRewardStatus, getPlayerStars, joinPublicRoom, joinRoom, reconnectRoom, useRoomState } from "./src/network/client";
 import { prepareSoundEffects, setSoundEffectsVolume, stopAllSoundEffects } from "./src/audio/sounds";
 import { pauseMusicForBackground, prepareMusic, setMusicVolume as applyMusicVolume, startMenuMusic, stopMenuMusic } from "./src/audio/music";
 import { getOrCreateDeviceId } from "./src/utils/deviceId";
@@ -80,6 +80,8 @@ export default function App() {
   const [defaultPlayerName, setDefaultPlayerName] = useState("");
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [stars, setStars] = useState(0);
+  const [dailyReward, setDailyReward] = useState<DailyRewardStatus | null>(null);
+  const [dailyRewardClaiming, setDailyRewardClaiming] = useState(false);
   const [hapticsEnabled, setHapticsEnabled] = useState(true);
   const [highContrastEnabled, setHighContrastEnabled] = useState(false);
   const [roomRecovery, setRoomRecovery] = useState<RoomRecoveryState | null>(null);
@@ -109,6 +111,12 @@ export default function App() {
         }
         void getPlayerStars(storedDeviceId).then((storedStars) => {
           if (!cancelled && storedStars !== null) setStars(storedStars);
+        });
+        void getDailyRewardStatus(storedDeviceId).then((status) => {
+          if (!cancelled && status) {
+            setDailyReward(status);
+            setStars(status.stars);
+          }
         });
         if (!cancelled && (saved === "en" || saved === "bg")) {
           setLocale(saved);
@@ -232,22 +240,74 @@ export default function App() {
     void AsyncStorage.setItem(HIGH_CONTRAST_STORAGE_KEY, String(enabled));
   }
 
+  async function handleClaimDailyReward() {
+    if (dailyRewardClaiming || !dailyReward?.available) return;
+    const currentDeviceId = await requireDeviceId();
+    setDailyRewardClaiming(true);
+    try {
+      const status = await claimDailyReward(currentDeviceId, defaultPlayerName);
+      if (!status) return;
+      setDailyReward(status);
+      setStars(status.stars);
+      if (hapticsEnabled) Vibration.vibrate(120);
+    } finally {
+      setDailyRewardClaiming(false);
+    }
+  }
+
   useEffect(() => {
     if (!localeReady) return;
     if (nav === "in-room") stopMenuMusic();
     else startMenuMusic();
   }, [localeReady, nav]);
 
+  // The match result is persisted asynchronously. Refresh a few times after
+  // returning home so the currency badge always catches the completed award,
+  // including when the player exits the results screen immediately.
+  useEffect(() => {
+    if (nav === "in-room" || !deviceId) return;
+
+    let cancelled = false;
+    const timeoutIds: Array<ReturnType<typeof setTimeout>> = [];
+    const refresh = () => {
+      void getPlayerStars(deviceId).then((storedStars) => {
+        if (!cancelled && storedStars !== null) setStars(storedStars);
+      });
+      void getDailyRewardStatus(deviceId).then((status) => {
+        if (!cancelled && status) {
+          setDailyReward(status);
+          setStars(status.stars);
+        }
+      });
+    };
+
+    refresh();
+    timeoutIds.push(setTimeout(refresh, 750));
+    timeoutIds.push(setTimeout(refresh, 2000));
+    return () => {
+      cancelled = true;
+      timeoutIds.forEach(clearTimeout);
+    };
+  }, [deviceId, nav]);
+
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextState) => {
       if (nextState === "active") {
         if (nav !== "in-room") startMenuMusic();
+        if (deviceId) {
+          void getDailyRewardStatus(deviceId).then((status) => {
+            if (status) {
+              setDailyReward(status);
+              setStars(status.stars);
+            }
+          });
+        }
       } else {
         pauseMusicForBackground();
       }
     });
     return () => subscription.remove();
-  }, [nav]);
+  }, [deviceId, nav]);
 
   async function attemptReconnect() {
     const token = reconnectionTokenRef.current;
@@ -322,6 +382,9 @@ export default function App() {
               onCreate={() => setNav("create")}
               onJoin={() => setNav("join")}
               onSettings={() => setNav("settings")}
+              dailyReward={dailyReward}
+              dailyRewardClaiming={dailyRewardClaiming}
+              onClaimDailyReward={() => void handleClaimDailyReward()}
             />
           )}
           {nav === "create" && <CreateGameScreen onCreate={handleCreate} locale={locale} initialName={defaultPlayerName} onBack={() => setNav("home")} />}
@@ -574,7 +637,7 @@ const styles = StyleSheet.create({
   menuButton: {
     position: "absolute",
     top: 18,
-    right: 110,
+    right: 18,
     zIndex: 20,
     backgroundColor: "rgba(31, 26, 51, 0.9)",
     borderRadius: 18,

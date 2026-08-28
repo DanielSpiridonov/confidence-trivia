@@ -6,9 +6,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getDatabaseStatus = getDatabaseStatus;
 exports.upsertPlayer = upsertPlayer;
 exports.getPlayerStars = getPlayerStars;
+exports.getDailyRewardStatus = getDailyRewardStatus;
+exports.claimDailyReward = claimDailyReward;
 exports.saveCompletedMatch = saveCompletedMatch;
 const postgres_1 = __importDefault(require("postgres"));
 const crypto_1 = require("crypto");
+const shared_1 = require("@confidence-trivia/shared");
 const databaseUrl = process.env.DATABASE_URL;
 // A missing database is allowed during local gameplay development. Render gets
 // DATABASE_URL as a secret, never as a value committed to the repository.
@@ -26,6 +29,11 @@ async function getDatabaseStatus() {
         console.error("Database health check failed", error);
         return "unavailable";
     }
+}
+function nextUtcDayIso() {
+    const next = new Date();
+    next.setUTCHours(24, 0, 0, 0);
+    return next.toISOString();
 }
 async function upsertPlayer(deviceId, displayName) {
     if (!sql)
@@ -60,6 +68,75 @@ async function getPlayerStars(deviceId) {
     }
     catch (error) {
         console.error("Could not load player stars", error);
+        return null;
+    }
+}
+async function getDailyRewardStatus(deviceId) {
+    if (!sql)
+        return null;
+    try {
+        const [player] = await sql `
+      select p.stars,
+        exists (
+          select 1 from public.star_transactions st
+          where st.player_id = p.id
+            and st.reason = 'daily_claim'
+            and st.reward_day = (now() at time zone 'UTC')::date
+        ) as claimed
+      from public.players p
+      where p.id = ${deviceId}
+    `;
+        return {
+            stars: player?.stars ?? 0,
+            available: !player?.claimed,
+            amount: shared_1.DAILY_STAR_REWARD,
+            nextClaimAt: nextUtcDayIso(),
+        };
+    }
+    catch (error) {
+        console.error("Could not load daily reward status", error);
+        return null;
+    }
+}
+async function claimDailyReward(deviceId, displayName) {
+    if (!sql)
+        return null;
+    try {
+        return await sql.begin(async (transaction) => {
+            await transaction `
+        insert into public.players (id, display_name, last_seen_at)
+        values (${deviceId}, ${displayName || "Player"}, now())
+        on conflict (id) do update set last_seen_at = excluded.last_seen_at
+      `;
+            await transaction `select id from public.players where id = ${deviceId} for update`;
+            const inserted = await transaction `
+        insert into public.star_transactions (
+          id, player_id, amount, reason, reward_day
+        ) values (
+          ${(0, crypto_1.randomUUID)()}, ${deviceId}, ${shared_1.DAILY_STAR_REWARD}, 'daily_claim',
+          (now() at time zone 'UTC')::date
+        )
+        on conflict do nothing
+        returning id
+      `;
+            if (inserted.length > 0) {
+                await transaction `
+          update public.players set stars = stars + ${shared_1.DAILY_STAR_REWARD} where id = ${deviceId}
+        `;
+            }
+            const [player] = await transaction `
+        select stars from public.players where id = ${deviceId}
+      `;
+            return {
+                stars: player?.stars ?? 0,
+                available: false,
+                amount: shared_1.DAILY_STAR_REWARD,
+                nextClaimAt: nextUtcDayIso(),
+            };
+        });
+    }
+    catch (error) {
+        console.error("Could not claim daily reward", error);
         return null;
     }
 }

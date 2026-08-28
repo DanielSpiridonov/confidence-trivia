@@ -24,6 +24,7 @@ export function RevealScreen({ room }: { room: Room }) {
   const isClosestAnswerReveal = state.currentQuestion?.qType === "closest_answer";
 
   if (isClosestAnswerReveal) {
+    const guessMarkerWidth = Platform.OS === "android" ? 116 : 104;
     const correctAnswer = Number(state.correctAnswerText);
     const rankedGuesses = results
       .map((item: any) => ({ ...item, numericAnswer: Number(item.answerText) }))
@@ -34,7 +35,7 @@ export function RevealScreen({ room }: { room: Room }) {
       });
     const timelineWidth = Math.max(
       Platform.OS === "android" ? 800 : 650,
-      rankedGuesses.length * 110 + 150,
+      rankedGuesses.length * (Platform.OS === "android" ? 122 : 110) + 150,
     );
     const guessStartX = 95;
     const guessEndX = timelineWidth - 215;
@@ -78,13 +79,17 @@ export function RevealScreen({ room }: { room: Room }) {
                   key={item.playerId}
                   style={[
                     styles.guessMarker,
-                    { left: markerX - 52 },
-                    labelAbove ? styles.guessMarkerAbove : styles.guessMarkerBelow,
+                    { left: markerX - guessMarkerWidth / 2, width: guessMarkerWidth },
                   ]}
                 >
-                  <View style={[styles.guessLabel, item.correct && styles.guessLabelWinner]}>
-                    <Text numberOfLines={1} style={styles.guessName}>{nameFor(item.playerId)}</Text>
-                    <Text style={styles.guessNumber}>{item.answerText}</Text>
+                  <View style={[
+                    styles.guessLabel,
+                    { width: guessMarkerWidth },
+                    labelAbove ? styles.guessLabelAbove : styles.guessLabelBelow,
+                    item.correct && styles.guessLabelWinner,
+                  ]}>
+                    <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={styles.guessName}>{nameFor(item.playerId)}</Text>
+                    <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} style={styles.guessNumber}>{item.answerText}</Text>
                     <Text style={[styles.guessDelta, { color: item.scoreDelta >= 0 ? "#7CFFA0" : theme.danger }] }>
                       {item.scoreDelta >= 0 ? "+" : ""}{item.scoreDelta}
                     </Text>
@@ -187,28 +192,35 @@ const styles = StyleSheet.create({
   },
   timelineFarthestLabel: { left: 4 },
   timelineClosestLabel: { right: Platform.OS === "android" ? 35 : 24, top: 145 },
-  guessMarker: { position: "absolute", width: 104, alignItems: "center" },
-  guessMarkerAbove: { top: 16 },
-  guessMarkerBelow: { top: 122, flexDirection: "column-reverse" },
+  guessMarker: { position: "absolute", top: 0, width: 104, height: 250, alignItems: "center" },
   guessLabel: {
-    width: 104, minHeight: 78, justifyContent: "center", alignItems: "center",
-    paddingHorizontal: 6, paddingVertical: 5, borderRadius: 10,
+    position: "absolute",
+    width: 104,
+    minHeight: 78,
+    ...(Platform.OS === "android" ? { height: 82 } : {}),
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: Platform.OS === "android" ? 9 : 6,
+    paddingVertical: Platform.OS === "android" ? 7 : 5,
+    borderRadius: 10,
     backgroundColor: theme.surface, borderWidth: 1, borderColor: "rgba(124, 92, 255, 0.55)",
   },
+  guessLabelAbove: { top: 27 },
+  guessLabelBelow: { top: 149 },
   guessLabelWinner: { borderColor: "#7CFFA0", backgroundColor: "rgba(47, 91, 66, 0.92)" },
   guessName: { color: theme.text, fontSize: 12, fontWeight: "800", width: "100%", textAlign: "center" },
   guessNumber: { color: theme.primary, fontSize: 16, fontWeight: "900", marginTop: 2 },
   guessDelta: { fontSize: 11, fontWeight: "800", marginTop: 1 },
   guessDot: {
-    width: 14, height: 14, marginVertical: 5, borderRadius: 7,
+    position: "absolute", top: 118, width: 14, height: 14, borderRadius: 7,
     backgroundColor: theme.primary, borderWidth: 2, borderColor: theme.text,
   },
   guessDotWinner: { backgroundColor: "#7CFFA0" },
-  resultMarker: { position: "absolute", top: Platform.OS === "android" ? 26 : 68, width: 110, alignItems: "center" },
-  resultLabel: { color: "#7CFFA0", fontSize: 12, fontWeight: "900", textTransform: "uppercase" },
-  resultNumber: { color: theme.text, fontSize: 20, fontWeight: "900", marginTop: 2 },
+  resultMarker: { position: "absolute", top: 0, height: 250, width: 110, alignItems: "center" },
+  resultLabel: { position: "absolute", top: 67, color: "#7CFFA0", fontSize: 12, fontWeight: "900", textTransform: "uppercase" },
+  resultNumber: { position: "absolute", top: 84, width: "100%", textAlign: "center", color: theme.text, fontSize: 20, fontWeight: "900" },
   resultDot: {
-    width: 18, height: 18, marginTop: 6, borderRadius: 9,
+    position: "absolute", top: 116, width: 18, height: 18, borderRadius: 9,
     backgroundColor: "#7CFFA0", borderWidth: 3, borderColor: theme.text,
   },
   screen: {

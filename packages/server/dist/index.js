@@ -29,6 +29,34 @@ app.get("/players/:deviceId/stars", async (req, res) => {
     }
     res.json({ stars });
 });
+function isDeviceId(value) {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+app.get("/players/:deviceId/daily-reward", async (req, res) => {
+    if (!isDeviceId(req.params.deviceId)) {
+        res.status(400).json({ error: "Invalid device ID" });
+        return;
+    }
+    const status = await (0, database_1.getDailyRewardStatus)(req.params.deviceId);
+    if (!status) {
+        res.status(503).json({ error: "Daily reward is temporarily unavailable" });
+        return;
+    }
+    res.json(status);
+});
+app.post("/players/:deviceId/daily-reward/claim", async (req, res) => {
+    if (!isDeviceId(req.params.deviceId)) {
+        res.status(400).json({ error: "Invalid device ID" });
+        return;
+    }
+    const displayName = typeof req.body?.displayName === "string" ? req.body.displayName.trim().slice(0, 20) : "";
+    const status = await (0, database_1.claimDailyReward)(req.params.deviceId, displayName);
+    if (!status) {
+        res.status(503).json({ error: "Daily reward is temporarily unavailable" });
+        return;
+    }
+    res.json(status);
+});
 const httpServer = http_1.default.createServer(app);
 const gameServer = new colyseus_1.Server({
     transport: new ws_transport_1.WebSocketTransport({ server: httpServer }),

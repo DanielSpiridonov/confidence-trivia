@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { TextInput, StyleSheet, Text, ScrollView, Pressable, View } from "react-native";
+import { TextInput, StyleSheet, Text, ScrollView, Pressable, View, Platform } from "react-native";
 import { useTranslation } from "react-i18next";
-import { BackIconButton, Screen, Title, BigButton, theme } from "../components/ui";
+import { ANDROID_COMPACT_MENU_UI_SCALE, BackIconButton, Screen, Title, BigButton, theme } from "../components/ui";
 import { DEFAULT_ROUND_COUNT } from "@confidence-trivia/shared";
 import { isValidPlayerName } from "../utils/playerName";
 
@@ -49,9 +49,10 @@ export function CreateGameScreen({
   }
 
   return (
-    <Screen>
+    <Screen androidScale={ANDROID_COMPACT_MENU_UI_SCALE}>
       <BackIconButton label={t("common.back")} onPress={onBack} disabled={submitting} />
       <Title>{t("home.createGame")}</Title>
+      <View style={styles.titleGap} />
       <View style={styles.body}>
         <View style={styles.formColumn}>
           <TextInput
@@ -143,6 +144,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 28,
   },
+  titleGap: { height: Platform.OS === "android" ? 44 : 0 },
   formColumn: { width: "62%", maxWidth: 560 },
   actionsColumn: { width: "30%", maxWidth: 300, justifyContent: "center" },
   settingsRow: { width: "100%", flexDirection: "row", gap: 10 },

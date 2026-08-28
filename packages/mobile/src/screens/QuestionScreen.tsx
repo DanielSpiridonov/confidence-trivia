@@ -343,7 +343,7 @@ export function QuestionScreen({ room }: { room: Room }) {
                   soundEffect="answerLocked"
                   variant={selected === index ? "primary" : "secondary"}
                   disabled={locked && selected !== index}
-                  textStyle={options.length <= 2 || options.length >= 4 ? styles.compactOptionText : undefined}
+                  textStyle={options.length <= 2 ? styles.binaryOptionText : styles.optionText}
                   style={[
                     styles.optionButton,
                     options.length <= 2
@@ -432,28 +432,31 @@ const styles = StyleSheet.create({
     width: "100%",
     flexGrow: 1,
     flexDirection: "row",
-    alignItems: "stretch",
+    alignItems: "center",
     justifyContent: "center",
     paddingBottom: 8,
   },
   optionButton: {
     minWidth: 0,
-    alignSelf: "stretch",
+    alignSelf: "center",
+    justifyContent: "center",
+    marginTop: 0,
+    paddingVertical: 10,
   },
   optionButtonTwoUp: {
-    width: "32%",
-    height: "86%",
-    alignSelf: "center",
+    width: "34%",
+    height: 96,
   },
   optionButtonThreeUp: {
     width: "28%",
+    height: 104,
   },
   optionButtonFourUp: {
-    width: "20%",
-    height: "86%",
-    alignSelf: "center",
+    width: "21%",
+    height: 112,
   },
-  compactOptionText: { fontSize: 18 },
+  optionText: { fontSize: 20, lineHeight: 24 },
+  binaryOptionText: { fontSize: 24, lineHeight: 28 },
   optionButtonGap: {
     marginRight: 10,
   },

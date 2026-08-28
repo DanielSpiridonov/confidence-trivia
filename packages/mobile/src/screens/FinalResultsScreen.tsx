@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, FlatList } from "react-native";
+import { View, Text, StyleSheet, FlatList, Platform, Animated } from "react-native";
 import { useTranslation } from "react-i18next";
 import { Room } from "colyseus.js";
 import { ANDROID_GAME_UI_SCALE, Screen, Title, Subtitle, BigButton, theme } from "../components/ui";
@@ -9,6 +9,31 @@ import { PointsIcon } from "../components/PointsIcon";
 export function FinalResultsScreen({ room, onExit }: { room: Room; onExit: () => void }) {
   const { t } = useTranslation();
   const state = useRoomState<any>(room);
+  const currentPlayer = state?.players?.get(room.sessionId) as any;
+  const starsEarned = currentPlayer?.starsEarnedThisGame ?? 0;
+  const rewardedGamesToday = currentPlayer?.rewardedGamesToday ?? 0;
+  const rewardScale = React.useRef(new Animated.Value(0)).current;
+  const rewardOpacity = React.useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    if (rewardedGamesToday <= 0) return;
+    rewardScale.setValue(0);
+    rewardOpacity.setValue(0);
+    Animated.parallel([
+      Animated.spring(rewardScale, {
+        toValue: 1,
+        speed: 28,
+        bounciness: 7,
+        useNativeDriver: true,
+      }),
+      Animated.timing(rewardOpacity, {
+        toValue: 1,
+        duration: 110,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [rewardOpacity, rewardScale, rewardedGamesToday]);
+
   if (!state) return null;
 
   const players = [...state.players.values()].map((p: any) => ({
@@ -18,9 +43,6 @@ export function FinalResultsScreen({ room, onExit }: { room: Room; onExit: () =>
     streak: p.streak,
   })).sort((a, b) => b.score - a.score);
   const winner = players[0];
-  const currentPlayer = state.players.get(room.sessionId) as any;
-  const starsEarned = currentPlayer?.starsEarnedThisGame ?? 0;
-  const rewardedGamesToday = currentPlayer?.rewardedGamesToday ?? 0;
 
   return (
     <Screen style={styles.screen} androidScale={ANDROID_GAME_UI_SCALE}>
@@ -28,8 +50,13 @@ export function FinalResultsScreen({ room, onExit }: { room: Room; onExit: () =>
       <Title>🏆 {winner?.name ?? "—"}</Title>
 
       {rewardedGamesToday > 0 ? (
-        <View style={styles.rewardBanner}>
-          <PointsIcon />
+        <Animated.View
+          style={[
+            styles.rewardBanner,
+            { opacity: rewardOpacity, transform: [{ scale: rewardScale }] },
+          ]}
+        >
+          <PointsIcon size={Platform.OS === "android" ? 29 : 22} />
           <View style={styles.rewardTextBlock}>
             <Text style={styles.rewardTitle}>
               {starsEarned > 0
@@ -40,7 +67,7 @@ export function FinalResultsScreen({ room, onExit }: { room: Room; onExit: () =>
               {t("final.rewardedGamesToday", { count: rewardedGamesToday })}
             </Text>
           </View>
-        </View>
+        </Animated.View>
       ) : null}
 
       <FlatList
@@ -79,29 +106,32 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   rewardBanner: {
-    width: "100%",
+    position: "absolute",
+    top: 10,
+    left: 10,
+    zIndex: 3,
+    ...(Platform.OS === "android" ? { width: 285, maxWidth: 285 } : { maxWidth: 230 }),
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
     backgroundColor: "rgba(255, 184, 77, 0.14)",
     borderColor: "#FFB84D",
     borderWidth: 1,
     borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    marginTop: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
   },
   rewardTextBlock: {
     marginLeft: 9,
+    flexShrink: 1,
   },
   rewardTitle: {
     color: "#FFCF75",
-    fontSize: 15,
+    fontSize: Platform.OS === "android" ? 10 : 13,
     fontWeight: "900",
   },
   rewardSubtitle: {
     color: theme.textDim,
-    fontSize: 11,
+    fontSize: Platform.OS === "android" ? 8 : 10,
     fontWeight: "700",
     marginTop: 1,
   },

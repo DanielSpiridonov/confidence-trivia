@@ -44,9 +44,13 @@ export function computeRoundResults(input: ComputeInput): RoundResult {
     const table = CONFIDENCE_SCORING[answer.confidence as ConfidenceValue];
     // Difficulty increases only the reward for a correct answer. Confidence
     // penalties remain canonical, avoiding extreme hard-question losses.
-    let delta = correct
-      ? table.correct + (basePoints - DEFAULT_BASE_POINTS)
-      : table.wrong;
+    // "No confidence" is a true opt-out: no reward, penalty, or difficulty
+    // bonus regardless of whether the submitted answer happens to be right.
+    let delta = answer.confidence === "none"
+      ? 0
+      : correct
+        ? table.correct + (basePoints - DEFAULT_BASE_POINTS)
+        : table.wrong;
 
     const priorStreak = currentStreaks[answer.playerId] ?? 0;
     const isHighConfidence = STREAK_QUALIFYING_CONFIDENCE.includes(answer.confidence);

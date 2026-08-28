@@ -36,15 +36,16 @@ export function LeaderboardStrip({
           <View style={styles.row}>
             <Text style={styles.rank}>#{index + 1}</Text>
             <Text
-              numberOfLines={Platform.OS === "android" ? 1 : undefined}
-              adjustsFontSizeToFit={Platform.OS === "android"}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+              adjustsFontSizeToFit
               minimumFontScale={0.75}
               style={styles.name}
             >
               {player.name}{player.id === myPlayerId ? " (You)" : ""}
             </Text>
-            {player.streak > 0 ? <Text style={styles.streak}>🔥{player.streak}</Text> : null}
-            <Text style={styles.score}>{player.score}</Text>
+            {player.streak > 0 ? <Text numberOfLines={1} style={styles.streak}>🔥{player.streak}</Text> : null}
+            <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} style={styles.score}>{player.score}</Text>
           </View>
         )}
       />
@@ -68,6 +69,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", paddingVertical: 6 },
   rank: { color: theme.textDim, width: 26, fontSize: Platform.OS === "android" ? 11 : 14, fontWeight: "700" },
   name: { color: theme.text, flex: 1, flexShrink: 1, fontSize: Platform.OS === "android" ? 11 : 14, fontWeight: "600", paddingRight: 6 },
-  streak: { color: "#FFB84D", marginRight: 6, fontSize: Platform.OS === "android" ? 11 : 14, fontWeight: "700" },
-  score: { color: theme.primary, fontSize: Platform.OS === "android" ? 12 : 14, fontWeight: "800", width: 36, textAlign: "right" },
+  streak: { color: "#FFB84D", marginRight: 6, flexShrink: 0, fontSize: Platform.OS === "android" ? 11 : 14, fontWeight: "700" },
+  score: { color: theme.primary, fontSize: Platform.OS === "android" ? 12 : 14, fontWeight: "800", width: 48, flexShrink: 0, textAlign: "right" },
 });

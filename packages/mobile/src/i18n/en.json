@@ -4,7 +4,10 @@
     "tagline": "Knowing the answer is only half the game.",
     "createGame": "Create Game",
     "joinGame": "Join Game",
-    "settings": "Settings"
+    "settings": "Settings",
+    "claimDailyReward": "Claim Daily Reward  +{{count}}",
+    "dailyRewardClaimed": "Daily Reward Claimed",
+    "dailyRewardTomorrow": "Available again tomorrow"
   },
   "join": {
     "roomCode": "Room Code",
@@ -65,7 +68,10 @@
   },
   "confidence": {
     "title": "How confident are you?",
+    "subtitle": "Raise the risk for a bigger reward — but mistakes cost more.",
     "none": "No confidence",
+    "correct": "Right",
+    "wrong": "Wrong",
     "lockedNone": "No confidence locked in.",
     "lockedValue": "Confidence {{value}} locked in.",
     "submit": "Lock In"
