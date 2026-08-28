@@ -95,6 +95,8 @@
     "damage": "щети",
     "shield": "Щит",
     "shieldReady": "Щитът е готов",
+    "ready": "Готов",
+    "notReady": "Не е готов",
     "streak": "Серия {{count}}/3"
   },
   "board": {

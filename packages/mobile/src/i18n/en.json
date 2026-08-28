@@ -95,6 +95,8 @@
     "damage": "damage",
     "shield": "Shield",
     "shieldReady": "Shield ready",
+    "ready": "Ready",
+    "notReady": "Not Ready",
     "streak": "Streak {{count}}/3"
   },
   "board": {

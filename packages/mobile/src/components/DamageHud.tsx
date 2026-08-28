@@ -14,17 +14,22 @@ export function DamageHud({ state, myPlayerId }: { state: any; myPlayerId: strin
         <React.Fragment key={player.id}>
           {index === 1 ? <Text style={styles.vs}>VS</Text> : null}
           <View style={styles.fighter}>
+            {(() => {
+              const shieldReady = player.shieldPending || player.shield > 0;
+              return <>
             <View style={styles.header}>
               <Text numberOfLines={1} style={styles.name}>{player.name}{player.id === myPlayerId ? ` (${t("common.you")})` : ""}</Text>
               <Text style={styles.healthText}>{player.health}/15 HP</Text>
             </View>
-            <View style={styles.healthTrack}>
-              <View style={[styles.healthFill, { width: `${Math.max(0, Math.min(100, player.health / 15 * 100))}%` }]} />
+            <View style={[styles.healthTrack, shieldReady && styles.healthTrackShielded]}>
+              <View style={[styles.healthFill, shieldReady && player.health >= 15 && styles.healthFillShielded, { width: `${Math.max(0, Math.min(100, player.health / 15 * 100))}%` }]} />
             </View>
             <View style={styles.statusRow}>
-              <Text style={styles.shield}>{t("damage.shield")}: {player.shield}</Text>
-              <Text style={styles.streak}>{player.shieldPending ? t("damage.shieldReady") : t("damage.streak", { count: player.damageStreak })}</Text>
+              <Text style={[styles.shield, shieldReady && styles.shieldReady]}>{t("damage.shield")}: {shieldReady ? t("damage.ready") : t("damage.notReady")}</Text>
+              <Text style={styles.streak}>{t("damage.streak", { count: player.damageStreak })}</Text>
             </View>
+              </>;
+            })()}
           </View>
         </React.Fragment>
       ))}
@@ -40,8 +45,11 @@ const styles = StyleSheet.create({
   healthText: { color: "#FF8096", fontSize: 11, fontWeight: "900" },
   healthTrack: { width: "100%", height: 8, borderRadius: 4, overflow: "hidden", backgroundColor: "rgba(255,255,255,0.12)", marginTop: 3 },
   healthFill: { height: "100%", backgroundColor: "#FF5C7A" },
+  healthTrackShielded: { backgroundColor: "#7CCBFF" },
+  healthFillShielded: { backgroundColor: "#7CCBFF" },
   statusRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 2 },
   shield: { color: "#7CCBFF", fontSize: 9, fontWeight: "800" },
+  shieldReady: { color: "#A8DEFF" },
   streak: { color: "#FFD166", fontSize: 9, fontWeight: "800" },
   vs: { color: theme.textDim, fontSize: 10, fontWeight: "900" },
 });

@@ -481,11 +481,8 @@ export class GameRoom extends Room<RoomStateSchema> {
       ? Number.isFinite(Number(value)) && Boolean(closestValues?.has(Number(value)))
       : isAnswerCorrect(record.type, value, correctAnswer);
     const correctness = new Map<string, boolean>();
-    const shieldGains = new Map<string, number>();
     const attacks = new Map<string, number>();
 
-    // Shield rewards are earned before simultaneous attacks are applied, so
-    // a newly earned shield can protect its owner during the same reveal.
     for (const player of this.state.players.values()) {
       const answer = this.roundAnswers.get(player.id);
       const correct = answer ? isWinningAnswer(answer.value) : false;
@@ -496,14 +493,12 @@ export class GameRoom extends Room<RoomStateSchema> {
       }
 
       attacks.set(player.id, record.basePoints);
-      if (player.shieldPending) {
-        player.shield += record.basePoints;
-        shieldGains.set(player.id, record.basePoints);
-        player.shieldPending = false;
-        player.damageStreak = 0;
-      } else {
+      if (!player.shieldPending) {
         player.damageStreak += 1;
-        if (player.damageStreak >= 3) player.shieldPending = true;
+        if (player.damageStreak >= 3) {
+          player.shieldPending = true;
+          player.damageStreak = 0;
+        }
       }
     }
 
@@ -512,8 +507,9 @@ export class GameRoom extends Room<RoomStateSchema> {
       if (damage <= 0) continue;
       const target = [...this.state.players.values()].find((player) => player.id !== attacker.id);
       if (!target) continue;
-      const absorbed = Math.min(target.shield, damage);
-      target.shield -= absorbed;
+      const absorbed = target.shieldPending ? damage : Math.min(target.shield, damage);
+      if (target.shieldPending) target.shieldPending = false;
+      else target.shield -= absorbed;
       target.health = Math.max(0, target.health - (damage - absorbed));
       attacker.score += damage;
     }
@@ -527,7 +523,7 @@ export class GameRoom extends Room<RoomStateSchema> {
       entry.correct = correctness.get(player.id) ?? false;
       entry.scoreDelta = attacks.get(player.id) ?? 0;
       entry.damageDealt = attacks.get(player.id) ?? 0;
-      entry.shieldGained = shieldGains.get(player.id) ?? 0;
+      entry.shieldGained = 0;
       entry.newStreak = player.damageStreak;
       entry.detail = entry.correct ? `Damage ${entry.damageDealt}` : "No damage";
       this.state.revealResults.push(entry);

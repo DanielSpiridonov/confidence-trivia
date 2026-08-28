@@ -208,6 +208,7 @@ export function QuestionScreen({ room }: { room: Room }) {
           style={[
             styles.orderCard,
             location === "slot" && styles.orderCardPlaced,
+            state.gameMode === "damage" && styles.damageOrderCard,
           ]}
         >
           {location === "slot" && slotIndex !== undefined ? (
@@ -222,11 +223,12 @@ export function QuestionScreen({ room }: { room: Room }) {
   return (
     <Screen style={styles.screen} androidScale={ANDROID_GAME_UI_SCALE}>
       <PhaseTimer phaseEndsAt={state.phaseEndsAt} />
-      <View style={styles.layout}>
+      <View style={[styles.layout, state.gameMode === "damage" && styles.damageLayout]}>
         <DamageHud state={state} myPlayerId={room.sessionId} />
         <View
           style={[
             styles.difficultyBadge,
+            state.gameMode === "damage" && styles.damageDifficultyBadge,
             { borderColor: difficultyStyle.color, backgroundColor: difficultyStyle.backgroundColor },
           ]}
         >
@@ -241,16 +243,16 @@ export function QuestionScreen({ room }: { room: Room }) {
               : t("question.round", { current: state.currentRoundIndex + 1, total: state.totalRounds })}
           </Text>
         </View>
-        <View style={styles.questionBlock}>
+        <View style={[styles.questionBlock, state.gameMode === "damage" && styles.damageQuestionBlock]}>
           <Title>{q.text}</Title>
         </View>
 
-        <View style={styles.answerSection}>
+        <View style={[styles.answerSection, state.gameMode === "damage" && styles.damageAnswerSection]}>
           {isFreeTextQuestion ? (
-            <View style={styles.freeAnswerWrap}>
+            <View style={[styles.freeAnswerWrap, state.gameMode === "damage" && styles.damageAnswerWrap]}>
               <Text style={styles.answerLabel}>{t("question.answerLabel")}</Text>
               <TextInput
-                style={styles.answerInput}
+                style={[styles.answerInput, state.gameMode === "damage" && styles.damageAnswerInput]}
                 placeholder={isNumericFreeTextQuestion ? t("question.estimatePlaceholder") as string : t("question.wordPlaceholder") as string}
                 placeholderTextColor={theme.textDim}
                 value={freeAnswer}
@@ -274,12 +276,12 @@ export function QuestionScreen({ room }: { room: Room }) {
                   onPress={submitFreeAnswer}
                   soundEffect="answerLocked"
                   disabled={!canSubmitFreeAnswer}
-                  style={styles.submitButton}
+                  style={[styles.submitButton, state.gameMode === "damage" && styles.damageSubmitButton]}
                 />
               )}
             </View>
           ) : isOrderingQuestion ? (
-            <View ref={boardRef} collapsable={false} style={styles.orderingWrap}>
+            <View ref={boardRef} collapsable={false} style={[styles.orderingWrap, state.gameMode === "damage" && styles.damageAnswerWrap]}>
               <View style={styles.orderSlotsWrap}>
                 {slotOrder.map((cardIndex, slotIndex) => (
                   <View
@@ -288,7 +290,7 @@ export function QuestionScreen({ room }: { room: Room }) {
                       slotRefs.current[slotIndex] = value;
                     }}
                     collapsable={false}
-                    style={styles.orderSlot}
+                    style={[styles.orderSlot, state.gameMode === "damage" && styles.damageOrderSlot]}
                   >
                     {cardIndex !== null ? renderOrderingCard(cardIndex, "slot", slotIndex) : null}
                   </View>
@@ -305,7 +307,7 @@ export function QuestionScreen({ room }: { room: Room }) {
                   onPress={submitOrderingAnswer}
                   soundEffect="answerLocked"
                   disabled={!canSubmitOrdering}
-                  style={styles.submitButton}
+                  style={[styles.submitButton, state.gameMode === "damage" && styles.damageSubmitButton]}
                 />
               )}
               <BigButton
@@ -313,7 +315,7 @@ export function QuestionScreen({ room }: { room: Room }) {
                 onPress={() => setSlotOrder(options.map((_, index) => index).sort(() => Math.random() - 0.5))}
                 disabled={slotOrder.length === 0 || locked}
                 variant="secondary"
-                style={styles.submitButton}
+                style={[styles.submitButton, state.gameMode === "damage" && styles.damageSubmitButton]}
               />
 
               {draggingCardIndex !== null ? (
@@ -347,7 +349,10 @@ export function QuestionScreen({ room }: { room: Room }) {
                   soundEffect="answerLocked"
                   variant={selected === index ? "primary" : "secondary"}
                   disabled={locked && selected !== index}
-                  textStyle={options.length <= 2 ? styles.binaryOptionText : styles.optionText}
+                  textStyle={[
+                    options.length <= 2 ? styles.binaryOptionText : styles.optionText,
+                    state.gameMode === "damage" && styles.damageOptionText,
+                  ]}
                   style={[
                     styles.optionButton,
                     options.length <= 2
@@ -355,6 +360,7 @@ export function QuestionScreen({ room }: { room: Room }) {
                       : options.length === 3
                         ? styles.optionButtonThreeUp
                         : styles.optionButtonFourUp,
+                    state.gameMode === "damage" && styles.damageOptionButton,
                     index < options.length - 1 && styles.optionButtonGap,
                   ]}
                 />
@@ -385,6 +391,7 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     paddingBottom: 12,
   },
+  damageLayout: { paddingTop: 8, paddingBottom: 4 },
   questionMetaRow: {
     width: "100%", flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 14, marginBottom: 8,
   },
@@ -406,6 +413,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     textTransform: "uppercase",
   },
+  damageDifficultyBadge: { top: undefined, right: 2, bottom: 2, minWidth: 64, paddingHorizontal: 7, paddingVertical: 3 },
   questionBlock: {
     width: "100%",
     minHeight: 92,
@@ -414,10 +422,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     marginBottom: 12,
   },
+  damageQuestionBlock: { minHeight: 62, paddingHorizontal: 12, marginBottom: 4 },
   answerSection: {
     flex: 1,
     width: "100%",
   },
+  damageAnswerSection: { minHeight: 0 },
   statusRow: {
     minHeight: 28,
     justifyContent: "center",
@@ -447,6 +457,7 @@ const styles = StyleSheet.create({
     marginTop: 0,
     paddingVertical: 10,
   },
+  damageOptionButton: { height: 76, paddingVertical: 2, borderRadius: 10 },
   optionButtonTwoUp: {
     width: "34%",
     height: 96,
@@ -461,11 +472,13 @@ const styles = StyleSheet.create({
   },
   optionText: { fontSize: 20, lineHeight: 24 },
   binaryOptionText: { fontSize: 24, lineHeight: 28 },
+  damageOptionText: { fontSize: 16, lineHeight: 19, paddingHorizontal: 4 },
   optionButtonGap: {
     marginRight: 10,
   },
   freeAnswerWrap: { width: "100%", alignItems: "center", paddingTop: 8 },
   orderingWrap: { width: "100%", alignItems: "center", paddingTop: 8 },
+  damageAnswerWrap: { paddingTop: 0 },
   answerLabel: {
     width: "100%",
     maxWidth: 520,
@@ -492,6 +505,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     overflow: "hidden",
   },
+  damageOrderSlot: { minHeight: 56, maxHeight: 56 },
   orderCardWrap: {
     width: "100%",
     height: "100%",
@@ -508,6 +522,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: theme.primary,
   },
+  damageOrderCard: { minHeight: 52, paddingVertical: 3 },
   orderCardPlaced: {
     width: "100%",
   },
@@ -560,6 +575,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     textAlign: "left",
   },
+  damageAnswerInput: { minHeight: 44, paddingVertical: 8, marginBottom: 5 },
   submitButton: { width: "100%", maxWidth: 520 },
+  damageSubmitButton: { paddingVertical: 7, marginTop: 5 },
   lockedText: { color: theme.textDim, textAlign: "center" },
 });
