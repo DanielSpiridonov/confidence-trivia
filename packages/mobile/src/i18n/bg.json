@@ -5,6 +5,11 @@
     "createGame": "Създай игра",
     "joinGame": "Присъедини се",
     "settings": "Настройки",
+    "dailyReward": "Дневна награда",
+    "claimed": "Взета",
+    "rewardDay": "Ден {{count}}",
+    "rewardUnlocked": "Дневната награда е отключена",
+    "stars": "звезди",
     "claimDailyReward": "Вземи дневна награда  +{{count}}",
     "dailyRewardClaimed": "Дневната награда е взета",
     "dailyRewardTomorrow": "Отново налична утре"
@@ -19,7 +24,8 @@
     "searchLeader": "Търси по име на домакина",
     "loadingRooms": "Търсене на публични стаи...",
     "noRooms": "Няма съвпадащи публични стаи",
-    "roomMeta": "{{players}} / {{max}} играчи · {{rounds}} рунда"
+    "roomMeta": "{{players}} / {{max}} играчи · {{rounds}} рунда",
+    "damageRoomMeta": "{{players}} / {{max}} играчи · Щети"
   },
   "create": {
     "yourName": "Твоето име",
@@ -27,6 +33,8 @@
     "mode": "Режим",
     "classic": "Класически",
     "friends": "Приятели",
+    "damage": "Щети",
+    "damageHealth": "1v1 · 15 HP",
     "comingSoon": "Очаквайте скоро",
     "visibility": "Достъп до стаята",
     "private": "Затворена",
@@ -38,6 +46,7 @@
     "roomCode": "КОД НА СТАЯТА",
     "players": "Играчи",
     "waitingForHost": "Изчакване домакинът да започне...",
+    "waitingForPlayers": "Изчакване на {{count}} играчи...",
     "start": "Започни играта",
     "startingTitle": "Играта започва",
     "startingMessage": "Пригответе се...",
@@ -81,6 +90,13 @@
     "medium": "Среден",
     "hard": "Труден"
   },
+  "damage": {
+    "question": "Въпрос {{current}}",
+    "damage": "щети",
+    "shield": "Щит",
+    "shieldReady": "Щитът е готов",
+    "streak": "Серия {{count}}/3"
+  },
   "board": {
     "title": "Страничен залог",
     "sideBetPrompt": "Избери играч, после предположи",
@@ -107,6 +123,8 @@
   "final": {
     "title": "Финални резултати",
     "winner": "Победител",
+    "draw": "Равенство",
+    "bothDefeated": "И двамата играчи са победени",
     "starsEarned": "+{{count}} спечелени звезди",
     "dailyStarLimit": "Дневният лимит за звезди е достигнат",
     "rewardedGamesToday": "Наградени игри днес: {{count}}/5",
@@ -131,6 +149,8 @@
     "musicComingSoon": "Готово за бъдещата музика"
   },
   "common": {
+    "close": "Затвори",
+    "you": "Ти",
     "back": "Назад"
   },
   "validation": {

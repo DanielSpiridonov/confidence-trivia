@@ -5,6 +5,11 @@
     "createGame": "Create Game",
     "joinGame": "Join Game",
     "settings": "Settings",
+    "dailyReward": "Daily Reward",
+    "claimed": "Claimed",
+    "rewardDay": "Day {{count}}",
+    "rewardUnlocked": "Daily Reward Unlocked",
+    "stars": "stars",
     "claimDailyReward": "Claim Daily Reward  +{{count}}",
     "dailyRewardClaimed": "Daily Reward Claimed",
     "dailyRewardTomorrow": "Available again tomorrow"
@@ -19,7 +24,8 @@
     "searchLeader": "Search by lobby leader",
     "loadingRooms": "Finding public rooms...",
     "noRooms": "No matching public rooms",
-    "roomMeta": "{{players}} / {{max}} players · {{rounds}} rounds"
+    "roomMeta": "{{players}} / {{max}} players · {{rounds}} rounds",
+    "damageRoomMeta": "{{players}} / {{max}} players · Damage"
   },
   "create": {
     "yourName": "Your Name",
@@ -27,6 +33,8 @@
     "mode": "Game Mode",
     "classic": "Classic",
     "friends": "Friends",
+    "damage": "Damage",
+    "damageHealth": "1v1 · 15 HP",
     "comingSoon": "Coming Soon",
     "visibility": "Lobby Access",
     "private": "Private",
@@ -38,6 +46,7 @@
     "roomCode": "ROOM CODE",
     "players": "Players",
     "waitingForHost": "Waiting for the host to start...",
+    "waitingForPlayers": "Waiting for {{count}} players...",
     "start": "Start Game",
     "startingTitle": "Game starting",
     "startingMessage": "Get ready...",
@@ -81,6 +90,13 @@
     "medium": "Medium",
     "hard": "Hard"
   },
+  "damage": {
+    "question": "Question {{current}}",
+    "damage": "damage",
+    "shield": "Shield",
+    "shieldReady": "Shield ready",
+    "streak": "Streak {{count}}/3"
+  },
   "board": {
     "title": "Side Bet",
     "sideBetPrompt": "Predict their answer (tap the player again to remove)",
@@ -107,6 +123,8 @@
   "final": {
     "title": "Final Results",
     "winner": "Winner",
+    "draw": "Draw",
+    "bothDefeated": "Both players defeated",
     "starsEarned": "+{{count}} stars earned",
     "dailyStarLimit": "Daily star limit reached",
     "rewardedGamesToday": "Rewarded games today: {{count}}/5",
@@ -131,6 +149,8 @@
     "musicComingSoon": "Ready for future music"
   },
   "common": {
+    "close": "Close",
+    "you": "You",
     "back": "Back"
   },
   "validation": {

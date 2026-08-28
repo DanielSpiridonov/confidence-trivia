@@ -63,7 +63,8 @@ export function LobbyScreen({ room, mySessionId }: { room: Room; mySessionId: st
 
   const me = players.find((p) => p.id === mySessionId);
   const isHost = me?.isHost ?? false;
-  const canStart = isHost && players.length >= MIN_PLAYERS_TO_START;
+  const requiredPlayers = state.gameMode === "damage" ? 2 : MIN_PLAYERS_TO_START;
+  const canStart = isHost && players.length >= requiredPlayers;
 
   async function handleCopyCode() {
     await Clipboard.setStringAsync(String(state.code));
@@ -130,7 +131,7 @@ export function LobbyScreen({ room, mySessionId }: { room: Room; mySessionId: st
             variant="secondary"
           />
         ))}
-        {!isStarting && !canStart && isHost && <Subtitle>{t("lobby.waitingForHost")} (min. {MIN_PLAYERS_TO_START} players)</Subtitle>}
+        {!isStarting && !canStart && isHost && <Subtitle>{t("lobby.waitingForPlayers", { count: requiredPlayers })}</Subtitle>}
 
         {isStarting ? (
           <View pointerEvents="none" style={styles.startingOverlay}>

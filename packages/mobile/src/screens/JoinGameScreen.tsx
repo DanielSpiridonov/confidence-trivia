@@ -129,7 +129,9 @@ export function JoinGameScreen({
               <View style={styles.roomRow}>
                 <View style={styles.roomInfo}>
                   <Text numberOfLines={1} style={styles.leaderName}>{item.leaderName}</Text>
-                  <Text style={styles.roomMeta}>{t("join.roomMeta", { players: item.playerCount, max: item.maxClients, rounds: item.roundCount })}</Text>
+                  <Text style={styles.roomMeta}>{item.gameMode === "damage"
+                    ? t("join.damageRoomMeta", { players: item.playerCount, max: item.maxClients })
+                    : t("join.roomMeta", { players: item.playerCount, max: item.maxClients, rounds: item.roundCount })}</Text>
                 </View>
                 <Pressable
                   onPress={() => void joinListedRoom(item.roomId)}

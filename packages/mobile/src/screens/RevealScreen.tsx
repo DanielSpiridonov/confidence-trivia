@@ -6,6 +6,7 @@ import { ANDROID_GAME_UI_SCALE, Screen, Title, Subtitle, theme } from "../compon
 import { useRoomState } from "../network/client";
 import { PhaseTimer } from "../components/PhaseTimer";
 import { LeaderboardStrip } from "./LeaderboardScreen";
+import { DamageHud } from "../components/DamageHud";
 
 export function RevealScreen({ room }: { room: Room }) {
   const { t } = useTranslation();
@@ -45,6 +46,7 @@ export function RevealScreen({ room }: { room: Room }) {
     return (
       <Screen style={styles.closestScreen} androidScale={ANDROID_GAME_UI_SCALE}>
         <PhaseTimer phaseEndsAt={state.phaseEndsAt} />
+        <DamageHud state={state} myPlayerId={room.sessionId} />
         <Title>{t("reveal.closestTimelineTitle")}</Title>
         <ScrollView
           horizontal
@@ -114,6 +116,7 @@ export function RevealScreen({ room }: { room: Room }) {
   return (
     <Screen style={styles.screen} androidScale={ANDROID_GAME_UI_SCALE}>
       <PhaseTimer phaseEndsAt={state.phaseEndsAt} />
+      <DamageHud state={state} myPlayerId={room.sessionId} />
       <Subtitle>{t("reveal.correctAnswer")}</Subtitle>
       <Title>{state.correctAnswerText}</Title>
 
@@ -128,11 +131,12 @@ export function RevealScreen({ room }: { room: Room }) {
             <View style={styles.rowHeader}>
               <Text style={styles.name}>{nameFor(item.playerId)}</Text>
               <View style={styles.scoreBlock}>
-                <Text style={styles.currentScore}>{state.players.get(item.playerId)?.score ?? 0}</Text>
+                <Text style={styles.currentScore}>{state.gameMode === "damage" ? `${state.players.get(item.playerId)?.health ?? 0} HP` : state.players.get(item.playerId)?.score ?? 0}</Text>
                 <Text style={[styles.delta, { color: item.scoreDelta >= 0 ? "#7CFFA0" : theme.danger }] }>
                   {item.scoreDelta >= 0 ? "+" : ""}
-                  {item.scoreDelta}
+                  {item.scoreDelta}{state.gameMode === "damage" ? ` ${t("damage.damage")}` : ""}
                 </Text>
+                {state.gameMode === "damage" && item.shieldGained > 0 ? <Text style={styles.shieldGain}>+{item.shieldGained} {t("damage.shield")}</Text> : null}
               </View>
             </View>
             {isOrderingReveal && item.orderingItems?.length ? (
@@ -241,6 +245,7 @@ const styles = StyleSheet.create({
   name: { color: theme.text, fontSize: Platform.OS === "android" ? 14 : 16, fontWeight: "700", flex: 1, flexShrink: 1, paddingRight: 12 },
   scoreBlock: { alignItems: "flex-end", minWidth: 54 },
   currentScore: { color: theme.textDim, fontSize: Platform.OS === "android" ? 11 : 12, fontWeight: "700" },
+  shieldGain: { color: "#7CCBFF", fontSize: 10, fontWeight: "800" },
   delta: { fontSize: Platform.OS === "android" ? 16 : 18, fontWeight: "900", marginTop: 2 },
   answerLabel: { color: theme.textDim, marginTop: 6, fontSize: Platform.OS === "android" ? 11 : 12, fontWeight: "700" },
   answerValue: { color: theme.text, marginTop: 6, fontSize: Platform.OS === "android" ? 12 : 14, fontWeight: "600" },

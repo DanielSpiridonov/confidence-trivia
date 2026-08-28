@@ -6,6 +6,7 @@ import { Room } from "colyseus.js";
 import { ANDROID_GAME_UI_SCALE, Screen, Title, BigButton, theme } from "../components/ui";
 import { useRoomState } from "../network/client";
 import { PhaseTimer } from "../components/PhaseTimer";
+import { DamageHud } from "../components/DamageHud";
 
 interface MeasuredRect {
   x: number;
@@ -222,6 +223,7 @@ export function QuestionScreen({ room }: { room: Room }) {
     <Screen style={styles.screen} androidScale={ANDROID_GAME_UI_SCALE}>
       <PhaseTimer phaseEndsAt={state.phaseEndsAt} />
       <View style={styles.layout}>
+        <DamageHud state={state} myPlayerId={room.sessionId} />
         <View
           style={[
             styles.difficultyBadge,
@@ -234,7 +236,9 @@ export function QuestionScreen({ room }: { room: Room }) {
         </View>
         <View style={styles.questionMetaRow}>
           <Text style={styles.round}>
-            {t("question.round", { current: state.currentRoundIndex + 1, total: state.totalRounds })}
+            {state.gameMode === "damage"
+              ? t("damage.question", { current: state.currentRoundIndex + 1 })
+              : t("question.round", { current: state.currentRoundIndex + 1, total: state.totalRounds })}
           </Text>
         </View>
         <View style={styles.questionBlock}>

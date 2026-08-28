@@ -1,6 +1,6 @@
 import postgres from "postgres";
 import { randomUUID } from "crypto";
-import { DAILY_STAR_REWARD } from "@confidence-trivia/shared";
+import { DAILY_REWARD_MAX_STREAK_DAY, getDailyStarReward } from "@confidence-trivia/shared";
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -50,6 +50,7 @@ export interface DailyRewardStatus {
   stars: number;
   available: boolean;
   amount: number;
+  streakDay: number;
   nextClaimAt: string;
 }
 
@@ -99,21 +100,39 @@ export async function getDailyRewardStatus(deviceId: string): Promise<DailyRewar
   if (!sql) return null;
 
   try {
-    const [player] = await sql<{ stars: number; claimed: boolean }[]>`
+    const [player] = await sql<{
+      stars: number;
+      claimed_today: boolean;
+      claimed_yesterday: boolean;
+      last_streak_day: number | null;
+      last_amount: number | null;
+    }[]>`
       select p.stars,
-        exists (
-          select 1 from public.star_transactions st
-          where st.player_id = p.id
-            and st.reason = 'daily_claim'
-            and st.reward_day = (now() at time zone 'UTC')::date
-        ) as claimed
+        coalesce(last_claim.reward_day = (now() at time zone 'UTC')::date, false) as claimed_today,
+        coalesce(last_claim.reward_day = (now() at time zone 'UTC')::date - 1, false) as claimed_yesterday,
+        last_claim.reward_streak_day as last_streak_day,
+        last_claim.amount as last_amount
       from public.players p
+      left join lateral (
+        select reward_day, reward_streak_day, amount
+        from public.star_transactions
+        where player_id = p.id and reason = 'daily_claim'
+        order by reward_day desc
+        limit 1
+      ) last_claim on true
       where p.id = ${deviceId}
     `;
+    const lastStreakDay = player?.last_streak_day ?? 1;
+    const streakDay = player?.claimed_today
+      ? lastStreakDay
+      : player?.claimed_yesterday
+        ? Math.min(DAILY_REWARD_MAX_STREAK_DAY, lastStreakDay + 1)
+        : 1;
     return {
       stars: player?.stars ?? 0,
-      available: !player?.claimed,
-      amount: DAILY_STAR_REWARD,
+      available: !player?.claimed_today,
+      amount: player?.claimed_today ? (player.last_amount ?? getDailyStarReward(streakDay)) : getDailyStarReward(streakDay),
+      streakDay,
       nextClaimAt: nextUtcDayIso(),
     };
   } catch (error) {
@@ -134,12 +153,47 @@ export async function claimDailyReward(deviceId: string, displayName: string): P
       `;
       await transaction`select id from public.players where id = ${deviceId} for update`;
 
+      const [lastClaim] = await transaction<{
+        claimed_today: boolean;
+        claimed_yesterday: boolean;
+        streak_day: number;
+        amount: number;
+      }[]>`
+        select
+          reward_day = (now() at time zone 'UTC')::date as claimed_today,
+          reward_day = (now() at time zone 'UTC')::date - 1 as claimed_yesterday,
+          coalesce(reward_streak_day, 1)::int as streak_day,
+          amount
+        from public.star_transactions
+        where player_id = ${deviceId} and reason = 'daily_claim'
+        order by reward_day desc
+        limit 1
+      `;
+
+      if (lastClaim?.claimed_today) {
+        const [player] = await transaction<{ stars: number }[]>`
+          select stars from public.players where id = ${deviceId}
+        `;
+        return {
+          stars: player?.stars ?? 0,
+          available: false,
+          amount: lastClaim.amount,
+          streakDay: lastClaim.streak_day,
+          nextClaimAt: nextUtcDayIso(),
+        };
+      }
+
+      const streakDay = lastClaim?.claimed_yesterday
+        ? Math.min(DAILY_REWARD_MAX_STREAK_DAY, lastClaim.streak_day + 1)
+        : 1;
+      const rewardAmount = getDailyStarReward(streakDay);
+
       const inserted = await transaction<{ id: string }[]>`
         insert into public.star_transactions (
-          id, player_id, amount, reason, reward_day
+          id, player_id, amount, reason, reward_day, reward_streak_day
         ) values (
-          ${randomUUID()}, ${deviceId}, ${DAILY_STAR_REWARD}, 'daily_claim',
-          (now() at time zone 'UTC')::date
+          ${randomUUID()}, ${deviceId}, ${rewardAmount}, 'daily_claim',
+          (now() at time zone 'UTC')::date, ${streakDay}
         )
         on conflict do nothing
         returning id
@@ -147,7 +201,7 @@ export async function claimDailyReward(deviceId: string, displayName: string): P
 
       if (inserted.length > 0) {
         await transaction`
-          update public.players set stars = stars + ${DAILY_STAR_REWARD} where id = ${deviceId}
+          update public.players set stars = stars + ${rewardAmount} where id = ${deviceId}
         `;
       }
 
@@ -157,7 +211,8 @@ export async function claimDailyReward(deviceId: string, displayName: string): P
       return {
         stars: player?.stars ?? 0,
         available: false,
-        amount: DAILY_STAR_REWARD,
+        amount: rewardAmount,
+        streakDay,
         nextClaimAt: nextUtcDayIso(),
       };
     });

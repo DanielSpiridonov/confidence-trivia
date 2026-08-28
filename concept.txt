@@ -1455,6 +1455,8 @@ The daily reward is separate from stars earned by completing games.
 
 ## PHASE 8 — Damage Mode
 
+Status: Functional 1v1 prototype implemented; visual combat polish remains.
+
 Add an optional game mode where correct answers and confidence decisions deal damage.
 
 Before implementation, define and playtest:

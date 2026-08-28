@@ -29,6 +29,7 @@ export interface DailyRewardStatus {
   stars: number;
   available: boolean;
   amount: number;
+  streakDay: number;
   nextClaimAt: string;
 }
 
@@ -77,7 +78,7 @@ export async function createRoom(
   playerName: string,
   roundCount: number,
   locale: "en" | "bg",
-  gameMode: "classic" | "friends",
+  gameMode: "classic" | "friends" | "damage",
   excludeQuestionIds: string[] = [],
   visibility: "private" | "public" = "private",
 ) {
@@ -107,7 +108,7 @@ export interface PublicRoomListing {
   maxClients: number;
   roundCount: number;
   locale: "en" | "bg";
-  gameMode: "classic" | "friends";
+  gameMode: "classic" | "friends" | "damage";
 }
 
 interface PublicRoomMetadata {
@@ -115,7 +116,7 @@ interface PublicRoomMetadata {
   playerCount?: number;
   roundCount?: number;
   locale?: "en" | "bg";
-  gameMode?: "classic" | "friends";
+  gameMode?: "classic" | "friends" | "damage";
 }
 
 export async function listPublicRooms(): Promise<PublicRoomListing[]> {

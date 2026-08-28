@@ -2,7 +2,7 @@ export type ConfidenceValue = "none" | 1 | 3 | 5 | 6;
 export declare const CONFIDENCE_VALUES: ConfidenceValue[];
 export type QuestionType = "multiple_choice" | "true_false" | "estimate" | "closest_answer" | "ordering" | "word" | "visual";
 export type Locale = "en" | "bg";
-export type GameMode = "classic" | "friends";
+export type GameMode = "classic" | "friends" | "damage";
 /** A single localized rendering of a question, sent to the client. */
 export interface LocalizedQuestion {
     id: string;

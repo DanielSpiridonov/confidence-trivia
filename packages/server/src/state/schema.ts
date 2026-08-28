@@ -12,6 +12,10 @@ export class PlayerSchema extends Schema {
   @type("number") starsEarnedThisGame: number = 0;
   @type("number") rewardedGamesToday: number = 0;
   @type("number") streak: number = 0;
+  @type("number") health: number = 15;
+  @type("number") shield: number = 0;
+  @type("number") damageStreak: number = 0;
+  @type("boolean") shieldPending: boolean = false;
   @type("boolean") connected: boolean = true;
   @type("boolean") ready: boolean = false;
   @type("boolean") isHost: boolean = false;
@@ -48,6 +52,8 @@ export class RevealEntrySchema extends Schema {
   @type("number") scoreDelta: number = 0;
   @type("string") detail: string = "";
   @type("number") newStreak: number = 0;
+  @type("number") damageDealt: number = 0;
+  @type("number") shieldGained: number = 0;
 }
 
 export class RoomStateSchema extends Schema {

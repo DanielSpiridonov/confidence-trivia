@@ -18,14 +18,14 @@ export function CreateGameScreen({
   initialName,
   onBack,
 }: {
-  onCreate: (name: string, rounds: number, gameMode: "classic" | "friends", visibility: "private" | "public") => Promise<void>;
+  onCreate: (name: string, rounds: number, gameMode: "classic" | "friends" | "damage", visibility: "private" | "public") => Promise<void>;
   locale: "en" | "bg";
   initialName: string;
   onBack: () => void;
 }) {
   const { t } = useTranslation();
   const [name, setName] = useState(initialName);
-  const [gameMode, setGameMode] = useState<"classic" | "friends">("classic");
+  const [gameMode, setGameMode] = useState<"classic" | "friends" | "damage">("classic");
   const [visibility, setVisibility] = useState<"private" | "public">("private");
   const [rounds, setRounds] = useState(DEFAULT_ROUNDS);
   const [submitting, setSubmitting] = useState(false);
@@ -79,10 +79,17 @@ export function CreateGameScreen({
                 <Text style={styles.modeTitle}>{t("create.friends")}</Text>
                 <Text style={styles.modeComingSoon}>{t("create.comingSoon")}</Text>
               </View>
+              <Pressable
+                onPress={() => setGameMode("damage")}
+                style={[styles.modeCard, gameMode === "damage" && styles.modeCardSelected]}
+              >
+                <Text style={styles.modeTitle}>{t("create.damage")}</Text>
+                <Text style={styles.modeComingSoon}>{t("create.damageHealth")}</Text>
+              </Pressable>
             </View>
           </View>
           <View style={styles.settingsRow}>
-            <View style={styles.roundsSection}>
+            {gameMode !== "damage" ? <View style={styles.roundsSection}>
               <Text style={styles.roundsLabel}>{t("create.rounds")}</Text>
               <ScrollView
                 horizontal
@@ -102,7 +109,7 @@ export function CreateGameScreen({
                   );
                 })}
               </ScrollView>
-            </View>
+            </View> : null}
             <View style={styles.visibilitySection}>
               <Text style={styles.roundsLabel}>{t("create.visibility")}</Text>
               <View style={styles.modeRow}>
@@ -184,7 +191,7 @@ const styles = StyleSheet.create({
   },
   modeCardSelected: { borderColor: theme.primary },
   modeCardDisabled: { opacity: 0.42 },
-  modeTitle: { color: theme.text, fontSize: 15, fontWeight: "800" },
+  modeTitle: { color: theme.text, fontSize: 14, fontWeight: "800" },
   modeComingSoon: { color: theme.textDim, fontSize: 10, fontWeight: "700", marginTop: 2 },
   actionButton: {
     width: "100%",

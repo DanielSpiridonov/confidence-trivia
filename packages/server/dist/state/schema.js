@@ -24,6 +24,10 @@ class PlayerSchema extends schema_1.Schema {
         this.starsEarnedThisGame = 0;
         this.rewardedGamesToday = 0;
         this.streak = 0;
+        this.health = 15;
+        this.shield = 0;
+        this.damageStreak = 0;
+        this.shieldPending = false;
         this.connected = true;
         this.ready = false;
         this.isHost = false;
@@ -59,6 +63,22 @@ __decorate([
     (0, schema_1.type)("number"),
     __metadata("design:type", Number)
 ], PlayerSchema.prototype, "streak", void 0);
+__decorate([
+    (0, schema_1.type)("number"),
+    __metadata("design:type", Number)
+], PlayerSchema.prototype, "health", void 0);
+__decorate([
+    (0, schema_1.type)("number"),
+    __metadata("design:type", Number)
+], PlayerSchema.prototype, "shield", void 0);
+__decorate([
+    (0, schema_1.type)("number"),
+    __metadata("design:type", Number)
+], PlayerSchema.prototype, "damageStreak", void 0);
+__decorate([
+    (0, schema_1.type)("boolean"),
+    __metadata("design:type", Boolean)
+], PlayerSchema.prototype, "shieldPending", void 0);
 __decorate([
     (0, schema_1.type)("boolean"),
     __metadata("design:type", Boolean)
@@ -149,6 +169,8 @@ class RevealEntrySchema extends schema_1.Schema {
         this.scoreDelta = 0;
         this.detail = "";
         this.newStreak = 0;
+        this.damageDealt = 0;
+        this.shieldGained = 0;
     }
 }
 exports.RevealEntrySchema = RevealEntrySchema;
@@ -188,6 +210,14 @@ __decorate([
     (0, schema_1.type)("number"),
     __metadata("design:type", Number)
 ], RevealEntrySchema.prototype, "newStreak", void 0);
+__decorate([
+    (0, schema_1.type)("number"),
+    __metadata("design:type", Number)
+], RevealEntrySchema.prototype, "damageDealt", void 0);
+__decorate([
+    (0, schema_1.type)("number"),
+    __metadata("design:type", Number)
+], RevealEntrySchema.prototype, "shieldGained", void 0);
 class RoomStateSchema extends schema_1.Schema {
     constructor() {
         super(...arguments);

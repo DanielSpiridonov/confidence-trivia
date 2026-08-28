@@ -81,6 +81,7 @@ export class GameRoom extends Room<RoomStateSchema> {
   private readonly matchId = randomUUID();
   private gameStartedAt = new Date();
   private resultsPersisted = false;
+  private damageKnockout = false;
 
   async onCreate(options: CreateOptions = {}) {
     if (options.gameMode === "friends") {
@@ -102,12 +103,13 @@ export class GameRoom extends Room<RoomStateSchema> {
 
     this.setState(new RoomStateSchema());
     this.state.code = this.roomId;
-    this.state.gameMode = "classic";
-    this.state.totalRounds = options.roundCount ?? DEFAULT_ROUND_COUNT;
+    this.state.gameMode = options.gameMode === "damage" ? "damage" : "classic";
+    if (this.state.gameMode === "damage") this.maxClients = 2;
+    this.state.totalRounds = this.state.gameMode === "damage" ? 0 : options.roundCount ?? DEFAULT_ROUND_COUNT;
     this.locale = options.locale ?? "en";
     this.isPublic = options.visibility === "public";
     this.state.isPublic = this.isPublic;
-    this.questionSet = getQuestionSet(this.state.totalRounds, options.excludeQuestionIds ?? []);
+    this.questionSet = getQuestionSet(this.state.gameMode === "damage" ? 100 : this.state.totalRounds, options.excludeQuestionIds ?? []);
     await this.setPrivate(!this.isPublic);
     await this.updateLobbyMetadata();
 
@@ -141,6 +143,7 @@ export class GameRoom extends Room<RoomStateSchema> {
       if (joinedPlayer && stars !== null) joinedPlayer.stars = stars;
     });
     player.isHost = this.state.players.size === 0;
+    player.health = 15;
     if (player.isHost) this.state.hostId = player.id;
     this.state.players.set(client.sessionId, player);
     void this.updateLobbyMetadata();
@@ -225,7 +228,7 @@ export class GameRoom extends Room<RoomStateSchema> {
   private handleStartGame(client: Client) {
     if (client.sessionId !== this.state.hostId) return; // only host may start
     if (this.state.gameStarted) return;
-    if (this.state.players.size < MIN_PLAYERS_TO_START) return;
+    if (this.state.gameMode === "damage" ? this.state.players.size !== 2 : this.state.players.size < MIN_PLAYERS_TO_START) return;
     this.state.gameStarted = true;
     this.gameStartedAt = new Date();
     this.isPublic = false;
@@ -241,7 +244,7 @@ export class GameRoom extends Room<RoomStateSchema> {
 
   private advanceToNextRound() {
     this.state.currentRoundIndex += 1;
-    if (this.state.currentRoundIndex >= this.state.totalRounds) {
+    if (this.state.gameMode !== "damage" && this.state.currentRoundIndex >= this.state.totalRounds) {
       this.endGame();
       return;
     }
@@ -255,7 +258,7 @@ export class GameRoom extends Room<RoomStateSchema> {
     this.state.correctAnswerText = "";
     for (const p of this.state.players.values()) p.hasActedThisPhase = false;
 
-    const record = this.questionSet[this.state.currentRoundIndex];
+    const record = this.questionSet[this.state.currentRoundIndex % this.questionSet.length];
     if (!record) {
       this.endGame();
       return;
@@ -288,6 +291,11 @@ export class GameRoom extends Room<RoomStateSchema> {
         break;
       case "question":
         this.finalizeAnswerDrafts();
+        if (this.state.gameMode === "damage") {
+          this.resolveDamageRound();
+          this.setPhase("reveal", PHASE_DURATIONS_MS.reveal);
+          break;
+        }
         this.setPhase("confidence", PHASE_DURATIONS_MS.confidence);
         this.shortenConfidencePhaseIfEveryoneDecided();
         break;
@@ -300,7 +308,8 @@ export class GameRoom extends Room<RoomStateSchema> {
         this.setPhase("reveal", PHASE_DURATIONS_MS.reveal);
         break;
       case "reveal":
-        this.advanceToNextRound();
+        if (this.state.gameMode === "damage" && this.damageKnockout) this.endGame();
+        else this.advanceToNextRound();
         break;
       default:
         break;
@@ -464,8 +473,72 @@ export class GameRoom extends Room<RoomStateSchema> {
     return winningValues;
   }
 
+  private resolveDamageRound() {
+    const record = this.questionSet[this.state.currentRoundIndex % this.questionSet.length];
+    const correctAnswer = getLocalizedCorrectAnswer(record, this.locale);
+    const closestValues = record.type === "closest_answer" ? this.getClosestAnswerWinningValues(correctAnswer) : null;
+    const isWinningAnswer = (value: unknown) => record.type === "closest_answer"
+      ? Number.isFinite(Number(value)) && Boolean(closestValues?.has(Number(value)))
+      : isAnswerCorrect(record.type, value, correctAnswer);
+    const correctness = new Map<string, boolean>();
+    const shieldGains = new Map<string, number>();
+    const attacks = new Map<string, number>();
+
+    // Shield rewards are earned before simultaneous attacks are applied, so
+    // a newly earned shield can protect its owner during the same reveal.
+    for (const player of this.state.players.values()) {
+      const answer = this.roundAnswers.get(player.id);
+      const correct = answer ? isWinningAnswer(answer.value) : false;
+      correctness.set(player.id, correct);
+      if (!correct) {
+        if (!player.shieldPending) player.damageStreak = 0;
+        continue;
+      }
+
+      attacks.set(player.id, record.basePoints);
+      if (player.shieldPending) {
+        player.shield += record.basePoints;
+        shieldGains.set(player.id, record.basePoints);
+        player.shieldPending = false;
+        player.damageStreak = 0;
+      } else {
+        player.damageStreak += 1;
+        if (player.damageStreak >= 3) player.shieldPending = true;
+      }
+    }
+
+    for (const attacker of this.state.players.values()) {
+      const damage = attacks.get(attacker.id) ?? 0;
+      if (damage <= 0) continue;
+      const target = [...this.state.players.values()].find((player) => player.id !== attacker.id);
+      if (!target) continue;
+      const absorbed = Math.min(target.shield, damage);
+      target.shield -= absorbed;
+      target.health = Math.max(0, target.health - (damage - absorbed));
+      attacker.score += damage;
+    }
+
+    this.state.revealResults.clear();
+    for (const player of this.state.players.values()) {
+      const answer = this.roundAnswers.get(player.id);
+      const entry = new RevealEntrySchema();
+      entry.playerId = player.id;
+      entry.answerText = answer ? localizeAnswer(record, this.locale, answer.value) : "";
+      entry.correct = correctness.get(player.id) ?? false;
+      entry.scoreDelta = attacks.get(player.id) ?? 0;
+      entry.damageDealt = attacks.get(player.id) ?? 0;
+      entry.shieldGained = shieldGains.get(player.id) ?? 0;
+      entry.newStreak = player.damageStreak;
+      entry.detail = entry.correct ? `Damage ${entry.damageDealt}` : "No damage";
+      this.state.revealResults.push(entry);
+    }
+
+    this.state.correctAnswerText = localizeAnswer(record, this.locale, correctAnswer);
+    this.damageKnockout = [...this.state.players.values()].some((player) => player.health <= 0);
+  }
+
   private resolveRound() {
-    const record = this.questionSet[this.state.currentRoundIndex];
+    const record = this.questionSet[this.state.currentRoundIndex % this.questionSet.length];
     const correctAnswer = getLocalizedCorrectAnswer(record, this.locale);
     const currentStreaks: Record<string, number> = {};
     for (const [id, p] of this.state.players.entries()) currentStreaks[id] = p.streak;
@@ -550,18 +623,20 @@ export class GameRoom extends Room<RoomStateSchema> {
     this.resultsPersisted = true;
 
     const rankedPlayers = [...this.state.players.values()]
-      .sort((left, right) => right.score - left.score);
+      .sort((left, right) => this.state.gameMode === "damage" ? right.health - left.health : right.score - left.score);
     const completedPlayers = rankedPlayers.flatMap((player, index) => {
       const deviceId = this.deviceIds.get(player.id);
       if (!deviceId) return [];
       const priorPlayer = rankedPlayers[index - 1];
-      const finalRank = priorPlayer && priorPlayer.score === player.score
-        ? rankedPlayers.findIndex((candidate) => candidate.score === player.score) + 1
+      const rankingValue = this.state.gameMode === "damage" ? player.health : player.score;
+      const priorRankingValue = priorPlayer ? (this.state.gameMode === "damage" ? priorPlayer.health : priorPlayer.score) : null;
+      const finalRank = priorPlayer && priorRankingValue === rankingValue
+        ? rankedPlayers.findIndex((candidate) => (this.state.gameMode === "damage" ? candidate.health : candidate.score) === rankingValue) + 1
         : index + 1;
       return [{
         deviceId,
         displayName: player.name,
-        finalScore: player.score,
+        finalScore: this.state.gameMode === "damage" ? player.health : player.score,
         finalRank,
       }];
     });
@@ -571,7 +646,7 @@ export class GameRoom extends Room<RoomStateSchema> {
       roomCode: this.state.code,
       gameMode: this.state.gameMode,
       locale: this.locale,
-      roundCount: this.state.totalRounds,
+      roundCount: this.state.gameMode === "damage" ? this.state.currentRoundIndex + 1 : this.state.totalRounds,
       startedAt: this.gameStartedAt,
       players: completedPlayers,
     });

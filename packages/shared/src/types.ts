@@ -15,7 +15,7 @@ export type QuestionType =
   | "visual";
 
 export type Locale = "en" | "bg";
-export type GameMode = "classic" | "friends";
+export type GameMode = "classic" | "friends" | "damage";
 
 /** A single localized rendering of a question, sent to the client. */
 export interface LocalizedQuestion {

@@ -40,14 +40,16 @@ export function FinalResultsScreen({ room, onExit }: { room: Room; onExit: () =>
     id: p.id,
     name: p.name,
     score: p.score,
+    health: p.health,
     streak: p.streak,
-  })).sort((a, b) => b.score - a.score);
+  })).sort((a, b) => state.gameMode === "damage" ? b.health - a.health : b.score - a.score);
   const winner = players[0];
+  const isDamageDraw = state.gameMode === "damage" && players.every((player) => player.health <= 0);
 
   return (
     <Screen style={styles.screen} androidScale={ANDROID_GAME_UI_SCALE}>
-      <Subtitle>{t("final.winner")}</Subtitle>
-      <Title>🏆 {winner?.name ?? "—"}</Title>
+      <Subtitle>{isDamageDraw ? t("final.draw") : t("final.winner")}</Subtitle>
+      <Title>{isDamageDraw ? t("final.bothDefeated") : `🏆 ${winner?.name ?? "—"}`}</Title>
 
       {rewardedGamesToday > 0 ? (
         <Animated.View
@@ -84,7 +86,7 @@ export function FinalResultsScreen({ room, onExit }: { room: Room; onExit: () =>
               <Text style={styles.name}>{item.name}{item.id === room.sessionId ? " (You)" : ""}</Text>
               {item.streak > 0 ? <Text style={styles.streak}>🔥 {item.streak}</Text> : null}
             </View>
-            <Text style={styles.score}>{item.score}</Text>
+            <Text style={styles.score}>{state.gameMode === "damage" ? `${item.health} HP` : item.score}</Text>
           </View>
         )}
       />

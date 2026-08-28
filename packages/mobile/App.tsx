@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { AppState, Image, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
+import { Animated, AppState, Image, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Room } from "colyseus.js";
@@ -61,11 +61,29 @@ function AppFrame({ children, highContrast = false }: { children: React.ReactNod
   );
 }
 
-function StarsBadge({ stars }: { stars: number }) {
+function StarsBadge({ stars, gain }: { stars: number; gain: { id: number; amount: number } | null }) {
+  const gainOpacity = useRef(new Animated.Value(0)).current;
+  const gainTranslateY = useRef(new Animated.Value(8)).current;
+
+  useEffect(() => {
+    if (!gain) return;
+    gainOpacity.setValue(1);
+    gainTranslateY.setValue(8);
+    Animated.parallel([
+      Animated.timing(gainOpacity, { toValue: 0, duration: 1400, useNativeDriver: true }),
+      Animated.timing(gainTranslateY, { toValue: -10, duration: 1400, useNativeDriver: true }),
+    ]).start();
+  }, [gain?.id, gainOpacity, gainTranslateY]);
+
   return (
-    <View pointerEvents="none" style={styles.pointsBadge}>
-      <PointsIcon />
-      <Text style={styles.pointsBadgeText}>{stars}</Text>
+    <View pointerEvents="none" style={styles.starsHud}>
+      <View style={styles.pointsBadge}>
+        <PointsIcon />
+        <Text style={styles.pointsBadgeText}>{stars}</Text>
+      </View>
+      {gain ? (
+        <Animated.Text style={[styles.starGainText, { opacity: gainOpacity, transform: [{ translateY: gainTranslateY }] }]}>+{gain.amount} stars</Animated.Text>
+      ) : null}
     </View>
   );
 }
@@ -80,6 +98,8 @@ export default function App() {
   const [defaultPlayerName, setDefaultPlayerName] = useState("");
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [stars, setStars] = useState(0);
+  const [starGain, setStarGain] = useState<{ id: number; amount: number } | null>(null);
+  const [dailyRewardCelebration, setDailyRewardCelebration] = useState<{ id: number; amount: number; streakDay: number } | null>(null);
   const [dailyReward, setDailyReward] = useState<DailyRewardStatus | null>(null);
   const [dailyRewardClaiming, setDailyRewardClaiming] = useState(false);
   const [hapticsEnabled, setHapticsEnabled] = useState(true);
@@ -158,7 +178,7 @@ export default function App() {
     return storedDeviceId;
   }
 
-  async function handleCreate(name: string, rounds: number, gameMode: "classic" | "friends", visibility: "private" | "public") {
+  async function handleCreate(name: string, rounds: number, gameMode: "classic" | "friends" | "damage", visibility: "private" | "public") {
     const currentDeviceId = await requireDeviceId();
     let recentQuestionIds: string[] = [];
     try {
@@ -247,13 +267,32 @@ export default function App() {
     try {
       const status = await claimDailyReward(currentDeviceId, defaultPlayerName);
       if (!status) return;
+      const earned = Math.max(0, status.stars - stars);
       setDailyReward(status);
       setStars(status.stars);
-      if (hapticsEnabled) Vibration.vibrate(120);
+      if (earned > 0) {
+        const id = Date.now();
+        setStarGain({ id, amount: earned });
+        setDailyRewardCelebration({ id, amount: earned, streakDay: status.streakDay });
+      }
     } finally {
       setDailyRewardClaiming(false);
     }
   }
+
+  useEffect(() => {
+    if (!deviceId || !dailyReward || dailyReward.available) return;
+    const refreshDelay = Math.max(1_000, new Date(dailyReward.nextClaimAt).getTime() - Date.now() + 500);
+    const timeout = setTimeout(() => {
+      void getDailyRewardStatus(deviceId).then((status) => {
+        if (status) {
+          setDailyReward(status);
+          setStars(status.stars);
+        }
+      });
+    }, Math.min(refreshDelay, 2_147_483_647));
+    return () => clearTimeout(timeout);
+  }, [dailyReward?.available, dailyReward?.nextClaimAt, deviceId]);
 
   useEffect(() => {
     if (!localeReady) return;
@@ -384,6 +423,8 @@ export default function App() {
               onSettings={() => setNav("settings")}
               dailyReward={dailyReward}
               dailyRewardClaiming={dailyRewardClaiming}
+              dailyRewardCelebration={dailyRewardCelebration}
+              onDailyRewardCelebrationShown={() => setDailyRewardCelebration(null)}
               onClaimDailyReward={() => void handleClaimDailyReward()}
             />
           )}
@@ -408,7 +449,7 @@ export default function App() {
           )}
         </>
       )}
-      {nav !== "in-room" ? <StarsBadge stars={stars} /> : null}
+      {nav !== "in-room" ? <StarsBadge stars={stars} gain={starGain} /> : null}
     </AppFrame>
   );
 }
@@ -612,11 +653,14 @@ const styles = StyleSheet.create({
   appContent: {
     flex: 1,
   },
-  pointsBadge: {
+  starsHud: {
     position: "absolute",
     top: 18,
     right: 18,
     zIndex: 20,
+    alignItems: "center",
+  },
+  pointsBadge: {
     minWidth: 76,
     height: 40,
     paddingHorizontal: 12,
@@ -633,6 +677,12 @@ const styles = StyleSheet.create({
     color: theme.text,
     fontSize: 17,
     fontWeight: "900",
+  },
+  starGainText: {
+    color: "#F7D85B",
+    fontSize: 13,
+    fontWeight: "900",
+    marginTop: 3,
   },
   menuButton: {
     position: "absolute",
