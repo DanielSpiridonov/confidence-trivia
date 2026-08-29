@@ -35,6 +35,7 @@ export function RankedScreen({
       <Title>{t("ranked.title")}</Title>
 
       <View style={styles.content}>
+        {current ? <PlayerRankCard entry={current} t={t} /> : null}
         <View style={styles.leaderboardPanel}>
           <View style={styles.headerRow}>
             <Text style={[styles.header, styles.position]}>{t("ranked.spot")}</Text>
@@ -77,9 +78,42 @@ function LeaderboardRow({ entry, isCurrent, t }: { entry: RankedLeaderboardEntry
   );
 }
 
+function PlayerRankCard({ entry, t }: { entry: RankedLeaderboardEntry; t: (key: string, options?: any) => string }) {
+  const isPlaced = entry.placementMatches >= RANKED_PLACEMENT_MATCHES;
+  const division = isPlaced ? getRankedDivision(entry.lp) : null;
+  const matchesPlayed = Math.min(entry.placementMatches, RANKED_PLACEMENT_MATCHES);
+
+  return (
+    <View style={[styles.rankCard, division && { borderColor: division.color }]}> 
+      <Text style={styles.rankCardEyebrow}>{t("ranked.yourRank")}</Text>
+      <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={[styles.rankCardName, { color: division?.color ?? theme.textDim }]}>
+        {isPlaced ? t(`ranked.ranks.${entry.rankKey}`) : t("ranked.ranks.novice")}
+      </Text>
+      {isPlaced ? (
+        <>
+          <Text style={styles.rankCardLp}>{t("ranked.lpValue", { value: entry.lp })}</Text>
+          <Text style={styles.rankCardPosition}>{entry.position ? t("ranked.globalPosition", { position: entry.position }) : ""}</Text>
+        </>
+      ) : (
+        <>
+          <Text style={styles.rankCardProgress}>{t("ranked.placements", { current: matchesPlayed, total: RANKED_PLACEMENT_MATCHES })}</Text>
+          <Text style={styles.rankCardHint}>{t("ranked.placementHint", { count: RANKED_PLACEMENT_MATCHES - matchesPlayed })}</Text>
+        </>
+      )}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   screen: { justifyContent: "flex-start", paddingTop: 12 },
-  content: { flex: 1, minHeight: 0, width: "100%", flexDirection: "row", gap: 18, marginTop: 6 },
+  content: { flex: 1, minHeight: 0, width: "100%", flexDirection: "row", gap: 12, marginTop: 6 },
+  rankCard: { width: 150, alignSelf: "stretch", alignItems: "center", justifyContent: "center", backgroundColor: "rgba(31, 26, 51, 0.96)", borderRadius: 14, borderWidth: 2, borderColor: "rgba(184, 140, 255, 0.45)", paddingHorizontal: 10 },
+  rankCardEyebrow: { color: theme.textDim, fontSize: 10, fontWeight: "900", textTransform: "uppercase", letterSpacing: 0.8 },
+  rankCardName: { marginTop: 5, color: theme.text, fontSize: 23, fontWeight: "900", textAlign: "center" },
+  rankCardLp: { marginTop: 5, color: theme.text, fontSize: 14, fontWeight: "900" },
+  rankCardPosition: { marginTop: 2, color: theme.textDim, fontSize: 10, fontWeight: "700" },
+  rankCardProgress: { marginTop: 7, color: theme.text, fontSize: 10, fontWeight: "800", textAlign: "center" },
+  rankCardHint: { marginTop: 3, color: theme.textDim, fontSize: 9, fontWeight: "600", textAlign: "center" },
   leaderboardPanel: { flex: 1, minWidth: 0, backgroundColor: "rgba(31, 26, 51, 0.94)", borderRadius: 14, padding: 10 },
   headerRow: { flexDirection: "row", paddingHorizontal: 8, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.09)" },
   header: { color: theme.textDim, fontSize: 10, fontWeight: "900", textTransform: "uppercase" },
