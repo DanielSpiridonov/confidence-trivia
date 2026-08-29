@@ -6,5 +6,6 @@ export * from "./config/streaks";
 export * from "./config/progression";
 export * from "./config/ranked";
 export * from "./config/damageWager";
+export * from "./config/cosmetics";
 export * from "./scoring/computeRoundResults";
 export * from "./scoring/isAnswerCorrect";

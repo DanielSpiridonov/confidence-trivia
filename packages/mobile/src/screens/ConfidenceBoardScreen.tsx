@@ -51,7 +51,7 @@ export function ConfidenceBoardScreen({ room, mySessionId }: { room: Room; mySes
             onPress={() => !isFinalized && setSelectedTarget((current) => current === item.playerId ? null : item.playerId)}
             style={[styles.row, selectedTarget === item.playerId && styles.rowSelected]}
           >
-            <Text style={styles.name}>{nameFor(item.playerId)}</Text>
+            <Text style={[styles.name, { color: state.players.get(item.playerId)?.nameColor || theme.text }]}>{nameFor(item.playerId)}</Text>
             <Text style={styles.confidence}>
               {item.confidence === "none" ? "—" : item.confidence}
             </Text>

@@ -8,6 +8,7 @@ interface PlayerRow {
   name: string;
   score: number;
   streak: number;
+  nameColor?: string;
 }
 
 /** Compact leaderboard embedded in the between-round reveal screen. */
@@ -40,7 +41,7 @@ export function LeaderboardStrip({
               ellipsizeMode="tail"
               adjustsFontSizeToFit
               minimumFontScale={0.75}
-              style={styles.name}
+              style={[styles.name, { color: player.nameColor || theme.text }]}
             >
               {player.name}{player.id === myPlayerId ? " (You)" : ""}
             </Text>

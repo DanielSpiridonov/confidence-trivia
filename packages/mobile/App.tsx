@@ -19,12 +19,13 @@ import { RevealScreen } from "./src/screens/RevealScreen";
 import { FinalResultsScreen } from "./src/screens/FinalResultsScreen";
 import { SettingsScreen, VolumeControl } from "./src/screens/SettingsScreen";
 import { RankedScreen } from "./src/screens/RankedScreen";
+import { ShopScreen } from "./src/screens/ShopScreen";
 import { claimDailyReward, createRoom, DailyRewardStatus, getDailyRewardStatus, getPlayerStars, joinPublicRoom, joinRoom, reconnectRoom, useRoomState } from "./src/network/client";
 import { prepareSoundEffects, setSoundEffectsVolume, stopAllSoundEffects } from "./src/audio/sounds";
 import { pauseMusicForBackground, prepareMusic, setMusicVolume as applyMusicVolume, startMenuMusic, stopMenuMusic } from "./src/audio/music";
 import { getOrCreateDeviceId } from "./src/utils/deviceId";
 
-type Nav = "home" | "create" | "join" | "ranked" | "settings" | "in-room";
+type Nav = "home" | "create" | "join" | "ranked" | "shop" | "settings" | "in-room";
 type RoomRecoveryState = "reconnecting" | "failed";
 const LANGUAGE_STORAGE_KEY = "confidence-trivia:locale";
 const SFX_VOLUME_STORAGE_KEY = "confidence-trivia:sfx-volume";
@@ -421,7 +422,8 @@ export default function App() {
             <HomeScreen
               onCreate={() => setNav("create")}
               onJoin={() => setNav("join")}
-              onRanked={() => setNav("ranked")}
+                onRanked={() => setNav("ranked")}
+                onShop={() => setNav("shop")}
               onSettings={() => setNav("settings")}
               dailyReward={dailyReward}
               dailyRewardClaiming={dailyRewardClaiming}
@@ -438,6 +440,7 @@ export default function App() {
               onBack={() => setNav("home")}
             />
           ) : null}
+          {nav === "shop" && deviceId ? <ShopScreen deviceId={deviceId} displayName={defaultPlayerName} onBack={() => setNav("home")} /> : null}
           {nav === "settings" && (
             <SettingsScreen
               locale={locale}

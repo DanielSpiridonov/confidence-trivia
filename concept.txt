@@ -1451,6 +1451,12 @@ Build on the device-based player profile and persistent stars system:
 
 The daily reward is separate from stars earned by completing games.
 
+### Shop prototype
+
+The mobile app includes a UI-only shop prototype with Featured, Avatars, Frames, and Buy Stars tabs. Cosmetic cards, prices, euro star bundles, and purchase controls are visual placeholders only. No inventory ownership, equipping, receipt validation, platform billing, or real-money transaction logic is enabled yet.
+
+Name colors are the first functional cosmetic exception. During prototype testing all six colors are free, choosing one creates an inventory record, and the equipped selection persists on the device-based player profile and appears throughout multiplayer game-room UI. Prices and account-authenticated ownership will be added later.
+
 ---
 
 ## PHASE 8 — Damage Mode

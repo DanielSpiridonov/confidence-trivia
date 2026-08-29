@@ -22,6 +22,12 @@
     "codeTab": "Въведи код",
     "browseTab": "Публични стаи",
     "searchLeader": "Търси по име на домакина",
+    "filters": {
+      "all": "Всички",
+      "classic": "Класическа",
+      "ranked": "Рангова",
+      "damage": "1v1 Щети"
+    },
     "loadingRooms": "Търсене на публични стаи...",
     "noRooms": "Няма съвпадащи публични стаи",
     "roomMeta": "{{players}} / {{max}} играчи · {{rounds}} рунда",
@@ -47,6 +53,7 @@
   },
   "lobby": {
     "roomCode": "КОД НА СТАЯТА",
+    "players": "Играчи",
     "wagerStake": "★ {{count}} на играч",
     "wagerPot": "Награда: ★ {{count}}",
     "insufficientWagerStars": "{{names}} се нуждае от поне {{stake}} звезди.",
@@ -130,7 +137,7 @@
   },
   "ranked": {
     "title": "Рангово класиране",
-    "shortTitle": "Рангова",
+    "shortTitle": "Класация",
     "spot": "Място",
     "player": "Играч",
     "lp": "LP",
@@ -170,6 +177,29 @@
       "omniscient": "Всезнаещ"
     }
   },
+  "shop": {
+    "title": "Магазин за персонализация",
+    "shortTitle": "Магазин",
+    "previewOnly": "Дизайн — покупките са изключени",
+    "nameColorsFree": "Цветове за име — безплатни за тест",
+    "free": "Безплатно · Сложи",
+    "equipped": "Избрано",
+    "equipping": "Задаване...",
+    "nameColors": {
+      "name_white": "Бяло",
+      "name_sky": "Небесно",
+      "name_mint": "Мента",
+      "name_gold": "Златно",
+      "name_coral": "Корал",
+      "name_lilac": "Люляк"
+    },
+    "tabs": {
+      "featured": "Избрани",
+      "avatars": "Аватари",
+      "frames": "Рамки",
+      "stars": "Купи звезди"
+    }
+  },
   "final": {
     "title": "Финални резултати",
     "winner": "Победител",
@@ -190,11 +220,9 @@
     "haptics": "Вибрации",
     "language": "Език",
     "accessibility": "Достъпност",
-    "appearance": "Външен вид",
     "defaultName": "Име по подразбиране",
     "hapticsEnabled": "Вибрации",
     "highContrast": "Висок контраст",
-    "appearanceComingSoon": "Темите и фоновете ще бъдат добавени по-късно.",
     "english": "Английски",
     "bulgarian": "Български",
     "soundEffects": "Звукови ефекти",

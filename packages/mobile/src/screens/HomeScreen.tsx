@@ -6,7 +6,6 @@ import { PointsIcon } from "../components/PointsIcon";
 
 const DAILY_REWARD_PLATFORM_IMAGE: ImageSourcePropType = require("../../assets/popup-platform.png");
 const DAILY_REWARD_PRESENT_IMAGE: ImageSourcePropType = require("../../assets/stars-gift.png");
-const CLAIMED_REWARD_PLATFORM_IMAGE: ImageSourcePropType = require("../../assets/platform-used-transparent.png");
 const CLAIMED_REWARD_PRESENT_IMAGE: ImageSourcePropType = require("../../assets/gift-opened-transparent.png");
 const RANKED_TROPHY_IMAGE: ImageSourcePropType = require("../../assets/trophy-transparent.png");
 const REWARD_STAGES = [10, 20, 30, 50, 75] as const;
@@ -34,7 +33,7 @@ function HomePopup({ label, amount, streakLabel, claimed, claimedLabel, countdow
       style={({ pressed }) => [styles.popup, disabled && !claimed && styles.popupDisabled, pressed && !disabled && styles.popupPressed]}
     >
       <View style={styles.popupArtwork}>
-        {platformImage ? <Image source={platformImage} resizeMode="contain" style={[styles.popupPlatformImage, claimed && styles.popupPlatformClaimed]} /> : <View style={styles.popupPlatformFallback} />}
+        {platformImage ? <Image source={platformImage} resizeMode="contain" style={[styles.popupPlatformImage, claimed && styles.popupPlatformClaimed]} /> : null}
         {featureImage ? (
           <Image source={featureImage} resizeMode="contain" style={[styles.popupFeatureImage, claimed && styles.popupFeatureClaimed]} />
         ) : (
@@ -53,6 +52,7 @@ export function HomeScreen({
   onCreate,
   onJoin,
   onRanked,
+  onShop,
   onSettings,
   dailyReward,
   dailyRewardClaiming,
@@ -63,6 +63,7 @@ export function HomeScreen({
   onCreate: () => void;
   onJoin: () => void;
   onRanked: () => void;
+  onShop: () => void;
   onSettings: () => void;
   dailyReward: { available: boolean; amount: number; streakDay: number; nextClaimAt: string } | null;
   dailyRewardClaiming: boolean;
@@ -133,7 +134,6 @@ export function HomeScreen({
             claimed={!dailyReward.available}
             claimedLabel={t("home.claimed")}
             countdown={countdown}
-            platformImage={dailyReward.available ? DAILY_REWARD_PLATFORM_IMAGE : CLAIMED_REWARD_PLATFORM_IMAGE}
             featureImage={dailyReward.available ? DAILY_REWARD_PRESENT_IMAGE : CLAIMED_REWARD_PRESENT_IMAGE}
             disabled={dailyRewardClaiming}
             onPress={() => {
@@ -156,6 +156,12 @@ export function HomeScreen({
             <Image source={RANKED_TROPHY_IMAGE} resizeMode="contain" style={styles.rankedTrophyImage} />
           </View>
           <Text numberOfLines={1} style={styles.popupLabel}>{t("ranked.shortTitle")}</Text>
+        </Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel={t("shop.title")} onPress={onShop} style={({ pressed }) => [styles.popup, pressed && styles.popupPressed]}>
+          <View style={styles.popupArtwork}>
+            <Text style={styles.shopIcon}>🛍️</Text>
+          </View>
+          <Text numberOfLines={1} style={styles.popupLabel}>{t("shop.shortTitle")}</Text>
         </Pressable>
       </View>
       <Title>🔥 {t("home.title")}</Title>
@@ -214,12 +220,12 @@ const styles = StyleSheet.create({
   popupFeatureClaimed: { width: 53, height: 53, bottom: 8 },
   popupStreakLabel: { position: "absolute", top: 0, zIndex: 2, color: "#FFFFFF", fontSize: 8, fontWeight: "900", textShadowColor: "#000000", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   popupCountdown: { position: "absolute", top: 24, zIndex: 2, color: "#FFFFFF", fontSize: 9, fontWeight: "900", textShadowColor: "#000000", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
-  popupPlatformFallback: { width: 110, height: 31, borderRadius: 6, backgroundColor: "rgba(124, 92, 255, 0.72)", borderWidth: 2, borderColor: "rgba(255, 255, 255, 0.24)" },
   popupFeatureFallback: { position: "absolute", width: 68, height: 68, bottom: 18, alignItems: "center", justifyContent: "center" },
   popupLabel: { color: "#FFFFFF", fontSize: 9, fontWeight: "800", textAlign: "center", width: "100%" },
   popupAmount: { color: "#F7D85B", fontSize: 10, fontWeight: "900", textAlign: "center" },
   popupTextClaimed: { color: "rgba(255, 255, 255, 0.68)" },
   rankedTrophyImage: { position: "absolute", width: 55, height: 53, bottom: 9 },
+  shopIcon: { position: "absolute", bottom: 6, fontSize: 43 },
   celebrationBackdrop: { ...StyleSheet.absoluteFillObject, zIndex: 30, alignItems: "center", justifyContent: "center" },
   celebrationPanel: { width: "78%", maxWidth: 620, minHeight: 204, borderRadius: 8, backgroundColor: "rgba(31, 26, 51, 0.98)", borderWidth: 1, borderColor: "rgba(181, 165, 255, 0.35)", paddingHorizontal: 28, paddingVertical: 18, alignItems: "center" },
   celebrationClose: { position: "absolute", top: 8, right: 10, zIndex: 2, width: 30, height: 30, alignItems: "center", justifyContent: "center" },

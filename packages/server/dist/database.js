@@ -4,6 +4,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getDatabaseStatus = getDatabaseStatus;
+exports.getPlayerCustomization = getPlayerCustomization;
+exports.equipFreeNameColor = equipFreeNameColor;
 exports.reserveDamageWager = reserveDamageWager;
 exports.settleDamageWager = settleDamageWager;
 exports.getRankedLeaderboard = getRankedLeaderboard;
@@ -31,6 +33,53 @@ async function getDatabaseStatus() {
     catch (error) {
         console.error("Database health check failed", error);
         return "unavailable";
+    }
+}
+async function getPlayerCustomization(deviceId) {
+    if (!sql)
+        return { nameColorId: shared_1.DEFAULT_NAME_COLOR_ID, nameColor: shared_1.DEFAULT_NAME_COLOR };
+    try {
+        const [equipped] = await sql `
+      select cosmetic_id from public.player_cosmetics
+      where player_id = ${deviceId} and cosmetic_type = 'name_color' and equipped = true
+      limit 1
+    `;
+        const cosmetic = (0, shared_1.getNameColorCosmetic)(equipped?.cosmetic_id) ?? (0, shared_1.getNameColorCosmetic)(shared_1.DEFAULT_NAME_COLOR_ID);
+        return { nameColorId: cosmetic.id, nameColor: cosmetic.color };
+    }
+    catch (error) {
+        console.error("Could not load player customization", error);
+        return null;
+    }
+}
+async function equipFreeNameColor(deviceId, cosmeticId, displayName) {
+    const cosmetic = (0, shared_1.getNameColorCosmetic)(cosmeticId);
+    if (!sql || !cosmetic)
+        return null;
+    try {
+        await sql.begin(async (transaction) => {
+            await transaction `
+        insert into public.players (id, display_name, last_seen_at)
+        values (${deviceId}, ${displayName || "Player"}, now())
+        on conflict (id) do update set display_name = excluded.display_name, last_seen_at = excluded.last_seen_at
+      `;
+            await transaction `select id from public.players where id = ${deviceId} for update`;
+            await transaction `
+        update public.player_cosmetics set equipped = false, equipped_at = null
+        where player_id = ${deviceId} and cosmetic_type = 'name_color' and equipped = true
+      `;
+            await transaction `
+        insert into public.player_cosmetics (player_id, cosmetic_id, cosmetic_type, equipped, equipped_at)
+        values (${deviceId}, ${cosmetic.id}, 'name_color', true, now())
+        on conflict (player_id, cosmetic_id) do update
+        set equipped = true, equipped_at = now()
+      `;
+        });
+        return { nameColorId: cosmetic.id, nameColor: cosmetic.color };
+    }
+    catch (error) {
+        console.error("Could not equip name color", error);
+        return null;
     }
 }
 async function reserveDamageWager(matchId, playerIds, stake) {

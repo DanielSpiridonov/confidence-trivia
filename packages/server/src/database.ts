@@ -8,6 +8,9 @@ import {
   RANKED_LP_BY_PLACEMENT,
   RANKED_PLACEMENT_MATCHES,
   RANKED_PLACEMENT_POINTS,
+  DEFAULT_NAME_COLOR,
+  DEFAULT_NAME_COLOR_ID,
+  getNameColorCosmetic,
 } from "@confidence-trivia/shared";
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -52,6 +55,56 @@ export interface PlayerProgressUpdate {
   stars: number;
   starsEarned: number;
   rewardedGamesToday: number;
+}
+
+export interface PlayerCustomization {
+  nameColorId: string;
+  nameColor: string;
+}
+
+export async function getPlayerCustomization(deviceId: string): Promise<PlayerCustomization | null> {
+  if (!sql) return { nameColorId: DEFAULT_NAME_COLOR_ID, nameColor: DEFAULT_NAME_COLOR };
+  try {
+    const [equipped] = await sql<{ cosmetic_id: string }[]>`
+      select cosmetic_id from public.player_cosmetics
+      where player_id = ${deviceId} and cosmetic_type = 'name_color' and equipped = true
+      limit 1
+    `;
+    const cosmetic = getNameColorCosmetic(equipped?.cosmetic_id) ?? getNameColorCosmetic(DEFAULT_NAME_COLOR_ID)!;
+    return { nameColorId: cosmetic.id, nameColor: cosmetic.color };
+  } catch (error) {
+    console.error("Could not load player customization", error);
+    return null;
+  }
+}
+
+export async function equipFreeNameColor(deviceId: string, cosmeticId: string, displayName: string): Promise<PlayerCustomization | null> {
+  const cosmetic = getNameColorCosmetic(cosmeticId);
+  if (!sql || !cosmetic) return null;
+  try {
+    await sql.begin(async (transaction) => {
+      await transaction`
+        insert into public.players (id, display_name, last_seen_at)
+        values (${deviceId}, ${displayName || "Player"}, now())
+        on conflict (id) do update set display_name = excluded.display_name, last_seen_at = excluded.last_seen_at
+      `;
+      await transaction`select id from public.players where id = ${deviceId} for update`;
+      await transaction`
+        update public.player_cosmetics set equipped = false, equipped_at = null
+        where player_id = ${deviceId} and cosmetic_type = 'name_color' and equipped = true
+      `;
+      await transaction`
+        insert into public.player_cosmetics (player_id, cosmetic_id, cosmetic_type, equipped, equipped_at)
+        values (${deviceId}, ${cosmetic.id}, 'name_color', true, now())
+        on conflict (player_id, cosmetic_id) do update
+        set equipped = true, equipped_at = now()
+      `;
+    });
+    return { nameColorId: cosmetic.id, nameColor: cosmetic.color };
+  } catch (error) {
+    console.error("Could not equip name color", error);
+    return null;
+  }
 }
 
 export interface DamageWagerReservation {

@@ -25,6 +25,35 @@ export async function getPlayerStars(deviceId: string): Promise<number | null> {
   }
 }
 
+export interface PlayerCustomization {
+  nameColorId: string;
+  nameColor: string;
+}
+
+export async function getPlayerCustomization(deviceId: string): Promise<PlayerCustomization | null> {
+  try {
+    const response = await fetch(`${HTTP_SERVER_URL}/players/${encodeURIComponent(deviceId)}/customization`);
+    if (!response.ok) return null;
+    return await response.json() as PlayerCustomization;
+  } catch {
+    return null;
+  }
+}
+
+export async function equipNameColor(deviceId: string, displayName: string, cosmeticId: string): Promise<PlayerCustomization | null> {
+  try {
+    const response = await fetch(`${HTTP_SERVER_URL}/players/${encodeURIComponent(deviceId)}/customization/name-color`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ displayName, cosmeticId }),
+    });
+    if (!response.ok) return null;
+    return await response.json() as PlayerCustomization;
+  } catch {
+    return null;
+  }
+}
+
 export interface DailyRewardStatus {
   stars: number;
   available: boolean;

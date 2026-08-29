@@ -120,9 +120,14 @@ class GameRoom extends colyseus_1.Room {
         if (player.isHost)
             this.state.hostId = player.id;
         this.state.players.set(client.sessionId, player);
-        const stars = await (0, database_1.upsertPlayer)(deviceId, player.name);
+        const [stars, customization] = await Promise.all([
+            (0, database_1.upsertPlayer)(deviceId, player.name),
+            (0, database_1.getPlayerCustomization)(deviceId),
+        ]);
         if (stars !== null)
             player.stars = stars;
+        if (customization)
+            player.nameColor = customization.nameColor;
         void this.updateLobbyMetadata();
     }
     async onLeave(client, consented) {

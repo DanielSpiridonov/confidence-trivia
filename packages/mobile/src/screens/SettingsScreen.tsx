@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { ANDROID_COMPACT_MENU_UI_SCALE, BackIconButton, Screen, Title, BigButton, theme } from "../components/ui";
 import { isValidPlayerName } from "../utils/playerName";
 
-type SettingsSection = "profile" | "sounds" | "haptics" | "language" | "accessibility" | "appearance";
+type SettingsSection = "profile" | "sounds" | "haptics" | "language" | "accessibility";
 
 function SettingsToggle({ label, value, onChange }: { label: string; value: boolean; onChange: (value: boolean) => void }) {
   return (
@@ -160,8 +160,6 @@ export function SettingsScreen({
         );
       case "accessibility":
         return <View style={styles.panelContent}><SettingsToggle label={t("settings.highContrast")} value={highContrastEnabled} onChange={onChangeHighContrastEnabled} /></View>;
-      case "appearance":
-        return <Text style={styles.emptyPanelText}>{t("settings.appearanceComingSoon")}</Text>;
     }
   }
 
@@ -171,7 +169,7 @@ export function SettingsScreen({
       <Title>{t("settings.title")}</Title>
       <View style={styles.settingsLayout}>
         <View style={styles.sidebar}>
-          {(["profile", "sounds", "haptics", "language", "accessibility", "appearance"] as const).map((value) => (
+          {(["profile", "sounds", "haptics", "language", "accessibility"] as const).map((value) => (
             <Pressable
               key={value}
               onPress={() => setSection(value)}
@@ -214,7 +212,6 @@ const styles = StyleSheet.create({
   toggleTrackEnabled: { backgroundColor: theme.primary },
   toggleThumb: { width: 20, height: 20, borderRadius: 10, backgroundColor: theme.textDim },
   toggleThumbEnabled: { transform: [{ translateX: 20 }], backgroundColor: theme.text },
-  emptyPanelText: { color: theme.textDim, fontSize: 15 },
   volumeControl: {
     width: "100%",
     backgroundColor: theme.surface,

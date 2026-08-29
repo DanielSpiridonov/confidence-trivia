@@ -18,7 +18,7 @@ export function DamageHud({ state, myPlayerId }: { state: any; myPlayerId: strin
               const shieldReady = player.shieldPending || player.shield > 0;
               return <>
             <View style={styles.header}>
-              <Text numberOfLines={1} style={styles.name}>{player.name}{player.id === myPlayerId ? ` (${t("common.you")})` : ""}</Text>
+              <Text numberOfLines={1} style={[styles.name, { color: player.nameColor || theme.text }]}>{player.name}{player.id === myPlayerId ? ` (${t("common.you")})` : ""}</Text>
               <Text style={styles.healthText}>{player.health}/15 HP</Text>
             </View>
             <View style={[styles.healthTrack, shieldReady && styles.healthTrackShielded]}>

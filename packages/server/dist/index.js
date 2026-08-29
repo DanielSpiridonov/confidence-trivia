@@ -29,6 +29,32 @@ app.get("/players/:deviceId/stars", async (req, res) => {
     }
     res.json({ stars });
 });
+app.get("/players/:deviceId/customization", async (req, res) => {
+    if (!isDeviceId(req.params.deviceId)) {
+        res.status(400).json({ error: "Invalid device ID" });
+        return;
+    }
+    const customization = await (0, database_1.getPlayerCustomization)(req.params.deviceId);
+    if (!customization) {
+        res.status(503).json({ error: "Customization is temporarily unavailable" });
+        return;
+    }
+    res.json(customization);
+});
+app.post("/players/:deviceId/customization/name-color", async (req, res) => {
+    if (!isDeviceId(req.params.deviceId)) {
+        res.status(400).json({ error: "Invalid device ID" });
+        return;
+    }
+    const cosmeticId = typeof req.body?.cosmeticId === "string" ? req.body.cosmeticId : "";
+    const displayName = typeof req.body?.displayName === "string" ? req.body.displayName.trim().slice(0, 20) : "Player";
+    const customization = await (0, database_1.equipFreeNameColor)(req.params.deviceId, cosmeticId, displayName);
+    if (!customization) {
+        res.status(400).json({ error: "Could not equip that name color" });
+        return;
+    }
+    res.json(customization);
+});
 function isDeviceId(value) {
     return /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }

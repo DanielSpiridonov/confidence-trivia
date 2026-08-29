@@ -20,6 +20,7 @@ export function RevealScreen({ room }: { room: Room }) {
     name: player.name,
     score: player.score,
     streak: player.streak,
+    nameColor: player.nameColor,
   }));
   const isOrderingReveal = state.currentQuestion?.qType === "ordering";
   const isClosestAnswerReveal = state.currentQuestion?.qType === "closest_answer";
@@ -90,7 +91,7 @@ export function RevealScreen({ room }: { room: Room }) {
                     labelAbove ? styles.guessLabelAbove : styles.guessLabelBelow,
                     item.correct && styles.guessLabelWinner,
                   ]}>
-                    <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={styles.guessName}>{nameFor(item.playerId)}</Text>
+                    <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={[styles.guessName, { color: state.players.get(item.playerId)?.nameColor || theme.text }]}>{nameFor(item.playerId)}</Text>
                     <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} style={styles.guessNumber}>{item.answerText}</Text>
                     <Text style={[styles.guessDelta, { color: item.scoreDelta >= 0 ? "#7CFFA0" : theme.danger }] }>
                       {item.scoreDelta >= 0 ? "+" : ""}{item.scoreDelta}
@@ -129,7 +130,7 @@ export function RevealScreen({ room }: { room: Room }) {
           renderItem={({ item }: any) => (
           <View style={[styles.row, { borderLeftColor: item.correct ? "#7CFFA0" : theme.danger }]}>
             <View style={styles.rowHeader}>
-              <Text style={styles.name}>{nameFor(item.playerId)}</Text>
+              <Text style={[styles.name, { color: state.players.get(item.playerId)?.nameColor || theme.text }]}>{nameFor(item.playerId)}</Text>
               <View style={styles.scoreBlock}>
                 <Text style={styles.currentScore}>{state.gameMode === "damage" ? `${state.players.get(item.playerId)?.health ?? 0} HP` : state.players.get(item.playerId)?.score ?? 0}</Text>
                 <Text style={[styles.delta, { color: item.scoreDelta >= 0 ? "#7CFFA0" : theme.danger }] }>

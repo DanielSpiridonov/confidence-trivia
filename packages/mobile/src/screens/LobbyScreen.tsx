@@ -15,6 +15,7 @@ interface PublicPlayerView {
   isHost: boolean;
   connected: boolean;
   stars: number;
+  nameColor: string;
 }
 
 export function LobbyScreen({ room, mySessionId }: { room: Room; mySessionId: string }) {
@@ -70,6 +71,7 @@ export function LobbyScreen({ room, mySessionId }: { room: Room; mySessionId: st
     isHost: p.isHost,
     connected: p.connected,
     stars: p.stars,
+    nameColor: p.nameColor,
   }));
 
   const me = players.find((p) => p.id === mySessionId);
@@ -86,71 +88,38 @@ export function LobbyScreen({ room, mySessionId }: { room: Room; mySessionId: st
   return (
     <Screen androidScale={ANDROID_GAME_UI_SCALE}>
       <View style={styles.contentWrap}>
-        <Subtitle>{t("lobby.roomCode")}</Subtitle>
-        <Pressable onPress={() => void handleCopyCode()} style={styles.codeWrap}>
-          <Title>{state.code}</Title>
-          <Text style={styles.copyHint}>{copied ? t("lobby.copied") : t("lobby.tapToCopy")}</Text>
-        </Pressable>
-
-        {state.gameMode === "damage" ? (
-          <View style={styles.wagerBanner}>
-            <Text style={styles.wagerStake}>{t("lobby.wagerStake", { count: state.damageWager })}</Text>
-            <Text style={styles.wagerPot}>{t("lobby.wagerPot", { count: state.damagePot })}</Text>
+        <View style={styles.lobbyColumns}>
+          <View style={styles.playersColumn}>
+            <Text style={styles.columnTitle}>{t("lobby.players")}</Text>
+            <FlatList style={styles.list} data={players} keyExtractor={(p) => p.id} contentContainerStyle={styles.listContent} nestedScrollEnabled showsVerticalScrollIndicator={players.length > 4} renderItem={({ item }) => (
+              <View style={styles.playerRow}>
+                <Text numberOfLines={1} style={[styles.playerName, { color: item.nameColor || theme.text }]}>{item.isHost ? "👑 " : ""}{item.name}{!item.connected ? " (reconnecting…)" : ""}</Text>
+                <Text style={item.ready ? styles.readyBadge : styles.notReadyBadge}>{item.ready ? t("lobby.ready") : t("lobby.notReady")}</Text>
+              </View>
+            )} />
           </View>
-        ) : null}
 
-        {isHost && !isStarting ? (
-          <Pressable
-            accessibilityRole="switch"
-            accessibilityState={{ checked: Boolean(state.isPublic) }}
-            onPress={() => room.send("toggleRoomVisibility")}
-            style={styles.visibilityControl}
-          >
-            <Text style={styles.visibilityLabel}>
-              {state.isPublic ? t("lobby.partyPublic") : t("lobby.partyPrivate")}
-            </Text>
-            <View style={[styles.visibilityTrack, state.isPublic && styles.visibilityTrackEnabled]}>
-              <View style={[styles.visibilityThumb, state.isPublic && styles.visibilityThumbEnabled]} />
+          <View style={styles.infoColumn}>
+            <Subtitle>{t("lobby.roomCode")}</Subtitle>
+            <Pressable onPress={() => void handleCopyCode()} style={styles.codeWrap}>
+              <Title>{state.code}</Title>
+              <Text style={styles.copyHint}>{copied ? t("lobby.copied") : t("lobby.tapToCopy")}</Text>
+            </Pressable>
+            {state.gameMode === "damage" ? <View style={styles.wagerBanner}>
+              <Text style={styles.wagerStake}>{t("lobby.wagerStake", { count: state.damageWager })}</Text>
+              <Text style={styles.wagerPot}>{t("lobby.wagerPot", { count: state.damagePot })}</Text>
+            </View> : null}
+            {isHost && !isStarting ? <Pressable accessibilityRole="switch" accessibilityState={{ checked: Boolean(state.isPublic) }} onPress={() => room.send("toggleRoomVisibility")} style={styles.visibilityControl}>
+              <Text style={styles.visibilityLabel}>{state.isPublic ? t("lobby.partyPublic") : t("lobby.partyPrivate")}</Text>
+              <View style={[styles.visibilityTrack, state.isPublic && styles.visibilityTrackEnabled]}><View style={[styles.visibilityThumb, state.isPublic && styles.visibilityThumbEnabled]} /></View>
+            </Pressable> : null}
+            <View style={styles.actionArea}>
+              {!isStarting && (isHost ? <BigButton label={t("lobby.start")} onPress={() => { setStartError(null); room.send("startGame"); }} disabled={!canStart} /> : <BigButton label={me?.ready ? t("lobby.notReady") : t("lobby.ready")} onPress={() => room.send("toggleReady")} variant="secondary" />)}
+              {!isStarting && !canStart && isHost && <Subtitle>{t("lobby.waitingForPlayers", { count: requiredPlayers })}</Subtitle>}
+              {!isStarting && startError ? <Text style={styles.startError}>{startError}</Text> : null}
             </View>
-          </Pressable>
-        ) : null}
-
-        <FlatList
-          style={styles.list}
-          data={players}
-          keyExtractor={(p) => p.id}
-          contentContainerStyle={styles.listContent}
-          nestedScrollEnabled
-          showsVerticalScrollIndicator={players.length > 4}
-          renderItem={({ item }) => (
-            <View style={styles.playerRow}>
-              <Text style={styles.playerName}>
-                {item.isHost ? "👑 " : ""}
-                {item.name}
-                {!item.connected ? " (reconnecting…)" : ""}
-              </Text>
-              <Text style={item.ready ? styles.readyBadge : styles.notReadyBadge}>
-                {item.ready ? t("lobby.ready") : t("lobby.notReady")}
-              </Text>
-            </View>
-          )}
-        />
-
-        {!isStarting && (isHost ? (
-          <BigButton
-            label={t("lobby.start")}
-            onPress={() => { setStartError(null); room.send("startGame"); }}
-            disabled={!canStart}
-          />
-        ) : (
-          <BigButton
-            label={me?.ready ? t("lobby.notReady") : t("lobby.ready")}
-            onPress={() => room.send("toggleReady")}
-            variant="secondary"
-          />
-        ))}
-        {!isStarting && !canStart && isHost && <Subtitle>{t("lobby.waitingForPlayers", { count: requiredPlayers })}</Subtitle>}
-        {!isStarting && startError ? <Text style={styles.startError}>{startError}</Text> : null}
+          </View>
+        </View>
 
         {isStarting ? (
           <View pointerEvents="none" style={styles.startingOverlay}>
@@ -169,17 +138,22 @@ export function LobbyScreen({ room, mySessionId }: { room: Room; mySessionId: st
 const styles = StyleSheet.create({
   contentWrap: {
     flex: 1,
+    width: "100%",
   },
+  lobbyColumns: { flex: 1, minHeight: 0, width: "100%", flexDirection: "row", alignItems: "stretch", justifyContent: "space-between", gap: 24 },
+  playersColumn: { width: "52%", minWidth: 0, backgroundColor: "rgba(31, 26, 51, 0.55)", borderRadius: 14, padding: 12 },
+  infoColumn: { flex: 1, minWidth: 0, alignItems: "center", justifyContent: "center", paddingHorizontal: 10 },
+  columnTitle: { color: theme.text, fontSize: 18, fontWeight: "900", marginBottom: 9, textAlign: "center" },
   codeWrap: {
     alignSelf: "center",
-    width: "70%",
-    maxWidth: 520,
+    width: "100%",
+    maxWidth: 360,
   },
   copyHint: {
     color: theme.textDim,
     textAlign: "center",
     marginTop: -4,
-    marginBottom: 16,
+    marginBottom: 10,
     fontSize: 13,
   },
   visibilityControl: {
@@ -187,11 +161,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 9,
-    marginTop: -8,
-    marginBottom: 10,
+    marginTop: 0,
+    marginBottom: 8,
     paddingVertical: 4,
   },
-  wagerBanner: { alignSelf: "center", flexDirection: "row", gap: 14, marginTop: -10, marginBottom: 7, paddingHorizontal: 14, paddingVertical: 5, borderRadius: 10, backgroundColor: "rgba(247, 216, 91, 0.11)", borderWidth: 1, borderColor: "rgba(247, 216, 91, 0.45)" },
+  wagerBanner: { alignSelf: "center", flexDirection: "row", gap: 14, marginBottom: 8, paddingHorizontal: 14, paddingVertical: 5, borderRadius: 10, backgroundColor: "rgba(247, 216, 91, 0.11)", borderWidth: 1, borderColor: "rgba(247, 216, 91, 0.45)" },
   wagerStake: { color: "#F7D85B", fontSize: 12, fontWeight: "900" },
   wagerPot: { color: theme.text, fontSize: 12, fontWeight: "800" },
   startError: { color: theme.danger, textAlign: "center", fontSize: 12, fontWeight: "700", marginTop: 5 },
@@ -209,12 +183,10 @@ const styles = StyleSheet.create({
   list: {
     flex: 1,
     minHeight: Platform.OS === "android" ? 120 : 0,
-    marginBottom: 12,
     width: "100%",
-    maxWidth: Platform.OS === "android" ? 650 : 520,
-    alignSelf: "center",
   },
   listContent: { paddingBottom: 4 },
+  actionArea: { width: "100%", maxWidth: 360, marginTop: 4 },
   startingOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: "center",

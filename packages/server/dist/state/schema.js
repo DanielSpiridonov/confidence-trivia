@@ -19,6 +19,7 @@ class PlayerSchema extends schema_1.Schema {
         super(...arguments);
         this.id = "";
         this.name = "";
+        this.nameColor = "#FFFFFF";
         this.score = 0;
         this.stars = 0;
         this.starsEarnedThisGame = 0;
@@ -43,6 +44,10 @@ __decorate([
     (0, schema_1.type)("string"),
     __metadata("design:type", String)
 ], PlayerSchema.prototype, "name", void 0);
+__decorate([
+    (0, schema_1.type)("string"),
+    __metadata("design:type", String)
+], PlayerSchema.prototype, "nameColor", void 0);
 __decorate([
     (0, schema_1.type)("number"),
     __metadata("design:type", Number)

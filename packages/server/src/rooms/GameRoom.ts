@@ -30,7 +30,7 @@ import {
   RevealEntrySchema,
 } from "../state/schema";
 import { getLocalizedCorrectAnswer, getQuestionSet, localize, localizeAnswer, localizeAnswerItems } from "../content/questions";
-import { reserveDamageWager, saveCompletedMatch, settleDamageWager, upsertPlayer } from "../database";
+import { getPlayerCustomization, reserveDamageWager, saveCompletedMatch, settleDamageWager, upsertPlayer } from "../database";
 
 interface JoinOptions {
   deviceId?: string;
@@ -163,8 +163,12 @@ export class GameRoom extends Room<RoomStateSchema> {
     player.health = 15;
     if (player.isHost) this.state.hostId = player.id;
     this.state.players.set(client.sessionId, player);
-    const stars = await upsertPlayer(deviceId, player.name);
+    const [stars, customization] = await Promise.all([
+      upsertPlayer(deviceId, player.name),
+      getPlayerCustomization(deviceId),
+    ]);
     if (stars !== null) player.stars = stars;
+    if (customization) player.nameColor = customization.nameColor;
     void this.updateLobbyMetadata();
   }
 

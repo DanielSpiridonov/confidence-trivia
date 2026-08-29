@@ -42,6 +42,7 @@ export function FinalResultsScreen({ room, onExit }: { room: Room; onExit: () =>
     score: p.score,
     health: p.health,
     streak: p.streak,
+    nameColor: p.nameColor,
   })).sort((a, b) => state.gameMode === "damage" ? b.health - a.health : b.score - a.score);
   const winner = players[0];
   const isDamageDraw = state.gameMode === "damage" && players.every((player) => player.health <= 0);
@@ -97,7 +98,7 @@ export function FinalResultsScreen({ room, onExit }: { room: Room; onExit: () =>
           <View style={[styles.row, item.id === room.sessionId && styles.myRow]}>
             <Text style={styles.rank}>#{index + 1}</Text>
             <View style={styles.playerBlock}>
-              <Text style={styles.name}>{item.name}{item.id === room.sessionId ? " (You)" : ""}</Text>
+              <Text style={[styles.name, { color: item.nameColor || theme.text }]}>{item.name}{item.id === room.sessionId ? " (You)" : ""}</Text>
               {item.streak > 0 ? <Text style={styles.streak}>🔥 {item.streak}</Text> : null}
             </View>
             <Text style={styles.score}>{state.gameMode === "damage" ? `${item.health} HP` : item.score}</Text>

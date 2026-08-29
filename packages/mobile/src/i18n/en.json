@@ -22,6 +22,12 @@
     "codeTab": "Enter code",
     "browseTab": "Public rooms",
     "searchLeader": "Search by lobby leader",
+    "filters": {
+      "all": "All",
+      "classic": "Classic",
+      "ranked": "Ranked",
+      "damage": "1v1 Damage"
+    },
     "loadingRooms": "Finding public rooms...",
     "noRooms": "No matching public rooms",
     "roomMeta": "{{players}} / {{max}} players · {{rounds}} rounds",
@@ -47,6 +53,7 @@
   },
   "lobby": {
     "roomCode": "ROOM CODE",
+    "players": "Players",
     "wagerStake": "★ {{count}} each",
     "wagerPot": "Pot: ★ {{count}}",
     "insufficientWagerStars": "{{names}} need at least {{stake}} stars to start.",
@@ -130,7 +137,7 @@
   },
   "ranked": {
     "title": "Ranked Leaderboard",
-    "shortTitle": "Ranked",
+    "shortTitle": "Leaderboard",
     "spot": "Spot",
     "player": "Player",
     "lp": "LP",
@@ -170,6 +177,29 @@
       "omniscient": "Omniscient"
     }
   },
+  "shop": {
+    "title": "Customization Shop",
+    "shortTitle": "Shop",
+    "previewOnly": "Design preview — purchases disabled",
+    "nameColorsFree": "Name colors — free for testing",
+    "free": "Free · Equip",
+    "equipped": "Equipped",
+    "equipping": "Equipping...",
+    "nameColors": {
+      "name_white": "White",
+      "name_sky": "Sky",
+      "name_mint": "Mint",
+      "name_gold": "Gold",
+      "name_coral": "Coral",
+      "name_lilac": "Lilac"
+    },
+    "tabs": {
+      "featured": "Featured",
+      "avatars": "Avatars",
+      "frames": "Frames",
+      "stars": "Buy Stars"
+    }
+  },
   "final": {
     "title": "Final Results",
     "winner": "Winner",
@@ -190,11 +220,9 @@
     "haptics": "Haptics",
     "language": "Language",
     "accessibility": "Accessibility",
-    "appearance": "Appearance",
     "defaultName": "Default player name",
     "hapticsEnabled": "Haptic feedback",
     "highContrast": "High contrast",
-    "appearanceComingSoon": "Themes and background options are coming soon.",
     "english": "English",
     "bulgarian": "Bulgarian",
     "soundEffects": "Sound Effects",
