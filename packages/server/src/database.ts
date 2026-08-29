@@ -1,6 +1,14 @@
 import postgres from "postgres";
 import { randomUUID } from "crypto";
-import { DAILY_REWARD_MAX_STREAK_DAY, getDailyStarReward } from "@confidence-trivia/shared";
+import {
+  DAILY_REWARD_MAX_STREAK_DAY,
+  getDailyStarReward,
+  getPlacementStartingLp,
+  getRankedDivision,
+  RANKED_LP_BY_PLACEMENT,
+  RANKED_PLACEMENT_MATCHES,
+  RANKED_PLACEMENT_POINTS,
+} from "@confidence-trivia/shared";
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -52,6 +60,96 @@ export interface DailyRewardStatus {
   amount: number;
   streakDay: number;
   nextClaimAt: string;
+}
+
+export interface RankedLeaderboardEntry {
+  playerId: string;
+  displayName: string;
+  lp: number;
+  rankKey: string;
+  wins: number;
+  position: number | null;
+  placementMatches: number;
+}
+
+export interface RankedLeaderboardResponse {
+  top: RankedLeaderboardEntry[];
+  currentPlayer: RankedLeaderboardEntry | null;
+}
+
+export async function getRankedLeaderboard(deviceId: string): Promise<RankedLeaderboardResponse | null> {
+  if (!sql) return null;
+
+  try {
+    const rows = await sql<{
+      id: string;
+      display_name: string;
+      ranked_lp: number;
+      wins: number;
+      ranked_placement_matches: number;
+      position: number;
+    }[]>`
+      select id, display_name, ranked_lp, wins, ranked_placement_matches, position::int
+      from (
+        select id, display_name, ranked_lp, wins, ranked_placement_matches,
+          row_number() over (order by ranked_lp desc, wins desc, created_at asc) as position
+        from public.players
+        where ranked_placement_matches >= ${RANKED_PLACEMENT_MATCHES}
+      ) ranked
+      order by position
+      limit 10
+    `;
+
+    const top = rows.map((player) => ({
+      playerId: player.id,
+      displayName: player.display_name,
+      lp: player.ranked_lp,
+      rankKey: getRankedDivision(player.ranked_lp).key,
+      wins: player.wins,
+      position: player.position,
+      placementMatches: player.ranked_placement_matches,
+    }));
+
+    const [current] = await sql<{
+      id: string;
+      display_name: string;
+      ranked_lp: number;
+      wins: number;
+      ranked_placement_matches: number;
+      position: number | null;
+    }[]>`
+      select p.id, p.display_name, p.ranked_lp, p.wins, p.ranked_placement_matches,
+        case when p.ranked_placement_matches >= ${RANKED_PLACEMENT_MATCHES} then (
+          select count(*)::int + 1
+          from public.players ahead
+          where ahead.ranked_placement_matches >= ${RANKED_PLACEMENT_MATCHES}
+            and (
+              ahead.ranked_lp > p.ranked_lp
+              or (ahead.ranked_lp = p.ranked_lp and ahead.wins > p.wins)
+              or (ahead.ranked_lp = p.ranked_lp and ahead.wins = p.wins and ahead.created_at < p.created_at)
+            )
+        end as position
+      from public.players p
+      where p.id = ${deviceId}
+    `;
+
+    const currentPlayer = current ? {
+      playerId: current.id,
+      displayName: current.display_name,
+      lp: current.ranked_lp,
+      rankKey: current.ranked_placement_matches < RANKED_PLACEMENT_MATCHES
+        ? "novice"
+        : getRankedDivision(current.ranked_lp).key,
+      wins: current.wins,
+      position: current.position,
+      placementMatches: current.ranked_placement_matches,
+    } : null;
+
+    return { top, currentPlayer };
+  } catch (error) {
+    console.error("Could not load ranked leaderboard", error);
+    return null;
+  }
 }
 
 function nextUtcDayIso(): string {
@@ -272,6 +370,55 @@ export async function saveCompletedMatch(match: CompletedMatch): Promise<Map<str
         await transaction`
           select id from public.players where id = ${player.deviceId} for update
         `;
+
+        if (match.gameMode === "ranked") {
+          const [rankedPlayer] = await transaction<{
+            ranked_lp: number;
+            ranked_placement_matches: number;
+            ranked_placement_points: number;
+          }[]>`
+            select ranked_lp, ranked_placement_matches, ranked_placement_points
+            from public.players
+            where id = ${player.deviceId}
+          `;
+
+          if (rankedPlayer) {
+            const placement = Math.min(4, Math.max(1, player.finalRank));
+            const isPlacementMatch = rankedPlayer.ranked_placement_matches < RANKED_PLACEMENT_MATCHES;
+            const placementPointsAwarded = isPlacementMatch ? (RANKED_PLACEMENT_POINTS[placement] ?? 0) : 0;
+            const placementMatchesAfter = isPlacementMatch
+              ? rankedPlayer.ranked_placement_matches + 1
+              : rankedPlayer.ranked_placement_matches;
+            const placementPointsAfter = isPlacementMatch
+              ? rankedPlayer.ranked_placement_points + placementPointsAwarded
+              : rankedPlayer.ranked_placement_points;
+            const lpAfter = isPlacementMatch
+              ? placementMatchesAfter === RANKED_PLACEMENT_MATCHES
+                ? getPlacementStartingLp(placementPointsAfter)
+                : rankedPlayer.ranked_lp
+              : Math.max(0, rankedPlayer.ranked_lp + (RANKED_LP_BY_PLACEMENT[placement] ?? 0));
+            const lpDelta = lpAfter - rankedPlayer.ranked_lp;
+
+            await transaction`
+              insert into public.ranked_match_results (
+                match_id, player_id, placement, was_placement_match,
+                placement_points_awarded, lp_before, lp_delta, lp_after
+              ) values (
+                ${match.id}, ${player.deviceId}, ${placement}, ${isPlacementMatch},
+                ${placementPointsAwarded}, ${rankedPlayer.ranked_lp}, ${lpDelta}, ${lpAfter}
+              )
+            `;
+
+            await transaction`
+              update public.players
+              set ranked_lp = ${lpAfter},
+                  ranked_placement_matches = ${placementMatchesAfter},
+                  ranked_placement_points = ${placementPointsAfter}
+              where id = ${player.deviceId}
+            `;
+          }
+        }
+
         const [dailyCount] = await transaction<{ count: number }[]>`
           select count(*)::int as count
           from public.star_transactions

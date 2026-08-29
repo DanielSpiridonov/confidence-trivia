@@ -310,13 +310,15 @@ export function QuestionScreen({ room }: { room: Room }) {
                   style={[styles.submitButton, state.gameMode === "damage" && styles.damageSubmitButton]}
                 />
               )}
-              <BigButton
-                label={t("question.resetOrder")}
-                onPress={() => setSlotOrder(options.map((_, index) => index).sort(() => Math.random() - 0.5))}
-                disabled={slotOrder.length === 0 || locked}
-                variant="secondary"
-                style={[styles.submitButton, state.gameMode === "damage" && styles.damageSubmitButton]}
-              />
+              {state.gameMode !== "damage" ? (
+                <BigButton
+                  label={t("question.resetOrder")}
+                  onPress={() => setSlotOrder(options.map((_, index) => index).sort(() => Math.random() - 0.5))}
+                  disabled={slotOrder.length === 0 || locked}
+                  variant="secondary"
+                  style={styles.submitButton}
+                />
+              ) : null}
 
               {draggingCardIndex !== null ? (
                 <Animated.View

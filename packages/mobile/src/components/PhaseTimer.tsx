@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Text, StyleSheet } from "react-native";
+import { Platform, Text, StyleSheet } from "react-native";
 import { theme } from "./ui";
 import { playSound } from "../audio/sounds";
 
@@ -54,7 +54,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     textAlign: "left",
     top: 12,
-    left: 12,
+    left: Platform.OS === "android" ? -10 : 12,
     zIndex: 1,
   },
   timerUrgent: {

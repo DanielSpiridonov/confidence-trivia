@@ -57,6 +57,40 @@ export async function claimDailyReward(deviceId: string, displayName: string): P
   }
 }
 
+export interface RankedLeaderboardEntry {
+  playerId: string;
+  displayName: string;
+  lp: number;
+  rankKey: string;
+  wins: number;
+  position: number | null;
+  placementMatches: number;
+}
+
+export interface RankedLeaderboardResponse {
+  top: RankedLeaderboardEntry[];
+  currentPlayer: RankedLeaderboardEntry | null;
+}
+
+export async function getRankedLeaderboard(deviceId: string): Promise<RankedLeaderboardResponse | null> {
+  try {
+    const response = await fetch(`${HTTP_SERVER_URL}/ranked/leaderboard?deviceId=${encodeURIComponent(deviceId)}`);
+    if (!response.ok) return null;
+    return await response.json() as RankedLeaderboardResponse;
+  } catch {
+    return null;
+  }
+}
+
+export async function joinRankedGame(deviceId: string, playerName: string, locale: "en" | "bg") {
+  return withRoomRequestTimeout(getClient().joinOrCreate("ranked_trivia", {
+    deviceId,
+    name: playerName,
+    locale,
+    rankedQueue: true,
+  }));
+}
+
 async function withRoomRequestTimeout<T>(promise: Promise<T>): Promise<T> {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
 

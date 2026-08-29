@@ -4,5 +4,6 @@ export * from "./config/room";
 export * from "./config/timing";
 export * from "./config/streaks";
 export * from "./config/progression";
+export * from "./config/ranked";
 export * from "./scoring/computeRoundResults";
 export * from "./scoring/isAnswerCorrect";

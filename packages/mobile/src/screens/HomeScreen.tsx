@@ -49,6 +49,7 @@ function HomePopup({ label, amount, streakLabel, claimed, claimedLabel, countdow
 export function HomeScreen({
   onCreate,
   onJoin,
+  onRanked,
   onSettings,
   dailyReward,
   dailyRewardClaiming,
@@ -58,6 +59,7 @@ export function HomeScreen({
 }: {
   onCreate: () => void;
   onJoin: () => void;
+  onRanked: () => void;
   onSettings: () => void;
   dailyReward: { available: boolean; amount: number; streakDay: number; nextClaimAt: string } | null;
   dailyRewardClaiming: boolean;
@@ -119,8 +121,8 @@ export function HomeScreen({
   ].map((value) => String(value).padStart(2, "0")).join(":");
   return (
     <Screen androidScale={ANDROID_MENU_UI_SCALE}>
-      {dailyReward ? (
-        <View style={styles.popupRail}>
+      <View style={styles.popupRail}>
+        {dailyReward ? (
           <HomePopup
             label={t("home.dailyReward")}
             amount={dailyReward.amount}
@@ -139,8 +141,12 @@ export function HomeScreen({
               }
             }}
           />
-        </View>
-      ) : null}
+        ) : null}
+        <Pressable accessibilityRole="button" onPress={onRanked} style={({ pressed }) => [styles.rankedShortcut, pressed && styles.popupPressed]}>
+          <Text style={styles.rankedShortcutIcon}>🏆</Text>
+          <Text style={styles.rankedShortcutLabel}>{t("ranked.shortTitle")}</Text>
+        </Pressable>
+      </View>
       <Title>🔥 {t("home.title")}</Title>
       <Subtitle>{t("home.tagline")}</Subtitle>
       <View style={styles.actions}>
@@ -202,6 +208,9 @@ const styles = StyleSheet.create({
   popupLabel: { color: "#FFFFFF", fontSize: 11, fontWeight: "800", textAlign: "center", width: "100%" },
   popupAmount: { color: "#F7D85B", fontSize: 12, fontWeight: "900", textAlign: "center" },
   popupTextClaimed: { color: "rgba(255, 255, 255, 0.68)" },
+  rankedShortcut: { width: 102, minHeight: 66, alignItems: "center", justifyContent: "center", borderRadius: 10, backgroundColor: "rgba(31, 26, 51, 0.9)", borderWidth: 1, borderColor: "rgba(184, 140, 255, 0.45)" },
+  rankedShortcutIcon: { fontSize: 25 },
+  rankedShortcutLabel: { color: "#D6C2FF", fontSize: 11, fontWeight: "900", marginTop: 2 },
   celebrationBackdrop: { ...StyleSheet.absoluteFillObject, zIndex: 30, alignItems: "center", justifyContent: "center" },
   celebrationPanel: { width: "78%", maxWidth: 620, minHeight: 204, borderRadius: 8, backgroundColor: "rgba(31, 26, 51, 0.98)", borderWidth: 1, borderColor: "rgba(181, 165, 255, 0.35)", paddingHorizontal: 28, paddingVertical: 18, alignItems: "center" },
   celebrationClose: { position: "absolute", top: 8, right: 10, zIndex: 2, width: 30, height: 30, alignItems: "center", justifyContent: "center" },

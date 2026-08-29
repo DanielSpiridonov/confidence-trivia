@@ -18,12 +18,13 @@ import { ConfidenceBoardScreen } from "./src/screens/ConfidenceBoardScreen";
 import { RevealScreen } from "./src/screens/RevealScreen";
 import { FinalResultsScreen } from "./src/screens/FinalResultsScreen";
 import { SettingsScreen, VolumeControl } from "./src/screens/SettingsScreen";
-import { claimDailyReward, createRoom, DailyRewardStatus, getDailyRewardStatus, getPlayerStars, joinPublicRoom, joinRoom, reconnectRoom, useRoomState } from "./src/network/client";
+import { RankedScreen } from "./src/screens/RankedScreen";
+import { claimDailyReward, createRoom, DailyRewardStatus, getDailyRewardStatus, getPlayerStars, joinPublicRoom, joinRankedGame, joinRoom, reconnectRoom, useRoomState } from "./src/network/client";
 import { prepareSoundEffects, setSoundEffectsVolume, stopAllSoundEffects } from "./src/audio/sounds";
 import { pauseMusicForBackground, prepareMusic, setMusicVolume as applyMusicVolume, startMenuMusic, stopMenuMusic } from "./src/audio/music";
 import { getOrCreateDeviceId } from "./src/utils/deviceId";
 
-type Nav = "home" | "create" | "join" | "settings" | "in-room";
+type Nav = "home" | "create" | "join" | "ranked" | "settings" | "in-room";
 type RoomRecoveryState = "reconnecting" | "failed";
 const LANGUAGE_STORAGE_KEY = "confidence-trivia:locale";
 const SFX_VOLUME_STORAGE_KEY = "confidence-trivia:sfx-volume";
@@ -211,6 +212,17 @@ export default function App() {
     const r = await joinPublicRoom(roomId, currentDeviceId, name);
     reconnectionTokenRef.current = r.reconnectionToken;
     setRoom(r);
+    setRoomRecovery(null);
+    setRoomRecoveryMessage(null);
+    setNav("in-room");
+  }
+
+  async function handleJoinRanked(name: string) {
+    const currentDeviceId = await requireDeviceId();
+    handleDefaultPlayerName(name);
+    const rankedRoom = await joinRankedGame(currentDeviceId, name, locale);
+    reconnectionTokenRef.current = rankedRoom.reconnectionToken;
+    setRoom(rankedRoom);
     setRoomRecovery(null);
     setRoomRecoveryMessage(null);
     setNav("in-room");
@@ -420,6 +432,7 @@ export default function App() {
             <HomeScreen
               onCreate={() => setNav("create")}
               onJoin={() => setNav("join")}
+              onRanked={() => setNav("ranked")}
               onSettings={() => setNav("settings")}
               dailyReward={dailyReward}
               dailyRewardClaiming={dailyRewardClaiming}
@@ -430,6 +443,14 @@ export default function App() {
           )}
           {nav === "create" && <CreateGameScreen onCreate={handleCreate} locale={locale} initialName={defaultPlayerName} onBack={() => setNav("home")} />}
           {nav === "join" && <JoinGameScreen onJoin={handleJoin} onJoinPublic={handleJoinPublic} initialName={defaultPlayerName} onBack={() => setNav("home")} />}
+          {nav === "ranked" && deviceId ? (
+            <RankedScreen
+              deviceId={deviceId}
+              initialName={defaultPlayerName}
+              onFindMatch={handleJoinRanked}
+              onBack={() => setNav("home")}
+            />
+          ) : null}
           {nav === "settings" && (
             <SettingsScreen
               locale={locale}

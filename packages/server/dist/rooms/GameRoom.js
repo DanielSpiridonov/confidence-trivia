@@ -66,12 +66,22 @@ class GameRoom extends colyseus_1.Room {
         }
         this.setState(new schema_1.RoomStateSchema());
         this.state.code = this.roomId;
-        this.state.gameMode = options.gameMode === "damage" ? "damage" : "classic";
+        this.state.gameMode = options.gameMode === "damage"
+            ? "damage"
+            : options.gameMode === "ranked"
+                ? "ranked"
+                : "classic";
         if (this.state.gameMode === "damage")
             this.maxClients = 2;
-        this.state.totalRounds = this.state.gameMode === "damage" ? 0 : options.roundCount ?? shared_1.DEFAULT_ROUND_COUNT;
+        if (this.state.gameMode === "ranked")
+            this.maxClients = shared_1.RANKED_PLAYER_COUNT;
+        this.state.totalRounds = this.state.gameMode === "damage"
+            ? 0
+            : this.state.gameMode === "ranked"
+                ? shared_1.RANKED_FIXED_ROUND_COUNT
+                : options.roundCount ?? shared_1.DEFAULT_ROUND_COUNT;
         this.locale = options.locale ?? "en";
-        this.isPublic = options.visibility === "public";
+        this.isPublic = this.state.gameMode === "ranked" || options.visibility === "public";
         this.state.isPublic = this.isPublic;
         this.questionSet = (0, questions_1.getQuestionSet)(this.state.gameMode === "damage" ? 100 : this.state.totalRounds, options.excludeQuestionIds ?? []);
         await this.setPrivate(!this.isPublic);
@@ -91,6 +101,7 @@ class GameRoom extends colyseus_1.Room {
         return !this.state.gameStarted
             && isValidPlayerName(options.name)
             && isValidDeviceId(options.deviceId)
+            && (this.state.gameMode !== "ranked" || options.rankedQueue === true)
             && ![...this.deviceIds.values()].includes(options.deviceId);
     }
     onJoin(client, options = {}) {
@@ -110,6 +121,9 @@ class GameRoom extends colyseus_1.Room {
             this.state.hostId = player.id;
         this.state.players.set(client.sessionId, player);
         void this.updateLobbyMetadata();
+        if (this.state.gameMode === "ranked" && this.state.players.size === shared_1.RANKED_PLAYER_COUNT) {
+            this.beginGame();
+        }
     }
     async onLeave(client, consented) {
         const player = this.state.players.get(client.sessionId);
@@ -119,6 +133,10 @@ class GameRoom extends colyseus_1.Room {
         this.shortenConfidencePhaseIfEveryoneDecided();
         this.shortenSideBetPhaseIfEveryoneDecided();
         if (consented) {
+            if (this.state.gameMode === "ranked" && this.state.gameStarted) {
+                void this.updateLobbyMetadata();
+                return;
+            }
             const closesLobby = player.isHost && !this.state.gameStarted;
             this.deviceIds.delete(client.sessionId);
             this.state.players.delete(client.sessionId);
@@ -142,6 +160,10 @@ class GameRoom extends colyseus_1.Room {
             void this.updateLobbyMetadata();
         }
         catch {
+            if (this.state.gameMode === "ranked" && this.state.gameStarted) {
+                void this.updateLobbyMetadata();
+                return;
+            }
             this.deviceIds.delete(client.sessionId);
             this.state.players.delete(client.sessionId);
             this.reassignHostIfNeeded();
@@ -177,7 +199,7 @@ class GameRoom extends colyseus_1.Room {
         player.ready = !player.ready;
     }
     async handleToggleRoomVisibility(client) {
-        if (client.sessionId !== this.state.hostId || this.state.gameStarted || this.state.phase !== "lobby")
+        if (client.sessionId !== this.state.hostId || this.state.gameStarted || this.state.phase !== "lobby" || this.state.gameMode === "ranked")
             return;
         const nextIsPublic = !this.isPublic;
         await this.setPrivate(!nextIsPublic);
@@ -187,9 +209,16 @@ class GameRoom extends colyseus_1.Room {
     handleStartGame(client) {
         if (client.sessionId !== this.state.hostId)
             return; // only host may start
+        if (this.state.gameMode === "ranked")
+            return;
         if (this.state.gameStarted)
             return;
         if (this.state.gameMode === "damage" ? this.state.players.size !== 2 : this.state.players.size < shared_1.MIN_PLAYERS_TO_START)
+            return;
+        this.beginGame();
+    }
+    beginGame() {
+        if (this.state.gameStarted)
             return;
         this.state.gameStarted = true;
         this.gameStartedAt = new Date();
@@ -575,7 +604,11 @@ class GameRoom extends colyseus_1.Room {
             return;
         this.resultsPersisted = true;
         const rankedPlayers = [...this.state.players.values()]
-            .sort((left, right) => this.state.gameMode === "damage" ? right.health - left.health : right.score - left.score);
+            .sort((left, right) => {
+            if (this.state.gameMode === "ranked" && left.connected !== right.connected)
+                return left.connected ? -1 : 1;
+            return this.state.gameMode === "damage" ? right.health - left.health : right.score - left.score;
+        });
         const completedPlayers = rankedPlayers.flatMap((player, index) => {
             const deviceId = this.deviceIds.get(player.id);
             if (!deviceId)
@@ -583,9 +616,11 @@ class GameRoom extends colyseus_1.Room {
             const priorPlayer = rankedPlayers[index - 1];
             const rankingValue = this.state.gameMode === "damage" ? player.health : player.score;
             const priorRankingValue = priorPlayer ? (this.state.gameMode === "damage" ? priorPlayer.health : priorPlayer.score) : null;
-            const finalRank = priorPlayer && priorRankingValue === rankingValue
-                ? rankedPlayers.findIndex((candidate) => (this.state.gameMode === "damage" ? candidate.health : candidate.score) === rankingValue) + 1
-                : index + 1;
+            const finalRank = this.state.gameMode === "ranked" && !player.connected
+                ? 4
+                : priorPlayer && priorPlayer.connected === player.connected && priorRankingValue === rankingValue
+                    ? rankedPlayers.findIndex((candidate) => (this.state.gameMode === "damage" ? candidate.health : candidate.score) === rankingValue) + 1
+                    : index + 1;
             return [{
                     deviceId,
                     displayName: player.name,

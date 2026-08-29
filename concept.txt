@@ -202,7 +202,7 @@ Use the following initial scoring system:
 
 | Confidence    | Correct | Wrong |
 | ------------- | ------: | ----: |
-| No confidence |      +1 |    +0 |
+| No confidence |      +0 |    +0 |
 | 1             |      +1 |    -1 |
 | 3             |      +2 |    -2 |
 | 5             |      +3 |    -4 |
@@ -234,7 +234,7 @@ Examples:
 
 Correct:
 
-> +1
+> +0
 
 Wrong:
 
@@ -298,9 +298,9 @@ Maximum confidence / maximum gamble.
 
 For the initial game:
 
-A normal correct answer with no confidence:
+A correct answer with no confidence:
 
-> +1
+> +0
 
 A wrong answer with no confidence:
 
@@ -587,7 +587,7 @@ Knowing the correct answer.
 
 Knowing when to trust yourself.
 
-A player who is extremely knowledgeable but always chooses no confidence should still score well, but should leave potential points on the table.
+A player who chooses no confidence opts out of both the reward and the penalty for that round.
 
 A less knowledgeable player who correctly recognizes when they know an answer can compete.
 
@@ -1486,7 +1486,81 @@ Required foundations:
 * Disconnect, abandonment, boosting, and duplicate-account protections
 * Match history and rating audit records
 
-Ranked balance should use telemetry from stable Classic games before LP formulas are finalized.
+The initial LP formula below is canonical for the prototype and should be validated with telemetry from stable ranked games before public competitive release.
+
+### Ranked format
+
+* Ranked games use the Classic question and confidence loop.
+* Ranked matchmaking creates exactly four-player games.
+* Ranked games use a fixed round count rather than a host-selected length.
+* LP is determined only by final placement. Raw in-game points decide placement but never convert directly into LP.
+* Ranked rooms are created through matchmaking and cannot be joined by a shared private-room code.
+* Leaving or abandoning a ranked game counts as fourth place.
+* LP cannot fall below zero.
+* Tied players receive the LP result for their shared placement.
+
+### Ranked LP changes
+
+| Placement | LP change |
+| --------- | --------: |
+| 1st       |       +30 |
+| 2nd       |       +15 |
+| 3rd       |         0 |
+| 4th       |       -15 |
+
+### Placement matches and Novice status
+
+* New ranked players begin as **Novice**, which means unranked rather than a permanent competitive division.
+* Novice players complete three placement matches.
+* Placement progress is displayed as 0/3, 1/3, 2/3, then the earned rank after match three.
+* Each placement awards internal placement points: 3 for first, 2 for second, 1 for third, and 0 for fourth.
+* Placement LP is not shown and normal LP gains/losses do not apply during these three matches.
+* Initial rank is based on the sum of the three placement results:
+
+| Placement points | Initial rank |
+| ---------------: | ------------ |
+| 0-2              | Bronze III   |
+| 3                | Bronze II    |
+| 4                | Bronze I     |
+| 5                | Silver III   |
+| 6                | Silver II    |
+| 7                | Silver I     |
+| 8                | Gold III     |
+| 9                | Gold II      |
+
+Gold II is the highest possible initial placement. Higher ranks must be earned through continued ranked play.
+
+### Rank ladder
+
+Every normal division spans 100 LP. Division order runs from III to I:
+
+1. Bronze III, II, I
+2. Silver III, II, I
+3. Gold III, II, I
+4. Platinum III, II, I
+5. Diamond III, II, I
+6. Master
+7. Omniscient
+
+Master begins at 1500 LP. Omniscient begins at 2000 LP and is the highest rank. Master and Omniscient do not have subdivisions.
+
+### Global ranked leaderboard
+
+The ranked leaderboard is a dedicated screen ordered from highest to lowest LP. Each row displays:
+
+* Global leaderboard position
+* Player display name
+* LP
+* Rank/division
+* Win count already tracked on the persistent player profile
+
+The client renders the global top 10. If the current player is outside the top 10, their own row is displayed separately below it with their real global position, for example #120. If they are already in the top 10, no duplicate personal row is shown.
+
+### Ranked integrity and future seasons
+
+* Ranked results, placement progress, LP, and leaderboard ordering are server-authoritative.
+* Every LP change must have a match-linked audit record so duplicate processing cannot award LP twice.
+* Authenticated accounts, seasonal resets, boosting protection, and stronger abandonment enforcement remain required before a public competitive release. Device profiles may be used during development only.
 
 ---
 
@@ -1639,7 +1713,7 @@ Treat this as the canonical initial scoring table:
 
 | Choice        | Correct | Wrong |
 | ------------- | ------: | ----: |
-| No confidence |      +1 |    +0 |
+| No confidence |      +0 |    +0 |
 | Confidence 1  |      +1 |    -1 |
 | Confidence 3  |      +2 |    -2 |
 | Confidence 5  |      +3 |    -4 |

@@ -3,7 +3,7 @@ import express from "express";
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { GameRoom } from "./rooms/GameRoom";
-import { claimDailyReward, getDailyRewardStatus, getDatabaseStatus, getPlayerStars } from "./database";
+import { claimDailyReward, getDailyRewardStatus, getDatabaseStatus, getPlayerStars, getRankedLeaderboard } from "./database";
 
 const port = Number(process.env.PORT ?? 2567);
 const app = express();
@@ -59,6 +59,20 @@ app.post("/players/:deviceId/daily-reward/claim", async (req, res) => {
   res.json(status);
 });
 
+app.get("/ranked/leaderboard", async (req, res) => {
+  const deviceId = typeof req.query.deviceId === "string" ? req.query.deviceId : "";
+  if (!isDeviceId(deviceId)) {
+    res.status(400).json({ error: "Invalid device ID" });
+    return;
+  }
+  const leaderboard = await getRankedLeaderboard(deviceId);
+  if (!leaderboard) {
+    res.status(503).json({ error: "Ranked leaderboard is temporarily unavailable" });
+    return;
+  }
+  res.json(leaderboard);
+});
+
 const httpServer = http.createServer(app);
 const gameServer = new Server({
   transport: new WebSocketTransport({ server: httpServer }),
@@ -68,6 +82,7 @@ const gameServer = new Server({
 // each call to joinOrCreate/create spins up a new authoritative GameRoom
 // instance with its own room code.
 gameServer.define("confidence_trivia", GameRoom);
+gameServer.define("ranked_trivia", GameRoom, { gameMode: "ranked" });
 
 httpServer.listen(port, () => {
   console.log(`Confidence Trivia server listening on ws://0.0.0.0:${port}`);

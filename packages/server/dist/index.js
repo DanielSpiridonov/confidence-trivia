@@ -57,6 +57,19 @@ app.post("/players/:deviceId/daily-reward/claim", async (req, res) => {
     }
     res.json(status);
 });
+app.get("/ranked/leaderboard", async (req, res) => {
+    const deviceId = typeof req.query.deviceId === "string" ? req.query.deviceId : "";
+    if (!isDeviceId(deviceId)) {
+        res.status(400).json({ error: "Invalid device ID" });
+        return;
+    }
+    const leaderboard = await (0, database_1.getRankedLeaderboard)(deviceId);
+    if (!leaderboard) {
+        res.status(503).json({ error: "Ranked leaderboard is temporarily unavailable" });
+        return;
+    }
+    res.json(leaderboard);
+});
 const httpServer = http_1.default.createServer(app);
 const gameServer = new colyseus_1.Server({
     transport: new ws_transport_1.WebSocketTransport({ server: httpServer }),
@@ -65,6 +78,7 @@ const gameServer = new colyseus_1.Server({
 // each call to joinOrCreate/create spins up a new authoritative GameRoom
 // instance with its own room code.
 gameServer.define("confidence_trivia", GameRoom_1.GameRoom);
+gameServer.define("ranked_trivia", GameRoom_1.GameRoom, { gameMode: "ranked" });
 httpServer.listen(port, () => {
     console.log(`Confidence Trivia server listening on ws://0.0.0.0:${port}`);
 });

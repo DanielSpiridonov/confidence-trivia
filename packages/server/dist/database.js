@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getDatabaseStatus = getDatabaseStatus;
+exports.getRankedLeaderboard = getRankedLeaderboard;
 exports.upsertPlayer = upsertPlayer;
 exports.getPlayerStars = getPlayerStars;
 exports.getDailyRewardStatus = getDailyRewardStatus;
@@ -28,6 +29,63 @@ async function getDatabaseStatus() {
     catch (error) {
         console.error("Database health check failed", error);
         return "unavailable";
+    }
+}
+async function getRankedLeaderboard(deviceId) {
+    if (!sql)
+        return null;
+    try {
+        const rows = await sql `
+      select id, display_name, ranked_lp, wins, ranked_placement_matches, position::int
+      from (
+        select id, display_name, ranked_lp, wins, ranked_placement_matches,
+          row_number() over (order by ranked_lp desc, wins desc, created_at asc) as position
+        from public.players
+        where ranked_placement_matches >= ${shared_1.RANKED_PLACEMENT_MATCHES}
+      ) ranked
+      order by position
+      limit 10
+    `;
+        const top = rows.map((player) => ({
+            playerId: player.id,
+            displayName: player.display_name,
+            lp: player.ranked_lp,
+            rankKey: (0, shared_1.getRankedDivision)(player.ranked_lp).key,
+            wins: player.wins,
+            position: player.position,
+            placementMatches: player.ranked_placement_matches,
+        }));
+        const [current] = await sql `
+      select p.id, p.display_name, p.ranked_lp, p.wins, p.ranked_placement_matches,
+        case when p.ranked_placement_matches >= ${shared_1.RANKED_PLACEMENT_MATCHES} then (
+          select count(*)::int + 1
+          from public.players ahead
+          where ahead.ranked_placement_matches >= ${shared_1.RANKED_PLACEMENT_MATCHES}
+            and (
+              ahead.ranked_lp > p.ranked_lp
+              or (ahead.ranked_lp = p.ranked_lp and ahead.wins > p.wins)
+              or (ahead.ranked_lp = p.ranked_lp and ahead.wins = p.wins and ahead.created_at < p.created_at)
+            )
+        end as position
+      from public.players p
+      where p.id = ${deviceId}
+    `;
+        const currentPlayer = current ? {
+            playerId: current.id,
+            displayName: current.display_name,
+            lp: current.ranked_lp,
+            rankKey: current.ranked_placement_matches < shared_1.RANKED_PLACEMENT_MATCHES
+                ? "novice"
+                : (0, shared_1.getRankedDivision)(current.ranked_lp).key,
+            wins: current.wins,
+            position: current.position,
+            placementMatches: current.ranked_placement_matches,
+        } : null;
+        return { top, currentPlayer };
+    }
+    catch (error) {
+        console.error("Could not load ranked leaderboard", error);
+        return null;
     }
 }
 function nextUtcDayIso() {
@@ -226,6 +284,46 @@ async function saveCompletedMatch(match) {
                 await transaction `
           select id from public.players where id = ${player.deviceId} for update
         `;
+                if (match.gameMode === "ranked") {
+                    const [rankedPlayer] = await transaction `
+            select ranked_lp, ranked_placement_matches, ranked_placement_points
+            from public.players
+            where id = ${player.deviceId}
+          `;
+                    if (rankedPlayer) {
+                        const placement = Math.min(4, Math.max(1, player.finalRank));
+                        const isPlacementMatch = rankedPlayer.ranked_placement_matches < shared_1.RANKED_PLACEMENT_MATCHES;
+                        const placementPointsAwarded = isPlacementMatch ? (shared_1.RANKED_PLACEMENT_POINTS[placement] ?? 0) : 0;
+                        const placementMatchesAfter = isPlacementMatch
+                            ? rankedPlayer.ranked_placement_matches + 1
+                            : rankedPlayer.ranked_placement_matches;
+                        const placementPointsAfter = isPlacementMatch
+                            ? rankedPlayer.ranked_placement_points + placementPointsAwarded
+                            : rankedPlayer.ranked_placement_points;
+                        const lpAfter = isPlacementMatch
+                            ? placementMatchesAfter === shared_1.RANKED_PLACEMENT_MATCHES
+                                ? (0, shared_1.getPlacementStartingLp)(placementPointsAfter)
+                                : rankedPlayer.ranked_lp
+                            : Math.max(0, rankedPlayer.ranked_lp + (shared_1.RANKED_LP_BY_PLACEMENT[placement] ?? 0));
+                        const lpDelta = lpAfter - rankedPlayer.ranked_lp;
+                        await transaction `
+              insert into public.ranked_match_results (
+                match_id, player_id, placement, was_placement_match,
+                placement_points_awarded, lp_before, lp_delta, lp_after
+              ) values (
+                ${match.id}, ${player.deviceId}, ${placement}, ${isPlacementMatch},
+                ${placementPointsAwarded}, ${rankedPlayer.ranked_lp}, ${lpDelta}, ${lpAfter}
+              )
+            `;
+                        await transaction `
+              update public.players
+              set ranked_lp = ${lpAfter},
+                  ranked_placement_matches = ${placementMatchesAfter},
+                  ranked_placement_points = ${placementPointsAfter}
+              where id = ${player.deviceId}
+            `;
+                    }
+                }
                 const [dailyCount] = await transaction `
           select count(*)::int as count
           from public.star_transactions

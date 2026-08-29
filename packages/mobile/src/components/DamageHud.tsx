@@ -1,5 +1,5 @@
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Platform, StyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { theme } from "./ui";
 
@@ -38,7 +38,7 @@ export function DamageHud({ state, myPlayerId }: { state: any; myPlayerId: strin
 }
 
 const styles = StyleSheet.create({
-  hud: { width: "78%", maxWidth: 620, alignSelf: "center", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 5 },
+  hud: { width: Platform.OS === "android" ? "90%" : "78%", maxWidth: Platform.OS === "android" ? 720 : 620, alignSelf: "center", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 5 },
   fighter: { flex: 1, minWidth: 0 },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 },
   name: { color: theme.text, flex: 1, fontSize: 11, fontWeight: "800" },
