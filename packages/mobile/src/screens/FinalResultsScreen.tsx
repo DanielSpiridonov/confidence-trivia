@@ -45,11 +45,25 @@ export function FinalResultsScreen({ room, onExit }: { room: Room; onExit: () =>
   })).sort((a, b) => state.gameMode === "damage" ? b.health - a.health : b.score - a.score);
   const winner = players[0];
   const isDamageDraw = state.gameMode === "damage" && players.every((player) => player.health <= 0);
+  const wonDamagePot = state.gameMode === "damage" && !isDamageDraw && winner?.id === room.sessionId;
 
   return (
     <Screen style={styles.screen} androidScale={ANDROID_GAME_UI_SCALE}>
       <Subtitle>{isDamageDraw ? t("final.draw") : t("final.winner")}</Subtitle>
       <Title>{isDamageDraw ? t("final.bothDefeated") : `🏆 ${winner?.name ?? "—"}`}</Title>
+
+      {state.gameMode === "damage" ? (
+        <View style={styles.wagerResult}>
+          <PointsIcon size={18} />
+          <Text style={styles.wagerResultText}>
+            {isDamageDraw
+              ? t("final.wagerRefunded", { count: state.damageWager })
+              : wonDamagePot
+                ? t("final.wagerWon", { count: state.damagePot })
+                : t("final.wagerLost", { count: state.damageWager })}
+          </Text>
+        </View>
+      ) : null}
 
       {rewardedGamesToday > 0 ? (
         <Animated.View
@@ -101,6 +115,8 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
     paddingTop: 12,
   },
+  wagerResult: { alignSelf: "center", flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 10, backgroundColor: "rgba(247, 216, 91, 0.12)", borderWidth: 1, borderColor: "rgba(247, 216, 91, 0.45)" },
+  wagerResultText: { color: "#F7D85B", fontSize: 12, fontWeight: "900" },
   list: {
     flex: 1,
     minHeight: 0,

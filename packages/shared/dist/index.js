@@ -21,5 +21,6 @@ __exportStar(require("./config/timing"), exports);
 __exportStar(require("./config/streaks"), exports);
 __exportStar(require("./config/progression"), exports);
 __exportStar(require("./config/ranked"), exports);
+__exportStar(require("./config/damageWager"), exports);
 __exportStar(require("./scoring/computeRoundResults"), exports);
 __exportStar(require("./scoring/isAnswerCorrect"), exports);

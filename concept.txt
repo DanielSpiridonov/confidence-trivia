@@ -1470,6 +1470,16 @@ Before implementation, define and playtest:
 
 Keep combat rules server-authoritative and separate from Classic scoring so Classic Mode remains unchanged.
 
+### Damage star wagers
+
+* The host selects a per-player wager of 5, 15, 40, 60, 75, 100, 150, 300, or 500 stars when creating the room.
+* Both players must have enough stars when the match starts.
+* Both stakes are deducted atomically into server-authoritative escrow; the match does not start if either payment fails.
+* The winner receives the combined two-player pot.
+* An exact draw refunds each player's original stake.
+* Leaving or failing to reconnect after the grace period counts as a defeat and awards the pot to the remaining player.
+* Every stake, payout, and refund is recorded in the immutable star transaction ledger and settled idempotently.
+
 ---
 
 ## PHASE 9 — Ranked Mode

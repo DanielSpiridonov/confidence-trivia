@@ -14,6 +14,7 @@ interface PublicPlayerView {
   ready: boolean;
   isHost: boolean;
   connected: boolean;
+  stars: number;
 }
 
 export function LobbyScreen({ room, mySessionId }: { room: Room; mySessionId: string }) {
@@ -22,8 +23,17 @@ export function LobbyScreen({ room, mySessionId }: { room: Room; mySessionId: st
   const [copied, setCopied] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [countdownEndsAt, setCountdownEndsAt] = useState<number | null>(null);
+  const [startError, setStartError] = useState<string | null>(null);
   const countdownSoundPlayed = useRef(false);
   const isStarting = state?.phase === "starting";
+
+  useEffect(() => {
+    room.onMessage("gameStartError", (message: { code?: string; names?: string[]; stake?: number }) => {
+      if (message.code === "insufficient_stars") {
+        setStartError(t("lobby.insufficientWagerStars", { names: message.names?.join(", ") || "Player", stake: message.stake ?? 0 }));
+      }
+    });
+  }, [room, t]);
 
   useEffect(() => {
     if (!isStarting) {
@@ -59,6 +69,7 @@ export function LobbyScreen({ room, mySessionId }: { room: Room; mySessionId: st
     ready: p.ready,
     isHost: p.isHost,
     connected: p.connected,
+    stars: p.stars,
   }));
 
   const me = players.find((p) => p.id === mySessionId);
@@ -80,6 +91,13 @@ export function LobbyScreen({ room, mySessionId }: { room: Room; mySessionId: st
           <Title>{state.code}</Title>
           <Text style={styles.copyHint}>{copied ? t("lobby.copied") : t("lobby.tapToCopy")}</Text>
         </Pressable>
+
+        {state.gameMode === "damage" ? (
+          <View style={styles.wagerBanner}>
+            <Text style={styles.wagerStake}>{t("lobby.wagerStake", { count: state.damageWager })}</Text>
+            <Text style={styles.wagerPot}>{t("lobby.wagerPot", { count: state.damagePot })}</Text>
+          </View>
+        ) : null}
 
         {isHost && !isStarting ? (
           <Pressable
@@ -121,7 +139,7 @@ export function LobbyScreen({ room, mySessionId }: { room: Room; mySessionId: st
         {!isStarting && (isHost ? (
           <BigButton
             label={t("lobby.start")}
-            onPress={() => room.send("startGame")}
+            onPress={() => { setStartError(null); room.send("startGame"); }}
             disabled={!canStart}
           />
         ) : (
@@ -132,6 +150,7 @@ export function LobbyScreen({ room, mySessionId }: { room: Room; mySessionId: st
           />
         ))}
         {!isStarting && !canStart && isHost && <Subtitle>{t("lobby.waitingForPlayers", { count: requiredPlayers })}</Subtitle>}
+        {!isStarting && startError ? <Text style={styles.startError}>{startError}</Text> : null}
 
         {isStarting ? (
           <View pointerEvents="none" style={styles.startingOverlay}>
@@ -172,6 +191,10 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     paddingVertical: 4,
   },
+  wagerBanner: { alignSelf: "center", flexDirection: "row", gap: 14, marginTop: -10, marginBottom: 7, paddingHorizontal: 14, paddingVertical: 5, borderRadius: 10, backgroundColor: "rgba(247, 216, 91, 0.11)", borderWidth: 1, borderColor: "rgba(247, 216, 91, 0.45)" },
+  wagerStake: { color: "#F7D85B", fontSize: 12, fontWeight: "900" },
+  wagerPot: { color: theme.text, fontSize: 12, fontWeight: "800" },
+  startError: { color: theme.danger, textAlign: "center", fontSize: 12, fontWeight: "700", marginTop: 5 },
   visibilityLabel: { color: theme.textDim, fontSize: 13, fontWeight: "700" },
   visibilityTrack: {
     width: 38,

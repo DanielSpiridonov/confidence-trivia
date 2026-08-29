@@ -46,6 +46,8 @@ class GameRoom extends colyseus_1.Room {
         this.gameStartedAt = new Date();
         this.resultsPersisted = false;
         this.damageKnockout = false;
+        this.damageWagerReserved = false;
+        this.gameStartPending = false;
     }
     async onCreate(options = {}) {
         if (options.gameMode === "friends") {
@@ -71,6 +73,10 @@ class GameRoom extends colyseus_1.Room {
             : options.gameMode === "ranked"
                 ? "ranked"
                 : "classic";
+        this.state.damageWager = this.state.gameMode === "damage" && (0, shared_1.isDamageWager)(options.damageWager)
+            ? options.damageWager
+            : this.state.gameMode === "damage" ? shared_1.DEFAULT_DAMAGE_WAGER : 0;
+        this.state.damagePot = this.state.damageWager * 2;
         if (this.state.gameMode === "damage")
             this.maxClients = 2;
         if (this.state.gameMode === "ranked")
@@ -88,7 +94,7 @@ class GameRoom extends colyseus_1.Room {
         await this.updateLobbyMetadata();
         this.onMessage("toggleReady", (client) => this.handleToggleReady(client));
         this.onMessage("toggleRoomVisibility", (client) => void this.handleToggleRoomVisibility(client));
-        this.onMessage("startGame", (client) => this.handleStartGame(client));
+        this.onMessage("startGame", (client) => void this.handleStartGame(client));
         this.onMessage("submitAnswer", (client, msg) => this.handleSubmitAnswer(client, msg));
         this.onMessage("saveAnswerDraft", (client, msg) => this.handleSaveAnswerDraft(client, msg));
         this.onMessage("submitConfidence", (client, msg) => this.handleSubmitConfidence(client, msg));
@@ -103,22 +109,20 @@ class GameRoom extends colyseus_1.Room {
             && isValidDeviceId(options.deviceId)
             && ![...this.deviceIds.values()].includes(options.deviceId);
     }
-    onJoin(client, options = {}) {
+    async onJoin(client, options = {}) {
         const player = new schema_1.PlayerSchema();
         player.id = client.sessionId;
         player.name = isValidPlayerName(options.name) ? options.name.trim() : "Player";
         this.deviceIds.set(client.sessionId, options.deviceId ?? "");
         const deviceId = options.deviceId ?? "";
-        void (0, database_1.upsertPlayer)(deviceId, player.name).then((stars) => {
-            const joinedPlayer = this.state.players.get(client.sessionId);
-            if (joinedPlayer && stars !== null)
-                joinedPlayer.stars = stars;
-        });
         player.isHost = this.state.players.size === 0;
         player.health = 15;
         if (player.isHost)
             this.state.hostId = player.id;
         this.state.players.set(client.sessionId, player);
+        const stars = await (0, database_1.upsertPlayer)(deviceId, player.name);
+        if (stars !== null)
+            player.stars = stars;
         void this.updateLobbyMetadata();
     }
     async onLeave(client, consented) {
@@ -129,6 +133,13 @@ class GameRoom extends colyseus_1.Room {
         this.shortenConfidencePhaseIfEveryoneDecided();
         this.shortenSideBetPhaseIfEveryoneDecided();
         if (consented) {
+            if (this.state.gameMode === "damage" && this.state.gameStarted && !this.state.gameEnded) {
+                player.health = 0;
+                this.damageKnockout = true;
+                this.endGame();
+                void this.updateLobbyMetadata();
+                return;
+            }
             if (this.state.gameMode === "ranked" && this.state.gameStarted) {
                 void this.updateLobbyMetadata();
                 return;
@@ -156,6 +167,13 @@ class GameRoom extends colyseus_1.Room {
             void this.updateLobbyMetadata();
         }
         catch {
+            if (this.state.gameMode === "damage" && this.state.gameStarted && !this.state.gameEnded) {
+                player.health = 0;
+                this.damageKnockout = true;
+                this.endGame();
+                void this.updateLobbyMetadata();
+                return;
+            }
             if (this.state.gameMode === "ranked" && this.state.gameStarted) {
                 void this.updateLobbyMetadata();
                 return;
@@ -202,13 +220,33 @@ class GameRoom extends colyseus_1.Room {
         this.isPublic = nextIsPublic;
         this.state.isPublic = nextIsPublic;
     }
-    handleStartGame(client) {
+    async handleStartGame(client) {
         if (client.sessionId !== this.state.hostId)
             return; // only host may start
-        if (this.state.gameStarted)
+        if (this.state.gameStarted || this.gameStartPending)
             return;
         if (this.state.gameMode === "damage" ? this.state.players.size !== 2 : this.state.players.size < shared_1.MIN_PLAYERS_TO_START)
             return;
+        if (this.state.gameMode === "damage") {
+            this.gameStartPending = true;
+            const playerEntries = [...this.state.players.values()].flatMap((player) => {
+                const deviceId = this.deviceIds.get(player.id);
+                return deviceId ? [{ player, deviceId }] : [];
+            });
+            const reservation = await (0, database_1.reserveDamageWager)(this.matchId, playerEntries.map(({ deviceId }) => deviceId), this.state.damageWager);
+            this.gameStartPending = false;
+            if (!reservation.ok) {
+                const insufficientNames = playerEntries.filter(({ deviceId }) => reservation.insufficientPlayerIds.includes(deviceId)).map(({ player }) => player.name);
+                this.broadcast("gameStartError", { code: "insufficient_stars", names: insufficientNames, stake: this.state.damageWager });
+                return;
+            }
+            playerEntries.forEach(({ player, deviceId }) => {
+                const balance = reservation.balances.get(deviceId);
+                if (balance !== undefined)
+                    player.stars = balance;
+            });
+            this.damageWagerReserved = true;
+        }
         this.beginGame();
     }
     beginGame() {
@@ -622,6 +660,10 @@ class GameRoom extends colyseus_1.Room {
                     finalRank,
                 }];
         });
+        if (this.state.gameMode === "damage" && this.damageWagerReserved) {
+            const winners = completedPlayers.filter((player) => player.finalRank === 1);
+            await (0, database_1.settleDamageWager)(this.matchId, winners.length === 1 ? winners[0].deviceId : null);
+        }
         const progressUpdates = await (0, database_1.saveCompletedMatch)({
             id: this.matchId,
             roomCode: this.state.code,

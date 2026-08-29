@@ -4,6 +4,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getDatabaseStatus = getDatabaseStatus;
+exports.reserveDamageWager = reserveDamageWager;
+exports.settleDamageWager = settleDamageWager;
 exports.getRankedLeaderboard = getRankedLeaderboard;
 exports.upsertPlayer = upsertPlayer;
 exports.getPlayerStars = getPlayerStars;
@@ -30,6 +32,77 @@ async function getDatabaseStatus() {
         console.error("Database health check failed", error);
         return "unavailable";
     }
+}
+async function reserveDamageWager(matchId, playerIds, stake) {
+    const failed = { ok: false, balances: new Map(), insufficientPlayerIds: playerIds };
+    if (!sql || playerIds.length !== 2)
+        return failed;
+    try {
+        return await sql.begin(async (transaction) => {
+            const players = await transaction `
+        select id, stars from public.players
+        where id in ${transaction(playerIds)}
+        order by id
+        for update
+      `;
+            const insufficientPlayerIds = players.filter((player) => player.stars < stake).map((player) => player.id);
+            if (players.length !== 2 || insufficientPlayerIds.length > 0) {
+                return { ok: false, balances: new Map(players.map((player) => [player.id, player.stars])), insufficientPlayerIds };
+            }
+            await transaction `
+        insert into public.damage_wagers (match_id, player_one_id, player_two_id, stake)
+        values (${matchId}, ${playerIds[0]}, ${playerIds[1]}, ${stake})
+      `;
+            for (const player of players) {
+                await transaction `update public.players set stars = stars - ${stake} where id = ${player.id}`;
+                await transaction `
+          insert into public.star_transactions (id, player_id, amount, reason, source_wager_id)
+          values (${(0, crypto_1.randomUUID)()}, ${player.id}, ${-stake}, 'damage_wager_stake', ${matchId})
+        `;
+            }
+            return { ok: true, balances: new Map(players.map((player) => [player.id, player.stars - stake])), insufficientPlayerIds: [] };
+        });
+    }
+    catch (error) {
+        console.error("Could not reserve Damage wager", error);
+        return failed;
+    }
+}
+async function settleDamageWager(matchId, winnerId) {
+    const balances = new Map();
+    if (!sql)
+        return balances;
+    try {
+        await sql.begin(async (transaction) => {
+            const [wager] = await transaction `
+        select player_one_id, player_two_id, stake, status
+        from public.damage_wagers where match_id = ${matchId} for update
+      `;
+            if (!wager || wager.status !== 'active')
+                return;
+            const playerIds = [wager.player_one_id, wager.player_two_id];
+            const validWinner = winnerId && playerIds.includes(winnerId) ? winnerId : null;
+            const recipients = validWinner ? [{ id: validWinner, amount: wager.stake * 2, reason: 'damage_wager_payout' }] : playerIds.map((id) => ({ id, amount: wager.stake, reason: 'damage_wager_refund' }));
+            for (const recipient of recipients) {
+                await transaction `update public.players set stars = stars + ${recipient.amount} where id = ${recipient.id}`;
+                await transaction `
+          insert into public.star_transactions (id, player_id, amount, reason, source_wager_id)
+          values (${(0, crypto_1.randomUUID)()}, ${recipient.id}, ${recipient.amount}, ${recipient.reason}, ${matchId})
+        `;
+            }
+            await transaction `
+        update public.damage_wagers
+        set status = ${validWinner ? 'paid' : 'refunded'}, winner_id = ${validWinner}, settled_at = now()
+        where match_id = ${matchId}
+      `;
+            const updated = await transaction `select id, stars from public.players where id in ${transaction(playerIds)}`;
+            updated.forEach((player) => balances.set(player.id, player.stars));
+        });
+    }
+    catch (error) {
+        console.error("Could not settle Damage wager", error);
+    }
+    return balances;
 }
 async function getRankedLeaderboard(deviceId) {
     if (!sql)
@@ -66,6 +139,7 @@ async function getRankedLeaderboard(deviceId) {
               or (ahead.ranked_lp = p.ranked_lp and ahead.wins > p.wins)
               or (ahead.ranked_lp = p.ranked_lp and ahead.wins = p.wins and ahead.created_at < p.created_at)
             )
+        )
         end as position
       from public.players p
       where p.id = ${deviceId}

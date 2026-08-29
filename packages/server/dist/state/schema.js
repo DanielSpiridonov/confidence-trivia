@@ -226,6 +226,8 @@ class RoomStateSchema extends schema_1.Schema {
         this.phase = "lobby";
         this.hostId = "";
         this.isPublic = false;
+        this.damageWager = 0;
+        this.damagePot = 0;
         this.players = new schema_1.MapSchema();
         this.currentRoundIndex = 0; // 0-based
         this.totalRounds = 10;
@@ -259,6 +261,14 @@ __decorate([
     (0, schema_1.type)("boolean"),
     __metadata("design:type", Boolean)
 ], RoomStateSchema.prototype, "isPublic", void 0);
+__decorate([
+    (0, schema_1.type)("number"),
+    __metadata("design:type", Number)
+], RoomStateSchema.prototype, "damageWager", void 0);
+__decorate([
+    (0, schema_1.type)("number"),
+    __metadata("design:type", Number)
+], RoomStateSchema.prototype, "damagePot", void 0);
 __decorate([
     (0, schema_1.type)({ map: PlayerSchema }),
     __metadata("design:type", Object)

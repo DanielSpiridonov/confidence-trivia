@@ -54,6 +54,80 @@ export interface PlayerProgressUpdate {
   rewardedGamesToday: number;
 }
 
+export interface DamageWagerReservation {
+  ok: boolean;
+  balances: Map<string, number>;
+  insufficientPlayerIds: string[];
+}
+
+export async function reserveDamageWager(matchId: string, playerIds: string[], stake: number): Promise<DamageWagerReservation> {
+  const failed = { ok: false, balances: new Map<string, number>(), insufficientPlayerIds: playerIds };
+  if (!sql || playerIds.length !== 2) return failed;
+  try {
+    return await sql.begin(async (transaction) => {
+      const players = await transaction<{ id: string; stars: number }[]>`
+        select id, stars from public.players
+        where id in ${transaction(playerIds)}
+        order by id
+        for update
+      `;
+      const insufficientPlayerIds = players.filter((player) => player.stars < stake).map((player) => player.id);
+      if (players.length !== 2 || insufficientPlayerIds.length > 0) {
+        return { ok: false, balances: new Map(players.map((player) => [player.id, player.stars])), insufficientPlayerIds };
+      }
+      await transaction`
+        insert into public.damage_wagers (match_id, player_one_id, player_two_id, stake)
+        values (${matchId}, ${playerIds[0]}, ${playerIds[1]}, ${stake})
+      `;
+      for (const player of players) {
+        await transaction`update public.players set stars = stars - ${stake} where id = ${player.id}`;
+        await transaction`
+          insert into public.star_transactions (id, player_id, amount, reason, source_wager_id)
+          values (${randomUUID()}, ${player.id}, ${-stake}, 'damage_wager_stake', ${matchId})
+        `;
+      }
+      return { ok: true, balances: new Map(players.map((player) => [player.id, player.stars - stake])), insufficientPlayerIds: [] };
+    });
+  } catch (error) {
+    console.error("Could not reserve Damage wager", error);
+    return failed;
+  }
+}
+
+export async function settleDamageWager(matchId: string, winnerId: string | null): Promise<Map<string, number>> {
+  const balances = new Map<string, number>();
+  if (!sql) return balances;
+  try {
+    await sql.begin(async (transaction) => {
+      const [wager] = await transaction<{ player_one_id: string; player_two_id: string; stake: number; status: string }[]>`
+        select player_one_id, player_two_id, stake, status
+        from public.damage_wagers where match_id = ${matchId} for update
+      `;
+      if (!wager || wager.status !== 'active') return;
+      const playerIds = [wager.player_one_id, wager.player_two_id];
+      const validWinner = winnerId && playerIds.includes(winnerId) ? winnerId : null;
+      const recipients = validWinner ? [{ id: validWinner, amount: wager.stake * 2, reason: 'damage_wager_payout' }] : playerIds.map((id) => ({ id, amount: wager.stake, reason: 'damage_wager_refund' }));
+      for (const recipient of recipients) {
+        await transaction`update public.players set stars = stars + ${recipient.amount} where id = ${recipient.id}`;
+        await transaction`
+          insert into public.star_transactions (id, player_id, amount, reason, source_wager_id)
+          values (${randomUUID()}, ${recipient.id}, ${recipient.amount}, ${recipient.reason}, ${matchId})
+        `;
+      }
+      await transaction`
+        update public.damage_wagers
+        set status = ${validWinner ? 'paid' : 'refunded'}, winner_id = ${validWinner}, settled_at = now()
+        where match_id = ${matchId}
+      `;
+      const updated = await transaction<{ id: string; stars: number }[]>`select id, stars from public.players where id in ${transaction(playerIds)}`;
+      updated.forEach((player) => balances.set(player.id, player.stars));
+    });
+  } catch (error) {
+    console.error("Could not settle Damage wager", error);
+  }
+  return balances;
+}
+
 export interface DailyRewardStatus {
   stars: number;
   available: boolean;

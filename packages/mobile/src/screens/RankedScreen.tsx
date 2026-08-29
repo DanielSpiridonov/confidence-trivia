@@ -37,6 +37,10 @@ export function RankedScreen({
       <View style={styles.content}>
         {current ? <PlayerRankCard entry={current} t={t} /> : null}
         <View style={styles.leaderboardPanel}>
+          <View pointerEvents="none" style={[styles.framePin, styles.framePinTopLeft]} />
+          <View pointerEvents="none" style={[styles.framePin, styles.framePinTopRight]} />
+          <View pointerEvents="none" style={[styles.framePin, styles.framePinBottomLeft]} />
+          <View pointerEvents="none" style={[styles.framePin, styles.framePinBottomRight]} />
           <View style={styles.headerRow}>
             <Text style={[styles.header, styles.position]}>{t("ranked.spot")}</Text>
             <Text style={[styles.header, styles.player]}>{t("ranked.player")}</Text>
@@ -114,18 +118,23 @@ const styles = StyleSheet.create({
   rankCardPosition: { marginTop: 2, color: theme.textDim, fontSize: 10, fontWeight: "700" },
   rankCardProgress: { marginTop: 7, color: theme.text, fontSize: 10, fontWeight: "800", textAlign: "center" },
   rankCardHint: { marginTop: 3, color: theme.textDim, fontSize: 9, fontWeight: "600", textAlign: "center" },
-  leaderboardPanel: { flex: 1, minWidth: 0, backgroundColor: "rgba(31, 26, 51, 0.94)", borderRadius: 14, padding: 10 },
-  headerRow: { flexDirection: "row", paddingHorizontal: 8, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.09)" },
-  header: { color: theme.textDim, fontSize: 10, fontWeight: "900", textTransform: "uppercase" },
+  leaderboardPanel: { flex: 1, minWidth: 0, backgroundColor: "#17211D", borderRadius: 9, borderWidth: 7, borderColor: "#6F4226", padding: 8, shadowColor: "#000000", shadowOpacity: 0.5, shadowRadius: 7, shadowOffset: { width: 0, height: 4 }, elevation: 7 },
+  framePin: { position: "absolute", width: 5, height: 5, borderRadius: 3, backgroundColor: "#C29A62", borderWidth: 1, borderColor: "#3E2517", zIndex: 3 },
+  framePinTopLeft: { left: -6, top: -6 },
+  framePinTopRight: { right: -6, top: -6 },
+  framePinBottomLeft: { left: -6, bottom: -6 },
+  framePinBottomRight: { right: -6, bottom: -6 },
+  headerRow: { flexDirection: "row", paddingHorizontal: 8, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: "rgba(238, 233, 218, 0.35)" },
+  header: { color: "#E8DFC8", fontSize: 10, fontWeight: "900", textTransform: "uppercase", letterSpacing: 0.5 },
   list: { flex: 1, minHeight: 0 },
-  row: { minHeight: 25, flexDirection: "row", alignItems: "center", paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.05)" },
-  currentRow: { backgroundColor: "rgba(124, 92, 255, 0.18)", borderColor: theme.primary, borderWidth: 1, borderRadius: 8 },
-  currentWrap: { borderTopWidth: 1, borderTopColor: "rgba(255,255,255,0.16)", paddingTop: 6, marginTop: 4 },
-  cell: { color: theme.text, fontSize: 11, fontWeight: "700" },
+  row: { minHeight: 25, flexDirection: "row", alignItems: "center", paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: "rgba(238, 233, 218, 0.12)" },
+  currentRow: { backgroundColor: "rgba(224, 190, 100, 0.13)", borderColor: "#D8BE78", borderWidth: 1, borderRadius: 5 },
+  currentWrap: { borderTopWidth: 1, borderTopColor: "rgba(238, 233, 218, 0.3)", paddingTop: 6, marginTop: 4 },
+  cell: { color: "#F1ECDD", fontSize: 11, fontWeight: "700", textShadowColor: "rgba(255,255,255,0.08)", textShadowRadius: 1 },
   position: { width: "10%" },
   player: { width: "35%", paddingRight: 6 },
   lp: { width: "14%", textAlign: "right", paddingRight: 8 },
   rank: { width: "27%", textAlign: "center", fontWeight: "900" },
   wins: { width: "14%", textAlign: "right" },
-  message: { color: theme.textDim, textAlign: "center", marginTop: 32 },
+  message: { color: "#CFC7B4", textAlign: "center", marginTop: 32 },
 });

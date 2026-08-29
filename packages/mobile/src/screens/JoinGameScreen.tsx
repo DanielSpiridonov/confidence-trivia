@@ -20,6 +20,7 @@ export function JoinGameScreen({
   const [code, setCode] = useState("");
   const [name, setName] = useState(initialName);
   const [search, setSearch] = useState("");
+  const [modeFilter, setModeFilter] = useState<"all" | "classic" | "ranked" | "damage">("all");
   const [rooms, setRooms] = useState<PublicRoomListing[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [joiningRoomId, setJoiningRoomId] = useState<string | null>(null);
@@ -47,8 +48,11 @@ export function JoinGameScreen({
 
   const visibleRooms = useMemo(() => {
     const query = search.trim().toLocaleLowerCase();
-    return query ? rooms.filter((room) => room.leaderName.toLocaleLowerCase().includes(query)) : rooms;
-  }, [rooms, search]);
+    return rooms.filter((room) => (
+      (modeFilter === "all" || room.gameMode === modeFilter)
+      && (!query || room.leaderName.toLocaleLowerCase().includes(query))
+    ));
+  }, [modeFilter, rooms, search]);
 
   async function joinWithCode() {
     if (joiningRoomId || code.length !== 6 || !isValidPlayerName(name)) return;
@@ -116,6 +120,16 @@ export function JoinGameScreen({
             value={search}
             onChangeText={setSearch}
           />
+          <View style={styles.filterRow}>
+            {(["all", "classic", "ranked", "damage"] as const).map((mode) => {
+              const selected = modeFilter === mode;
+              return (
+                <Pressable key={mode} onPress={() => setModeFilter(mode)} style={[styles.filterChip, selected && styles.filterChipSelected]}>
+                  <Text numberOfLines={1} style={[styles.filterText, selected && styles.filterTextSelected]}>{t(`join.filters.${mode}`)}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
           <FlatList
             style={styles.roomList}
             contentContainerStyle={visibleRooms.length === 0 ? styles.emptyList : styles.roomListContent}
@@ -157,6 +171,11 @@ const styles = StyleSheet.create({
   input: { width: "100%", minHeight: 54, backgroundColor: theme.surface, color: theme.text, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, marginBottom: 10 },
   codeInput: { letterSpacing: 2, textAlign: "center" },
   searchInput: { width: "100%", color: theme.text, backgroundColor: "transparent", paddingHorizontal: 4, paddingVertical: 8, fontSize: 14, marginBottom: 4 },
+  filterRow: { width: "100%", flexDirection: "row", gap: 6, marginBottom: 7 },
+  filterChip: { flex: 1, minWidth: 0, alignItems: "center", justifyContent: "center", paddingHorizontal: 5, paddingVertical: 6, borderRadius: 8, backgroundColor: "rgba(31, 26, 51, 0.78)", borderWidth: 1, borderColor: "rgba(185, 176, 214, 0.22)" },
+  filterChipSelected: { backgroundColor: "rgba(124, 92, 255, 0.25)", borderColor: theme.primary },
+  filterText: { color: theme.textDim, fontSize: 10, fontWeight: "800" },
+  filterTextSelected: { color: theme.text },
   roomList: { flex: 1, minHeight: 0, width: "100%" },
   roomListContent: { paddingBottom: 6 },
   emptyList: { flexGrow: 1, justifyContent: "center" },

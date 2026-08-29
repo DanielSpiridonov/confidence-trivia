@@ -20,6 +20,8 @@ import {
   DIFFICULTY_REWARDS,
   RANKED_FIXED_ROUND_COUNT,
   RANKED_PLAYER_COUNT,
+  DEFAULT_DAMAGE_WAGER,
+  isDamageWager,
 } from "@confidence-trivia/shared";
 import {
   RoomStateSchema,
@@ -28,7 +30,7 @@ import {
   RevealEntrySchema,
 } from "../state/schema";
 import { getLocalizedCorrectAnswer, getQuestionSet, localize, localizeAnswer, localizeAnswerItems } from "../content/questions";
-import { saveCompletedMatch, upsertPlayer } from "../database";
+import { reserveDamageWager, saveCompletedMatch, settleDamageWager, upsertPlayer } from "../database";
 
 interface JoinOptions {
   deviceId?: string;
@@ -41,6 +43,7 @@ interface CreateOptions extends JoinOptions {
   gameMode?: GameMode;
   excludeQuestionIds?: string[];
   visibility?: "private" | "public";
+  damageWager?: number;
 }
 
 const PLAYER_NAME_PATTERN = /^[\p{L}\p{N} ]+$/u;
@@ -85,6 +88,8 @@ export class GameRoom extends Room<RoomStateSchema> {
   private gameStartedAt = new Date();
   private resultsPersisted = false;
   private damageKnockout = false;
+  private damageWagerReserved = false;
+  private gameStartPending = false;
 
   async onCreate(options: CreateOptions = {}) {
     if (options.gameMode === "friends") {
@@ -111,6 +116,10 @@ export class GameRoom extends Room<RoomStateSchema> {
       : options.gameMode === "ranked"
         ? "ranked"
         : "classic";
+    this.state.damageWager = this.state.gameMode === "damage" && isDamageWager(options.damageWager)
+      ? options.damageWager
+      : this.state.gameMode === "damage" ? DEFAULT_DAMAGE_WAGER : 0;
+    this.state.damagePot = this.state.damageWager * 2;
     if (this.state.gameMode === "damage") this.maxClients = 2;
     if (this.state.gameMode === "ranked") this.maxClients = RANKED_PLAYER_COUNT;
     this.state.totalRounds = this.state.gameMode === "damage"
@@ -127,7 +136,7 @@ export class GameRoom extends Room<RoomStateSchema> {
 
     this.onMessage("toggleReady", (client) => this.handleToggleReady(client));
     this.onMessage("toggleRoomVisibility", (client) => void this.handleToggleRoomVisibility(client));
-    this.onMessage("startGame", (client) => this.handleStartGame(client));
+    this.onMessage("startGame", (client) => void this.handleStartGame(client));
     this.onMessage("submitAnswer", (client, msg) => this.handleSubmitAnswer(client, msg));
     this.onMessage("saveAnswerDraft", (client, msg) => this.handleSaveAnswerDraft(client, msg));
     this.onMessage("submitConfidence", (client, msg) => this.handleSubmitConfidence(client, msg));
@@ -144,20 +153,18 @@ export class GameRoom extends Room<RoomStateSchema> {
       && ![...this.deviceIds.values()].includes(options.deviceId);
   }
 
-  onJoin(client: Client, options: JoinOptions = {}) {
+  async onJoin(client: Client, options: JoinOptions = {}) {
     const player = new PlayerSchema();
     player.id = client.sessionId;
     player.name = isValidPlayerName(options.name) ? options.name.trim() : "Player";
     this.deviceIds.set(client.sessionId, options.deviceId ?? "");
     const deviceId = options.deviceId ?? "";
-    void upsertPlayer(deviceId, player.name).then((stars) => {
-      const joinedPlayer = this.state.players.get(client.sessionId);
-      if (joinedPlayer && stars !== null) joinedPlayer.stars = stars;
-    });
     player.isHost = this.state.players.size === 0;
     player.health = 15;
     if (player.isHost) this.state.hostId = player.id;
     this.state.players.set(client.sessionId, player);
+    const stars = await upsertPlayer(deviceId, player.name);
+    if (stars !== null) player.stars = stars;
     void this.updateLobbyMetadata();
   }
 
@@ -169,6 +176,13 @@ export class GameRoom extends Room<RoomStateSchema> {
     this.shortenSideBetPhaseIfEveryoneDecided();
 
     if (consented) {
+      if (this.state.gameMode === "damage" && this.state.gameStarted && !this.state.gameEnded) {
+        player.health = 0;
+        this.damageKnockout = true;
+        this.endGame();
+        void this.updateLobbyMetadata();
+        return;
+      }
       if (this.state.gameMode === "ranked" && this.state.gameStarted) {
         void this.updateLobbyMetadata();
         return;
@@ -196,6 +210,13 @@ export class GameRoom extends Room<RoomStateSchema> {
       player.connected = true;
       void this.updateLobbyMetadata();
     } catch {
+      if (this.state.gameMode === "damage" && this.state.gameStarted && !this.state.gameEnded) {
+        player.health = 0;
+        this.damageKnockout = true;
+        this.endGame();
+        void this.updateLobbyMetadata();
+        return;
+      }
       if (this.state.gameMode === "ranked" && this.state.gameStarted) {
         void this.updateLobbyMetadata();
         return;
@@ -245,10 +266,29 @@ export class GameRoom extends Room<RoomStateSchema> {
     this.state.isPublic = nextIsPublic;
   }
 
-  private handleStartGame(client: Client) {
+  private async handleStartGame(client: Client) {
     if (client.sessionId !== this.state.hostId) return; // only host may start
-    if (this.state.gameStarted) return;
+    if (this.state.gameStarted || this.gameStartPending) return;
     if (this.state.gameMode === "damage" ? this.state.players.size !== 2 : this.state.players.size < MIN_PLAYERS_TO_START) return;
+    if (this.state.gameMode === "damage") {
+      this.gameStartPending = true;
+      const playerEntries = [...this.state.players.values()].flatMap((player) => {
+        const deviceId = this.deviceIds.get(player.id);
+        return deviceId ? [{ player, deviceId }] : [];
+      });
+      const reservation = await reserveDamageWager(this.matchId, playerEntries.map(({ deviceId }) => deviceId), this.state.damageWager);
+      this.gameStartPending = false;
+      if (!reservation.ok) {
+        const insufficientNames = playerEntries.filter(({ deviceId }) => reservation.insufficientPlayerIds.includes(deviceId)).map(({ player }) => player.name);
+        this.broadcast("gameStartError", { code: "insufficient_stars", names: insufficientNames, stake: this.state.damageWager });
+        return;
+      }
+      playerEntries.forEach(({ player, deviceId }) => {
+        const balance = reservation.balances.get(deviceId);
+        if (balance !== undefined) player.stars = balance;
+      });
+      this.damageWagerReserved = true;
+    }
     this.beginGame();
   }
 
@@ -667,6 +707,11 @@ export class GameRoom extends Room<RoomStateSchema> {
         finalRank,
       }];
     });
+
+    if (this.state.gameMode === "damage" && this.damageWagerReserved) {
+      const winners = completedPlayers.filter((player) => player.finalRank === 1);
+      await settleDamageWager(this.matchId, winners.length === 1 ? winners[0].deviceId : null);
+    }
 
     const progressUpdates = await saveCompletedMatch({
       id: this.matchId,

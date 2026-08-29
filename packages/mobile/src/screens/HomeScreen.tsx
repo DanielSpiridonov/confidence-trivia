@@ -8,7 +8,10 @@ const DAILY_REWARD_PLATFORM_IMAGE: ImageSourcePropType = require("../../assets/p
 const DAILY_REWARD_PRESENT_IMAGE: ImageSourcePropType = require("../../assets/stars-gift.png");
 const CLAIMED_REWARD_PLATFORM_IMAGE: ImageSourcePropType = require("../../assets/platform-used-transparent.png");
 const CLAIMED_REWARD_PRESENT_IMAGE: ImageSourcePropType = require("../../assets/gift-opened-transparent.png");
+const RANKED_TROPHY_IMAGE: ImageSourcePropType = require("../../assets/trophy-transparent.png");
 const REWARD_STAGES = [10, 20, 30, 50, 75] as const;
+const SIDEBAR_ITEM_WIDTH = 82;
+const SIDEBAR_ITEM_HEIGHT = 91;
 
 function HomePopup({ label, amount, streakLabel, claimed, claimedLabel, countdown, platformImage, featureImage, disabled, onPress }: {
   label: string;
@@ -142,9 +145,17 @@ export function HomeScreen({
             }}
           />
         ) : null}
-        <Pressable accessibilityRole="button" onPress={onRanked} style={({ pressed }) => [styles.rankedShortcut, pressed && styles.popupPressed]}>
-          <Text style={styles.rankedShortcutIcon}>🏆</Text>
-          <Text style={styles.rankedShortcutLabel}>{t("ranked.shortTitle")}</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t("ranked.shortTitle")}
+          onPress={onRanked}
+          style={({ pressed }) => [styles.popup, pressed && styles.popupPressed]}
+        >
+          <View style={styles.popupArtwork}>
+            <Image source={DAILY_REWARD_PLATFORM_IMAGE} resizeMode="contain" style={styles.popupPlatformImage} />
+            <Image source={RANKED_TROPHY_IMAGE} resizeMode="contain" style={styles.rankedTrophyImage} />
+          </View>
+          <Text numberOfLines={1} style={styles.popupLabel}>{t("ranked.shortTitle")}</Text>
         </Pressable>
       </View>
       <Title>🔥 {t("home.title")}</Title>
@@ -192,25 +203,23 @@ const styles = StyleSheet.create({
     maxWidth: 420,
     alignSelf: "center",
   },
-  popupRail: { position: "absolute", left: -2, top: 42, bottom: 12, width: 102, justifyContent: "flex-start", gap: 4, zIndex: 5 },
-  popup: { width: 102, height: 112, alignItems: "center", justifyContent: "flex-end", paddingBottom: 3 },
+  popupRail: { position: "absolute", left: 1, top: 38, bottom: 12, width: SIDEBAR_ITEM_WIDTH, justifyContent: "flex-start", gap: 3, zIndex: 5 },
+  popup: { width: SIDEBAR_ITEM_WIDTH, height: SIDEBAR_ITEM_HEIGHT, alignItems: "center", justifyContent: "flex-end", paddingBottom: 2 },
   popupDisabled: { opacity: 0.55 },
   popupPressed: { transform: [{ scale: 0.96 }] },
-  popupArtwork: { width: 98, height: 76, position: "relative", alignItems: "center", justifyContent: "flex-end" },
-  popupPlatformImage: { position: "absolute", bottom: 2, width: 98, height: 24 },
-  popupFeatureImage: { position: "absolute", width: 62, height: 62, bottom: 13 },
-  popupPlatformClaimed: { bottom: 0, height: 35 },
-  popupFeatureClaimed: { width: 66, height: 66, bottom: 10 },
-  popupStreakLabel: { position: "absolute", top: 1, zIndex: 2, color: "#FFFFFF", fontSize: 9, fontWeight: "900", textShadowColor: "#000000", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
-  popupCountdown: { position: "absolute", top: 30, zIndex: 2, color: "#FFFFFF", fontSize: 11, fontWeight: "900", textShadowColor: "#000000", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  popupArtwork: { width: 80, height: 61, position: "relative", alignItems: "center", justifyContent: "flex-end" },
+  popupPlatformImage: { position: "absolute", bottom: 1, width: 80, height: 20 },
+  popupFeatureImage: { position: "absolute", width: 50, height: 50, bottom: 10 },
+  popupPlatformClaimed: { bottom: 0, height: 28 },
+  popupFeatureClaimed: { width: 53, height: 53, bottom: 8 },
+  popupStreakLabel: { position: "absolute", top: 0, zIndex: 2, color: "#FFFFFF", fontSize: 8, fontWeight: "900", textShadowColor: "#000000", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  popupCountdown: { position: "absolute", top: 24, zIndex: 2, color: "#FFFFFF", fontSize: 9, fontWeight: "900", textShadowColor: "#000000", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   popupPlatformFallback: { width: 110, height: 31, borderRadius: 6, backgroundColor: "rgba(124, 92, 255, 0.72)", borderWidth: 2, borderColor: "rgba(255, 255, 255, 0.24)" },
   popupFeatureFallback: { position: "absolute", width: 68, height: 68, bottom: 18, alignItems: "center", justifyContent: "center" },
-  popupLabel: { color: "#FFFFFF", fontSize: 11, fontWeight: "800", textAlign: "center", width: "100%" },
-  popupAmount: { color: "#F7D85B", fontSize: 12, fontWeight: "900", textAlign: "center" },
+  popupLabel: { color: "#FFFFFF", fontSize: 9, fontWeight: "800", textAlign: "center", width: "100%" },
+  popupAmount: { color: "#F7D85B", fontSize: 10, fontWeight: "900", textAlign: "center" },
   popupTextClaimed: { color: "rgba(255, 255, 255, 0.68)" },
-  rankedShortcut: { width: 102, minHeight: 66, alignItems: "center", justifyContent: "center", borderRadius: 10, backgroundColor: "rgba(31, 26, 51, 0.9)", borderWidth: 1, borderColor: "rgba(184, 140, 255, 0.45)" },
-  rankedShortcutIcon: { fontSize: 25 },
-  rankedShortcutLabel: { color: "#D6C2FF", fontSize: 11, fontWeight: "900", marginTop: 2 },
+  rankedTrophyImage: { position: "absolute", width: 55, height: 53, bottom: 9 },
   celebrationBackdrop: { ...StyleSheet.absoluteFillObject, zIndex: 30, alignItems: "center", justifyContent: "center" },
   celebrationPanel: { width: "78%", maxWidth: 620, minHeight: 204, borderRadius: 8, backgroundColor: "rgba(31, 26, 51, 0.98)", borderWidth: 1, borderColor: "rgba(181, 165, 255, 0.35)", paddingHorizontal: 28, paddingVertical: 18, alignItems: "center" },
   celebrationClose: { position: "absolute", top: 8, right: 10, zIndex: 2, width: 30, height: 30, alignItems: "center", justifyContent: "center" },

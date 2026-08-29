@@ -106,6 +106,7 @@ export async function createRoom(
   gameMode: "classic" | "ranked" | "damage",
   excludeQuestionIds: string[] = [],
   visibility: "private" | "public" = "private",
+  damageWager = 5,
 ) {
   const room = await withRoomRequestTimeout(
     getClient().create("confidence_trivia", {
@@ -116,6 +117,7 @@ export async function createRoom(
       deviceId,
       name: playerName,
       visibility,
+      damageWager,
     })
   );
   return room;

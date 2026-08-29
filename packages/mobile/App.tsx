@@ -179,7 +179,7 @@ export default function App() {
     return storedDeviceId;
   }
 
-  async function handleCreate(name: string, rounds: number, gameMode: "classic" | "ranked" | "damage", visibility: "private" | "public") {
+  async function handleCreate(name: string, rounds: number, gameMode: "classic" | "ranked" | "damage", visibility: "private" | "public", damageWager: number) {
     const currentDeviceId = await requireDeviceId();
     let recentQuestionIds: string[] = [];
     try {
@@ -189,7 +189,7 @@ export default function App() {
     } catch {
       // A corrupt local history should never prevent room creation.
     }
-    const r = await createRoom(currentDeviceId, name, rounds, locale, gameMode, recentQuestionIds, visibility);
+    const r = await createRoom(currentDeviceId, name, rounds, locale, gameMode, recentQuestionIds, visibility, damageWager);
     reconnectionTokenRef.current = r.reconnectionToken;
     setRoom(r);
     setRoomRecovery(null);

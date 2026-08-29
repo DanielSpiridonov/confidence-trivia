@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { TextInput, StyleSheet, Text, ScrollView, Pressable, View, Platform } from "react-native";
 import { useTranslation } from "react-i18next";
 import { ANDROID_COMPACT_MENU_UI_SCALE, BackIconButton, Screen, Title, BigButton, theme } from "../components/ui";
-import { DEFAULT_ROUND_COUNT } from "@confidence-trivia/shared";
+import { DAMAGE_WAGER_OPTIONS, DEFAULT_DAMAGE_WAGER, DEFAULT_ROUND_COUNT } from "@confidence-trivia/shared";
 import { isValidPlayerName } from "../utils/playerName";
 
 const ROUND_OPTIONS = [3, 5, 7, 9, 11, 13, 15];
@@ -18,7 +18,7 @@ export function CreateGameScreen({
   initialName,
   onBack,
 }: {
-  onCreate: (name: string, rounds: number, gameMode: "classic" | "ranked" | "damage", visibility: "private" | "public") => Promise<void>;
+  onCreate: (name: string, rounds: number, gameMode: "classic" | "ranked" | "damage", visibility: "private" | "public", damageWager: number) => Promise<void>;
   locale: "en" | "bg";
   initialName: string;
   onBack: () => void;
@@ -28,6 +28,7 @@ export function CreateGameScreen({
   const [gameMode, setGameMode] = useState<"classic" | "ranked" | "damage">("classic");
   const [visibility, setVisibility] = useState<"private" | "public">("private");
   const [rounds, setRounds] = useState(DEFAULT_ROUNDS);
+  const [damageWager, setDamageWager] = useState<number>(DEFAULT_DAMAGE_WAGER);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const trimmedName = name.trim();
@@ -39,7 +40,7 @@ export function CreateGameScreen({
     try {
       setSubmitting(true);
       setError(null);
-      await onCreate(trimmedName, rounds, gameMode, visibility);
+      await onCreate(trimmedName, rounds, gameMode, visibility, damageWager);
     } catch (err) {
       const message = err instanceof Error ? err.message : t("network.unknownError");
       setError(message);
@@ -108,6 +109,19 @@ export function CreateGameScreen({
                       style={[styles.roundChip, isSelected && styles.roundChipSelected]}
                     >
                       <Text style={[styles.roundChipText, isSelected && styles.roundChipTextSelected]}>{value}</Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View> : null}
+            {gameMode === "damage" ? <View style={styles.roundsSection}>
+              <Text style={styles.roundsLabel}>{t("create.starWager")}</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.roundsScroller}>
+                {DAMAGE_WAGER_OPTIONS.map((value) => {
+                  const isSelected = damageWager === value;
+                  return (
+                    <Pressable key={value} onPress={() => setDamageWager(value)} style={[styles.wagerChip, isSelected && styles.wagerChipSelected]}>
+                      <Text style={[styles.wagerChipText, isSelected && styles.wagerChipTextSelected]}>★ {value}</Text>
                     </Pressable>
                   );
                 })}
@@ -229,6 +243,10 @@ const styles = StyleSheet.create({
   roundChipTextSelected: {
     color: theme.primary,
   },
+  wagerChip: { backgroundColor: theme.surface, borderRadius: 10, paddingHorizontal: 11, paddingVertical: 10, marginRight: 6, borderWidth: 2, borderColor: "transparent" },
+  wagerChipSelected: { borderColor: "#F7D85B", backgroundColor: "#342D20" },
+  wagerChipText: { color: theme.text, fontSize: 13, fontWeight: "800" },
+  wagerChipTextSelected: { color: "#F7D85B" },
   error: {
     color: theme.danger,
     marginBottom: 8,
