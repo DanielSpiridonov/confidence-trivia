@@ -1491,10 +1491,12 @@ The initial LP formula below is canonical for the prototype and should be valida
 ### Ranked format
 
 * Ranked games use the Classic question and confidence loop.
-* Ranked matchmaking creates exactly four-player games.
+* Public ranked play is designed for exactly four-player games.
+* In the current prototype, Ranked is selected from Create Game and uses the normal room lobby/code flow. A host-created ranked test room may start with one player so the mode can be tested alone.
+* Dedicated ranked matchmaking is future work and is not exposed from the leaderboard screen.
 * Ranked games use a fixed round count rather than a host-selected length.
 * LP is determined only by final placement. Raw in-game points decide placement but never convert directly into LP.
-* Ranked rooms are created through matchmaking and cannot be joined by a shared private-room code.
+* Before public ranked release, the temporary one-player start and code-based ranked rooms must be replaced by the dedicated four-player queue.
 * Leaving or abandoning a ranked game counts as fourth place.
 * LP cannot fall below zero.
 * Tied players receive the LP result for their shared placement.

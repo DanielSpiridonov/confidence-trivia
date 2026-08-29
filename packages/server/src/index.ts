@@ -82,7 +82,6 @@ const gameServer = new Server({
 // each call to joinOrCreate/create spins up a new authoritative GameRoom
 // instance with its own room code.
 gameServer.define("confidence_trivia", GameRoom);
-gameServer.define("ranked_trivia", GameRoom, { gameMode: "ranked" });
 
 httpServer.listen(port, () => {
   console.log(`Confidence Trivia server listening on ws://0.0.0.0:${port}`);

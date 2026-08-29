@@ -19,7 +19,7 @@ import { RevealScreen } from "./src/screens/RevealScreen";
 import { FinalResultsScreen } from "./src/screens/FinalResultsScreen";
 import { SettingsScreen, VolumeControl } from "./src/screens/SettingsScreen";
 import { RankedScreen } from "./src/screens/RankedScreen";
-import { claimDailyReward, createRoom, DailyRewardStatus, getDailyRewardStatus, getPlayerStars, joinPublicRoom, joinRankedGame, joinRoom, reconnectRoom, useRoomState } from "./src/network/client";
+import { claimDailyReward, createRoom, DailyRewardStatus, getDailyRewardStatus, getPlayerStars, joinPublicRoom, joinRoom, reconnectRoom, useRoomState } from "./src/network/client";
 import { prepareSoundEffects, setSoundEffectsVolume, stopAllSoundEffects } from "./src/audio/sounds";
 import { pauseMusicForBackground, prepareMusic, setMusicVolume as applyMusicVolume, startMenuMusic, stopMenuMusic } from "./src/audio/music";
 import { getOrCreateDeviceId } from "./src/utils/deviceId";
@@ -179,7 +179,7 @@ export default function App() {
     return storedDeviceId;
   }
 
-  async function handleCreate(name: string, rounds: number, gameMode: "classic" | "friends" | "damage", visibility: "private" | "public") {
+  async function handleCreate(name: string, rounds: number, gameMode: "classic" | "ranked" | "damage", visibility: "private" | "public") {
     const currentDeviceId = await requireDeviceId();
     let recentQuestionIds: string[] = [];
     try {
@@ -212,17 +212,6 @@ export default function App() {
     const r = await joinPublicRoom(roomId, currentDeviceId, name);
     reconnectionTokenRef.current = r.reconnectionToken;
     setRoom(r);
-    setRoomRecovery(null);
-    setRoomRecoveryMessage(null);
-    setNav("in-room");
-  }
-
-  async function handleJoinRanked(name: string) {
-    const currentDeviceId = await requireDeviceId();
-    handleDefaultPlayerName(name);
-    const rankedRoom = await joinRankedGame(currentDeviceId, name, locale);
-    reconnectionTokenRef.current = rankedRoom.reconnectionToken;
-    setRoom(rankedRoom);
     setRoomRecovery(null);
     setRoomRecoveryMessage(null);
     setNav("in-room");
@@ -446,8 +435,6 @@ export default function App() {
           {nav === "ranked" && deviceId ? (
             <RankedScreen
               deviceId={deviceId}
-              initialName={defaultPlayerName}
-              onFindMatch={handleJoinRanked}
               onBack={() => setNav("home")}
             />
           ) : null}

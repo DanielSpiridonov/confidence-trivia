@@ -18,14 +18,14 @@ export function CreateGameScreen({
   initialName,
   onBack,
 }: {
-  onCreate: (name: string, rounds: number, gameMode: "classic" | "friends" | "damage", visibility: "private" | "public") => Promise<void>;
+  onCreate: (name: string, rounds: number, gameMode: "classic" | "ranked" | "damage", visibility: "private" | "public") => Promise<void>;
   locale: "en" | "bg";
   initialName: string;
   onBack: () => void;
 }) {
   const { t } = useTranslation();
   const [name, setName] = useState(initialName);
-  const [gameMode, setGameMode] = useState<"classic" | "friends" | "damage">("classic");
+  const [gameMode, setGameMode] = useState<"classic" | "ranked" | "damage">("classic");
   const [visibility, setVisibility] = useState<"private" | "public">("private");
   const [rounds, setRounds] = useState(DEFAULT_ROUNDS);
   const [submitting, setSubmitting] = useState(false);
@@ -75,10 +75,13 @@ export function CreateGameScreen({
               >
                 <Text style={styles.modeTitle}>{t("create.classic")}</Text>
               </Pressable>
-              <View style={[styles.modeCard, styles.modeCardDisabled]}>
-                <Text style={styles.modeTitle}>{t("create.friends")}</Text>
-                <Text style={styles.modeComingSoon}>{t("create.comingSoon")}</Text>
-              </View>
+              <Pressable
+                onPress={() => setGameMode("ranked")}
+                style={[styles.modeCard, gameMode === "ranked" && styles.modeCardSelected]}
+              >
+                <Text style={styles.modeTitle}>{t("create.ranked")}</Text>
+                <Text style={styles.modeComingSoon}>{t("create.rankedPlayers")}</Text>
+              </Pressable>
               <Pressable
                 onPress={() => setGameMode("damage")}
                 style={[styles.modeCard, gameMode === "damage" && styles.modeCardSelected]}
@@ -89,7 +92,7 @@ export function CreateGameScreen({
             </View>
           </View>
           <View style={styles.settingsRow}>
-            {gameMode !== "damage" ? <View style={styles.roundsSection}>
+            {gameMode === "classic" ? <View style={styles.roundsSection}>
               <Text style={styles.roundsLabel}>{t("create.rounds")}</Text>
               <ScrollView
                 horizontal
@@ -110,7 +113,7 @@ export function CreateGameScreen({
                 })}
               </ScrollView>
             </View> : null}
-            <View style={styles.visibilitySection}>
+            {gameMode !== "ranked" ? <View style={styles.visibilitySection}>
               <Text style={styles.roundsLabel}>{t("create.visibility")}</Text>
               <View style={styles.modeRow}>
                 {(["private", "public"] as const).map((value) => (
@@ -123,7 +126,7 @@ export function CreateGameScreen({
                   </Pressable>
                 ))}
               </View>
-            </View>
+            </View> : null}
           </View>
         </View>
         <View style={styles.actionsColumn}>

@@ -1,28 +1,20 @@
 import React from "react";
-import { FlatList, StyleSheet, Text, TextInput, View } from "react-native";
+import { FlatList, StyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { getRankedDivision, RANKED_PLACEMENT_MATCHES } from "@confidence-trivia/shared";
-import { ANDROID_MENU_UI_SCALE, BackIconButton, BigButton, Screen, Title, theme } from "../components/ui";
+import { ANDROID_MENU_UI_SCALE, BackIconButton, Screen, Title, theme } from "../components/ui";
 import { getRankedLeaderboard, RankedLeaderboardEntry, RankedLeaderboardResponse } from "../network/client";
-import { isValidPlayerName } from "../utils/playerName";
 
 export function RankedScreen({
   deviceId,
-  initialName,
   onBack,
-  onFindMatch,
 }: {
   deviceId: string;
-  initialName: string;
   onBack: () => void;
-  onFindMatch: (name: string) => Promise<void>;
 }) {
   const { t } = useTranslation();
-  const [name, setName] = React.useState(initialName);
   const [leaderboard, setLeaderboard] = React.useState<RankedLeaderboardResponse | null>(null);
   const [loading, setLoading] = React.useState(true);
-  const [joining, setJoining] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -34,24 +26,12 @@ export function RankedScreen({
     return () => { cancelled = true; };
   }, [deviceId]);
 
-  async function findMatch() {
-    if (joining || !isValidPlayerName(name)) return;
-    setJoining(true);
-    setError(null);
-    try {
-      await onFindMatch(name.trim());
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : t("network.unknownError"));
-      setJoining(false);
-    }
-  }
-
   const current = leaderboard?.currentPlayer ?? null;
   const currentIsInTop = Boolean(current && leaderboard?.top.some((entry) => entry.playerId === current.playerId));
 
   return (
     <Screen style={styles.screen} androidScale={ANDROID_MENU_UI_SCALE}>
-      <BackIconButton label={t("common.back")} onPress={onBack} disabled={joining} />
+      <BackIconButton label={t("common.back")} onPress={onBack} />
       <Title>{t("ranked.title")}</Title>
 
       <View style={styles.content}>
@@ -78,29 +58,6 @@ export function RankedScreen({
           ) : null}
         </View>
 
-        <View style={styles.actionPanel}>
-          {current && current.placementMatches < RANKED_PLACEMENT_MATCHES ? (
-            <Text style={styles.placementText}>
-              {t("ranked.placements", { current: current.placementMatches, total: RANKED_PLACEMENT_MATCHES })}
-            </Text>
-          ) : null}
-          <TextInput
-            value={name}
-            onChangeText={setName}
-            placeholder={t("join.yourName") as string}
-            placeholderTextColor={theme.textDim}
-            maxLength={20}
-            editable={!joining}
-            style={styles.nameInput}
-          />
-          <BigButton
-            label={joining ? t("ranked.finding") : t("ranked.findMatch")}
-            onPress={findMatch}
-            disabled={joining || !isValidPlayerName(name)}
-            style={styles.findButton}
-          />
-          {error ? <Text numberOfLines={2} style={styles.error}>{error}</Text> : null}
-        </View>
       </View>
     </Screen>
   );
@@ -124,7 +81,6 @@ const styles = StyleSheet.create({
   screen: { justifyContent: "flex-start", paddingTop: 12 },
   content: { flex: 1, minHeight: 0, width: "100%", flexDirection: "row", gap: 18, marginTop: 6 },
   leaderboardPanel: { flex: 1, minWidth: 0, backgroundColor: "rgba(31, 26, 51, 0.94)", borderRadius: 14, padding: 10 },
-  actionPanel: { width: "30%", minWidth: 220, justifyContent: "center" },
   headerRow: { flexDirection: "row", paddingHorizontal: 8, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: "rgba(255,255,255,0.09)" },
   header: { color: theme.textDim, fontSize: 10, fontWeight: "900", textTransform: "uppercase" },
   list: { flex: 1, minHeight: 0 },
@@ -138,8 +94,4 @@ const styles = StyleSheet.create({
   rank: { width: "27%", textAlign: "center", fontWeight: "900" },
   wins: { width: "14%", textAlign: "right" },
   message: { color: theme.textDim, textAlign: "center", marginTop: 32 },
-  placementText: { color: "#B88CFF", fontSize: 14, fontWeight: "900", textAlign: "center", marginBottom: 10 },
-  nameInput: { width: "100%", minHeight: 48, borderRadius: 10, backgroundColor: theme.surface, color: theme.text, paddingHorizontal: 14, fontSize: 15 },
-  findButton: { width: "100%", minWidth: 0 },
-  error: { color: theme.danger, fontSize: 11, textAlign: "center", marginTop: 7 },
 });

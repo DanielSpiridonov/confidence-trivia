@@ -63,8 +63,7 @@ export function LobbyScreen({ room, mySessionId }: { room: Room; mySessionId: st
 
   const me = players.find((p) => p.id === mySessionId);
   const isHost = me?.isHost ?? false;
-  const isRanked = state.gameMode === "ranked";
-  const requiredPlayers = state.gameMode === "damage" ? 2 : isRanked ? 4 : MIN_PLAYERS_TO_START;
+  const requiredPlayers = state.gameMode === "damage" ? 2 : MIN_PLAYERS_TO_START;
   const canStart = isHost && players.length >= requiredPlayers;
 
   async function handleCopyCode() {
@@ -76,22 +75,13 @@ export function LobbyScreen({ room, mySessionId }: { room: Room; mySessionId: st
   return (
     <Screen androidScale={ANDROID_GAME_UI_SCALE}>
       <View style={styles.contentWrap}>
-        {isRanked ? (
-          <>
-            <Title>{t("ranked.matchmaking")}</Title>
-            <Subtitle>{t("ranked.playersFound", { count: players.length })}</Subtitle>
-          </>
-        ) : (
-          <>
-            <Subtitle>{t("lobby.roomCode")}</Subtitle>
-            <Pressable onPress={() => void handleCopyCode()} style={styles.codeWrap}>
-              <Title>{state.code}</Title>
-              <Text style={styles.copyHint}>{copied ? t("lobby.copied") : t("lobby.tapToCopy")}</Text>
-            </Pressable>
-          </>
-        )}
+        <Subtitle>{t("lobby.roomCode")}</Subtitle>
+        <Pressable onPress={() => void handleCopyCode()} style={styles.codeWrap}>
+          <Title>{state.code}</Title>
+          <Text style={styles.copyHint}>{copied ? t("lobby.copied") : t("lobby.tapToCopy")}</Text>
+        </Pressable>
 
-        {isHost && !isStarting && !isRanked ? (
+        {isHost && !isStarting ? (
           <Pressable
             accessibilityRole="switch"
             accessibilityState={{ checked: Boolean(state.isPublic) }}
@@ -128,7 +118,7 @@ export function LobbyScreen({ room, mySessionId }: { room: Room; mySessionId: st
           )}
         />
 
-        {!isStarting && !isRanked && (isHost ? (
+        {!isStarting && (isHost ? (
           <BigButton
             label={t("lobby.start")}
             onPress={() => room.send("startGame")}
@@ -141,8 +131,7 @@ export function LobbyScreen({ room, mySessionId }: { room: Room; mySessionId: st
             variant="secondary"
           />
         ))}
-        {!isStarting && !canStart && isHost && !isRanked && <Subtitle>{t("lobby.waitingForPlayers", { count: requiredPlayers })}</Subtitle>}
-        {!isStarting && isRanked ? <Subtitle>{t("ranked.waitingForPlayers", { count: requiredPlayers - players.length })}</Subtitle> : null}
+        {!isStarting && !canStart && isHost && <Subtitle>{t("lobby.waitingForPlayers", { count: requiredPlayers })}</Subtitle>}
 
         {isStarting ? (
           <View pointerEvents="none" style={styles.startingOverlay}>

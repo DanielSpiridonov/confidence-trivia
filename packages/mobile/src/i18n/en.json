@@ -33,6 +33,8 @@
     "mode": "Game Mode",
     "classic": "Classic",
     "friends": "Friends",
+    "ranked": "Ranked",
+    "rankedPlayers": "4 players · fixed rounds",
     "damage": "Damage",
     "damageHealth": "1v1 · 15 HP",
     "comingSoon": "Coming Soon",

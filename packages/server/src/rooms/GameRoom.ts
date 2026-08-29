@@ -33,7 +33,6 @@ import { saveCompletedMatch, upsertPlayer } from "../database";
 interface JoinOptions {
   deviceId?: string;
   name?: string;
-  rankedQueue?: boolean;
 }
 
 interface CreateOptions extends JoinOptions {
@@ -120,7 +119,7 @@ export class GameRoom extends Room<RoomStateSchema> {
         ? RANKED_FIXED_ROUND_COUNT
         : options.roundCount ?? DEFAULT_ROUND_COUNT;
     this.locale = options.locale ?? "en";
-    this.isPublic = this.state.gameMode === "ranked" || options.visibility === "public";
+    this.isPublic = options.visibility === "public";
     this.state.isPublic = this.isPublic;
     this.questionSet = getQuestionSet(this.state.gameMode === "damage" ? 100 : this.state.totalRounds, options.excludeQuestionIds ?? []);
     await this.setPrivate(!this.isPublic);
@@ -142,7 +141,6 @@ export class GameRoom extends Room<RoomStateSchema> {
     return !this.state.gameStarted
       && isValidPlayerName(options.name)
       && isValidDeviceId(options.deviceId)
-      && (this.state.gameMode !== "ranked" || options.rankedQueue === true)
       && ![...this.deviceIds.values()].includes(options.deviceId);
   }
 
@@ -161,9 +159,6 @@ export class GameRoom extends Room<RoomStateSchema> {
     if (player.isHost) this.state.hostId = player.id;
     this.state.players.set(client.sessionId, player);
     void this.updateLobbyMetadata();
-    if (this.state.gameMode === "ranked" && this.state.players.size === RANKED_PLAYER_COUNT) {
-      this.beginGame();
-    }
   }
 
   async onLeave(client: Client, consented: boolean) {
@@ -243,7 +238,7 @@ export class GameRoom extends Room<RoomStateSchema> {
   }
 
   private async handleToggleRoomVisibility(client: Client) {
-    if (client.sessionId !== this.state.hostId || this.state.gameStarted || this.state.phase !== "lobby" || this.state.gameMode === "ranked") return;
+    if (client.sessionId !== this.state.hostId || this.state.gameStarted || this.state.phase !== "lobby") return;
     const nextIsPublic = !this.isPublic;
     await this.setPrivate(!nextIsPublic);
     this.isPublic = nextIsPublic;
@@ -252,7 +247,6 @@ export class GameRoom extends Room<RoomStateSchema> {
 
   private handleStartGame(client: Client) {
     if (client.sessionId !== this.state.hostId) return; // only host may start
-    if (this.state.gameMode === "ranked") return;
     if (this.state.gameStarted) return;
     if (this.state.gameMode === "damage" ? this.state.players.size !== 2 : this.state.players.size < MIN_PLAYERS_TO_START) return;
     this.beginGame();

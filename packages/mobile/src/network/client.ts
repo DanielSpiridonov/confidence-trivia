@@ -82,15 +82,6 @@ export async function getRankedLeaderboard(deviceId: string): Promise<RankedLead
   }
 }
 
-export async function joinRankedGame(deviceId: string, playerName: string, locale: "en" | "bg") {
-  return withRoomRequestTimeout(getClient().joinOrCreate("ranked_trivia", {
-    deviceId,
-    name: playerName,
-    locale,
-    rankedQueue: true,
-  }));
-}
-
 async function withRoomRequestTimeout<T>(promise: Promise<T>): Promise<T> {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
@@ -112,7 +103,7 @@ export async function createRoom(
   playerName: string,
   roundCount: number,
   locale: "en" | "bg",
-  gameMode: "classic" | "friends" | "damage",
+  gameMode: "classic" | "ranked" | "damage",
   excludeQuestionIds: string[] = [],
   visibility: "private" | "public" = "private",
 ) {
@@ -142,7 +133,7 @@ export interface PublicRoomListing {
   maxClients: number;
   roundCount: number;
   locale: "en" | "bg";
-  gameMode: "classic" | "friends" | "damage";
+  gameMode: "classic" | "friends" | "ranked" | "damage";
 }
 
 interface PublicRoomMetadata {
@@ -150,7 +141,7 @@ interface PublicRoomMetadata {
   playerCount?: number;
   roundCount?: number;
   locale?: "en" | "bg";
-  gameMode?: "classic" | "friends" | "damage";
+  gameMode?: "classic" | "friends" | "ranked" | "damage";
 }
 
 export async function listPublicRooms(): Promise<PublicRoomListing[]> {

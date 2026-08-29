@@ -81,7 +81,7 @@ class GameRoom extends colyseus_1.Room {
                 ? shared_1.RANKED_FIXED_ROUND_COUNT
                 : options.roundCount ?? shared_1.DEFAULT_ROUND_COUNT;
         this.locale = options.locale ?? "en";
-        this.isPublic = this.state.gameMode === "ranked" || options.visibility === "public";
+        this.isPublic = options.visibility === "public";
         this.state.isPublic = this.isPublic;
         this.questionSet = (0, questions_1.getQuestionSet)(this.state.gameMode === "damage" ? 100 : this.state.totalRounds, options.excludeQuestionIds ?? []);
         await this.setPrivate(!this.isPublic);
@@ -101,7 +101,6 @@ class GameRoom extends colyseus_1.Room {
         return !this.state.gameStarted
             && isValidPlayerName(options.name)
             && isValidDeviceId(options.deviceId)
-            && (this.state.gameMode !== "ranked" || options.rankedQueue === true)
             && ![...this.deviceIds.values()].includes(options.deviceId);
     }
     onJoin(client, options = {}) {
@@ -121,9 +120,6 @@ class GameRoom extends colyseus_1.Room {
             this.state.hostId = player.id;
         this.state.players.set(client.sessionId, player);
         void this.updateLobbyMetadata();
-        if (this.state.gameMode === "ranked" && this.state.players.size === shared_1.RANKED_PLAYER_COUNT) {
-            this.beginGame();
-        }
     }
     async onLeave(client, consented) {
         const player = this.state.players.get(client.sessionId);
@@ -199,7 +195,7 @@ class GameRoom extends colyseus_1.Room {
         player.ready = !player.ready;
     }
     async handleToggleRoomVisibility(client) {
-        if (client.sessionId !== this.state.hostId || this.state.gameStarted || this.state.phase !== "lobby" || this.state.gameMode === "ranked")
+        if (client.sessionId !== this.state.hostId || this.state.gameStarted || this.state.phase !== "lobby")
             return;
         const nextIsPublic = !this.isPublic;
         await this.setPrivate(!nextIsPublic);
@@ -209,8 +205,6 @@ class GameRoom extends colyseus_1.Room {
     handleStartGame(client) {
         if (client.sessionId !== this.state.hostId)
             return; // only host may start
-        if (this.state.gameMode === "ranked")
-            return;
         if (this.state.gameStarted)
             return;
         if (this.state.gameMode === "damage" ? this.state.players.size !== 2 : this.state.players.size < shared_1.MIN_PLAYERS_TO_START)
