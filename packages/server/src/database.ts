@@ -128,6 +128,7 @@ export async function getRankedLeaderboard(deviceId: string): Promise<RankedLead
               or (ahead.ranked_lp = p.ranked_lp and ahead.wins > p.wins)
               or (ahead.ranked_lp = p.ranked_lp and ahead.wins = p.wins and ahead.created_at < p.created_at)
             )
+        )
         end as position
       from public.players p
       where p.id = ${deviceId}
