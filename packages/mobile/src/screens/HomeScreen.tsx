@@ -95,7 +95,9 @@ export function HomeScreen({
   React.useEffect(() => {
     if (!deviceId) return;
     void getPlayerCustomization(deviceId).then((customization) => {
-      if (customization) setAvatarHead(AVATAR_HEAD_IMAGES[customization.avatarId] ?? DEFAULT_AVATAR_HEAD_IMAGE);
+      if (customization) {
+        setAvatarHead(AVATAR_HEAD_IMAGES[customization.avatarId] ?? DEFAULT_AVATAR_HEAD_IMAGE);
+      }
     });
   }, [deviceId]);
 

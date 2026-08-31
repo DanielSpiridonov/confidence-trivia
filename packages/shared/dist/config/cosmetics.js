@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DEFAULT_FRAME_ID = exports.FRAME_COSMETIC_IDS = exports.DEFAULT_AVATAR_ID = exports.AVATAR_COSMETIC_IDS = exports.DEFAULT_NAME_COLOR = exports.DEFAULT_NAME_COLOR_ID = exports.NAME_COLOR_COSMETICS = void 0;
+exports.FRAME_COSMETIC_COLORS = exports.DEFAULT_FRAME_ID = exports.FRAME_COSMETIC_IDS = exports.DEFAULT_AVATAR_ID = exports.AVATAR_COSMETIC_IDS = exports.DEFAULT_NAME_COLOR = exports.DEFAULT_NAME_COLOR_ID = exports.NAME_COLOR_COSMETICS = void 0;
 exports.getNameColorCosmetic = getNameColorCosmetic;
 exports.isAvatarCosmeticId = isAvatarCosmeticId;
 exports.isFrameCosmeticId = isFrameCosmeticId;
@@ -26,6 +26,14 @@ exports.AVATAR_COSMETIC_IDS = [
 exports.DEFAULT_AVATAR_ID = exports.AVATAR_COSMETIC_IDS[0];
 exports.FRAME_COSMETIC_IDS = ["bronze", "silver", "gold", "flame", "ice", "royal"];
 exports.DEFAULT_FRAME_ID = "";
+exports.FRAME_COSMETIC_COLORS = {
+    bronze: "#CD7F32",
+    silver: "#C7D0DA",
+    gold: "#F7D85B",
+    flame: "#FF6542",
+    ice: "#65D9FF",
+    royal: "#B887FF",
+};
 function getNameColorCosmetic(id) {
     return exports.NAME_COLOR_COSMETICS.find((item) => item.id === id) ?? null;
 }

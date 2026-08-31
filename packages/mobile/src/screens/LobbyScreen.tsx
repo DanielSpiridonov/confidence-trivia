@@ -3,7 +3,7 @@ import { View, Text, FlatList, Platform, StyleSheet, Pressable } from "react-nat
 import * as Clipboard from "expo-clipboard";
 import { useTranslation } from "react-i18next";
 import { Room } from "colyseus.js";
-import { MIN_PLAYERS_TO_START } from "@confidence-trivia/shared";
+import { FRAME_COSMETIC_COLORS, MIN_PLAYERS_TO_START } from "@confidence-trivia/shared";
 import { ANDROID_GAME_UI_SCALE, Screen, Title, Subtitle, BigButton, theme } from "../components/ui";
 import { useRoomState } from "../network/client";
 import { playSound } from "../audio/sounds";
@@ -16,6 +16,7 @@ interface PublicPlayerView {
   connected: boolean;
   stars: number;
   nameColor: string;
+  frameId: string;
 }
 
 export function LobbyScreen({ room, mySessionId }: { room: Room; mySessionId: string }) {
@@ -72,6 +73,7 @@ export function LobbyScreen({ room, mySessionId }: { room: Room; mySessionId: st
     connected: p.connected,
     stars: p.stars,
     nameColor: p.nameColor,
+    frameId: p.frameId,
   }));
 
   const me = players.find((p) => p.id === mySessionId);
@@ -92,7 +94,7 @@ export function LobbyScreen({ room, mySessionId }: { room: Room; mySessionId: st
           <View style={styles.playersColumn}>
             <Text style={styles.columnTitle}>{t("lobby.players")}</Text>
             <FlatList style={styles.list} data={players} keyExtractor={(p) => p.id} contentContainerStyle={styles.listContent} nestedScrollEnabled showsVerticalScrollIndicator={players.length > 4} renderItem={({ item }) => (
-              <View style={styles.playerRow}>
+              <View style={[styles.playerRow, item.frameId ? { borderWidth: 2, borderColor: FRAME_COSMETIC_COLORS[item.frameId as keyof typeof FRAME_COSMETIC_COLORS] } : null]}>
                 <Text numberOfLines={1} style={[styles.playerName, { color: item.nameColor || theme.text }]}>{item.isHost ? "👑 " : ""}{item.name}{!item.connected ? " (reconnecting…)" : ""}</Text>
                 <Text style={item.ready ? styles.readyBadge : styles.notReadyBadge}>{item.ready ? t("lobby.ready") : t("lobby.notReady")}</Text>
               </View>

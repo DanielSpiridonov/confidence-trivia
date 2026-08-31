@@ -23,6 +23,7 @@ export declare const AVATAR_COSMETIC_IDS: readonly ["smart_owl", "clever_fox", "
 export declare const DEFAULT_AVATAR_ID: "smart_owl";
 export declare const FRAME_COSMETIC_IDS: readonly ["bronze", "silver", "gold", "flame", "ice", "royal"];
 export declare const DEFAULT_FRAME_ID = "";
+export declare const FRAME_COSMETIC_COLORS: Record<typeof FRAME_COSMETIC_IDS[number], string>;
 export declare function getNameColorCosmetic(id: unknown): {
     readonly id: "name_white";
     readonly color: "#FFFFFF";

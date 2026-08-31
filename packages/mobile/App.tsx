@@ -35,6 +35,25 @@ const HAPTICS_STORAGE_KEY = "confidence-trivia:haptics-enabled";
 const HIGH_CONTRAST_STORAGE_KEY = "confidence-trivia:high-contrast-enabled";
 const RECENT_QUESTIONS_STORAGE_KEY = "confidence-trivia:recent-question-ids";
 const RECENT_QUESTION_LIMIT = 40;
+const COMBAT_PRELOAD_IMAGES = [
+  require("./assets/avatars/smart-owl.png"),
+  require("./assets/avatars/fox.png"),
+  require("./assets/avatars/quiz-bot.png"),
+  require("./assets/avatars/omniscient.png"),
+  require("./assets/avatars/trivia-wizard.png"),
+  require("./assets/avatars/detective.png"),
+  require("./assets/avatars/globe.png"),
+  require("./assets/combat/quiz-bot-calculator.png"),
+  require("./assets/combat/smart-owl-book.png"),
+] as const;
+
+function CombatAssetPreloader() {
+  return (
+    <View pointerEvents="none" style={styles.combatPreloader}>
+      {COMBAT_PRELOAD_IMAGES.map((source, index) => <Image key={index} source={source} fadeDuration={0} style={styles.combatPreloadImage} />)}
+    </View>
+  );
+}
 
 function AppFrame({ children, highContrast = false }: { children: React.ReactNode; highContrast?: boolean }) {
   const [backgroundRevision, setBackgroundRevision] = useState(0);
@@ -400,6 +419,7 @@ export default function App() {
 
   return (
     <AppFrame highContrast={highContrastEnabled}>
+      <CombatAssetPreloader />
       <StatusBar style="light" />
       {nav === "in-room" && room ? (
         <InRoomRouter
@@ -675,6 +695,8 @@ const styles = StyleSheet.create({
   appContent: {
     flex: 1,
   },
+  combatPreloader: { position: "absolute", left: -200, top: 0, width: 70, height: 70, opacity: 0.01, overflow: "hidden" },
+  combatPreloadImage: { position: "absolute", width: 64, height: 64 },
   starsHud: {
     position: "absolute",
     top: 18,

@@ -3,7 +3,7 @@ import { FlatList, Image, ImageSourcePropType, Pressable, ScrollView, StyleSheet
 import { useTranslation } from "react-i18next";
 import { ANDROID_MENU_UI_SCALE, BackIconButton, Screen, Title, theme } from "../components/ui";
 import { PointsIcon } from "../components/PointsIcon";
-import { NAME_COLOR_COSMETICS } from "@confidence-trivia/shared";
+import { FRAME_COSMETIC_COLORS, NAME_COLOR_COSMETICS } from "@confidence-trivia/shared";
 import { equipAvatar, equipFrame, equipNameColor, getPlayerCustomization } from "../network/client";
 
 type ShopTab = "featured" | "avatars" | "frames" | "inventory" | "stars";
@@ -39,18 +39,26 @@ const STAR_PACKS: Array<{ stars: number; price: string; bonus?: string }> = [
   { stars: 7000, price: "€39.99", bonus: "Best value" },
 ];
 
+const SHOP_AVATAR_IMAGES = COSMETICS.avatars.flatMap((item) => item.image ? [item.image] : []);
+const customizationCache = new Map<string, { nameColorId: string; avatarId: string; frameId: string }>();
+
 export function ShopScreen({ deviceId, displayName, onBack }: { deviceId: string; displayName: string; onBack: () => void }) {
   const { t } = useTranslation();
+  const cachedCustomization = customizationCache.get(deviceId);
   const [tab, setTab] = React.useState<ShopTab>("featured");
-  const [equippedNameColorId, setEquippedNameColorId] = React.useState("name_white");
-  const [equippedAvatarId, setEquippedAvatarId] = React.useState("smart_owl");
-  const [equippedFrameId, setEquippedFrameId] = React.useState("");
-  const [equippingId, setEquippingId] = React.useState<string | null>(null);
+  const [equippedNameColorId, setEquippedNameColorId] = React.useState(cachedCustomization?.nameColorId ?? "name_white");
+  const [equippedAvatarId, setEquippedAvatarId] = React.useState(cachedCustomization?.avatarId ?? "smart_owl");
+  const [equippedFrameId, setEquippedFrameId] = React.useState(cachedCustomization?.frameId ?? "");
+  const [equippingIds, setEquippingIds] = React.useState<Set<string>>(() => new Set());
+  const colorRequest = React.useRef(0);
+  const avatarRequest = React.useRef(0);
+  const frameRequest = React.useRef(0);
   const tabs: ShopTab[] = ["featured", "avatars", "frames", "inventory", "stars"];
 
   React.useEffect(() => {
     void getPlayerCustomization(deviceId).then((customization) => {
       if (customization) {
+        customizationCache.set(deviceId, customization);
         setEquippedNameColorId(customization.nameColorId);
         setEquippedAvatarId(customization.avatarId);
         setEquippedFrameId(customization.frameId);
@@ -58,32 +66,80 @@ export function ShopScreen({ deviceId, displayName, onBack }: { deviceId: string
     });
   }, [deviceId]);
 
+  function setEquipping(cosmeticId: string, active: boolean) {
+    setEquippingIds((current) => {
+      const next = new Set(current);
+      active ? next.add(cosmeticId) : next.delete(cosmeticId);
+      return next;
+    });
+  }
+
+  function cacheCustomization(nameColorId: string, avatarId: string, frameId: string) {
+    customizationCache.set(deviceId, { nameColorId, avatarId, frameId });
+  }
+
   async function equipColor(cosmeticId: string) {
-    if (equippingId || cosmeticId === equippedNameColorId) return;
-    setEquippingId(cosmeticId);
+    if (cosmeticId === equippedNameColorId) return;
+    const previous = equippedNameColorId;
+    const request = ++colorRequest.current;
+    setEquippedNameColorId(cosmeticId);
+    cacheCustomization(cosmeticId, equippedAvatarId, equippedFrameId);
+    setEquipping(cosmeticId, true);
     const customization = await equipNameColor(deviceId, displayName, cosmeticId);
-    if (customization) setEquippedNameColorId(customization.nameColorId);
-    setEquippingId(null);
+    setEquipping(cosmeticId, false);
+    if (request !== colorRequest.current) return;
+    if (customization) {
+      customizationCache.set(deviceId, customization);
+      setEquippedNameColorId(customization.nameColorId);
+    } else {
+      setEquippedNameColorId(previous);
+      cacheCustomization(previous, equippedAvatarId, equippedFrameId);
+    }
   }
 
   async function equipPlayerAvatar(cosmeticId: string) {
-    if (equippingId || cosmeticId === equippedAvatarId) return;
-    setEquippingId(cosmeticId);
+    if (cosmeticId === equippedAvatarId) return;
+    const previous = equippedAvatarId;
+    const request = ++avatarRequest.current;
+    setEquippedAvatarId(cosmeticId);
+    cacheCustomization(equippedNameColorId, cosmeticId, equippedFrameId);
+    setEquipping(cosmeticId, true);
     const customization = await equipAvatar(deviceId, displayName, cosmeticId);
-    if (customization) setEquippedAvatarId(customization.avatarId);
-    setEquippingId(null);
+    setEquipping(cosmeticId, false);
+    if (request !== avatarRequest.current) return;
+    if (customization) {
+      customizationCache.set(deviceId, customization);
+      setEquippedAvatarId(customization.avatarId);
+    } else {
+      setEquippedAvatarId(previous);
+      cacheCustomization(equippedNameColorId, previous, equippedFrameId);
+    }
   }
 
   async function equipPlayerFrame(cosmeticId: string) {
-    if (equippingId || cosmeticId === equippedFrameId) return;
-    setEquippingId(cosmeticId);
+    if (cosmeticId === equippedFrameId) return;
+    const previous = equippedFrameId;
+    const request = ++frameRequest.current;
+    setEquippedFrameId(cosmeticId);
+    cacheCustomization(equippedNameColorId, equippedAvatarId, cosmeticId);
+    setEquipping(cosmeticId, true);
     const customization = await equipFrame(deviceId, displayName, cosmeticId);
-    if (customization) setEquippedFrameId(customization.frameId);
-    setEquippingId(null);
+    setEquipping(cosmeticId, false);
+    if (request !== frameRequest.current) return;
+    if (customization) {
+      customizationCache.set(deviceId, customization);
+      setEquippedFrameId(customization.frameId);
+    } else {
+      setEquippedFrameId(previous);
+      cacheCustomization(equippedNameColorId, equippedAvatarId, previous);
+    }
   }
 
   return (
     <Screen style={styles.screen} androidScale={ANDROID_MENU_UI_SCALE}>
+      <View pointerEvents="none" style={styles.avatarPreloader}>
+        {SHOP_AVATAR_IMAGES.map((source, index) => <Image key={index} source={source} fadeDuration={0} resizeMode="contain" style={styles.preloadedAvatar} />)}
+      </View>
       <BackIconButton label={t("common.back")} onPress={onBack} />
       <View style={styles.headerRow}>
         <Title>{t("shop.title")}</Title>
@@ -118,7 +174,7 @@ export function ShopScreen({ deviceId, displayName, onBack }: { deviceId: string
               <InventoryCategory title={t("shop.inventoryCategories.nameColors")}>
                 <View style={styles.inventoryItems}>
                   {NAME_COLOR_COSMETICS.map((item) => (
-                    <Pressable key={item.id} disabled={Boolean(equippingId)} onPress={() => void equipColor(item.id)} style={[styles.inventoryColorItem, item.id === equippedNameColorId && styles.inventoryItemEquipped]}>
+                    <Pressable key={item.id} onPress={() => void equipColor(item.id)} style={[styles.inventoryColorItem, item.id === equippedNameColorId && styles.inventoryItemEquipped]}>
                       <View style={[styles.colorSwatch, { backgroundColor: item.color }]} />
                       <Text numberOfLines={1} style={[styles.inventoryItemName, { color: item.color }]}>{t(`shop.nameColors.${item.id}`)}</Text>
                       <Text style={[styles.inventoryItemState, item.id === equippedNameColorId && styles.equippedState]}>{item.id === equippedNameColorId ? t("shop.equipped") : t("shop.equip")}</Text>
@@ -131,11 +187,11 @@ export function ShopScreen({ deviceId, displayName, onBack }: { deviceId: string
             </ScrollView>
           ) : (
             <FlatList key={`cosmetics-${tab}`} data={COSMETICS[tab]} numColumns={3} keyExtractor={(item) => item.id} columnWrapperStyle={styles.cosmeticRow} contentContainerStyle={styles.cosmeticList} showsVerticalScrollIndicator={false} renderItem={({ item }) => (
-              <Pressable disabled={Boolean(equippingId)} onPress={() => item.color ? void equipColor(item.id) : item.image ? void equipPlayerAvatar(item.id) : tab === "frames" ? void equipPlayerFrame(item.id) : undefined} style={[styles.cosmeticCard, (item.id === equippedNameColorId || item.id === equippedAvatarId || item.id === equippedFrameId) && styles.cosmeticCardEquipped]}>
+              <Pressable onPress={() => item.color ? void equipColor(item.id) : item.image ? void equipPlayerAvatar(item.id) : tab === "frames" ? void equipPlayerFrame(item.id) : undefined} style={[styles.cosmeticCard, (item.id === equippedNameColorId || item.id === equippedAvatarId || item.id === equippedFrameId) && styles.cosmeticCardEquipped, tab === "frames" ? { borderColor: FRAME_COSMETIC_COLORS[item.id as keyof typeof FRAME_COSMETIC_COLORS], borderWidth: item.id === equippedFrameId ? 3 : 2 } : null]}>
                 {item.tag ? <Text style={styles.itemTag}>{item.tag}</Text> : null}
-                {item.image ? <Image source={item.image} resizeMode="contain" style={styles.avatarImage} /> : <Text style={[styles.cosmeticIcon, item.color ? { color: item.color, textShadowColor: "rgba(0,0,0,0.8)", textShadowRadius: 2 } : null]}>{item.icon}</Text>}
+                {item.image ? <Image source={item.image} resizeMode="contain" style={styles.avatarImage} /> : <Text style={[styles.cosmeticIcon, item.color || tab === "frames" ? { color: item.color ?? FRAME_COSMETIC_COLORS[item.id as keyof typeof FRAME_COSMETIC_COLORS], textShadowColor: "rgba(0,0,0,0.8)", textShadowRadius: 2 } : null]}>{item.icon}</Text>}
                 <Text numberOfLines={1} style={[styles.cosmeticName, item.color ? { color: item.color, textTransform: "capitalize" } : null]}>{item.color ? t(`shop.nameColors.${item.id}`) : item.image ? t(`shop.avatarNames.${item.id}`) : item.name}</Text>
-                {item.color ? <Text style={[styles.equipState, item.id === equippedNameColorId && styles.equippedState]}>{item.id === equippedNameColorId ? t("shop.equipped") : equippingId === item.id ? t("shop.equipping") : t("shop.free")}</Text> : item.image ? <Text style={[styles.equipState, item.id === equippedAvatarId && styles.equippedState]}>{item.id === equippedAvatarId ? t("shop.equipped") : equippingId === item.id ? t("shop.equipping") : t("shop.free")}</Text> : tab === "frames" ? <Text style={[styles.equipState, item.id === equippedFrameId && styles.equippedState]}>{item.id === equippedFrameId ? t("shop.equipped") : equippingId === item.id ? t("shop.equipping") : t("shop.free")}</Text> : item.free ? <Text style={styles.freeItem}>{t("shop.freeItem")}</Text> : <View style={styles.priceRow}><PointsIcon size={14} /><Text style={styles.price}>{item.price}</Text></View>}
+                {item.color ? <Text style={[styles.equipState, item.id === equippedNameColorId && styles.equippedState]}>{item.id === equippedNameColorId ? t("shop.equipped") : equippingIds.has(item.id) ? t("shop.equipping") : t("shop.free")}</Text> : item.image ? <Text style={[styles.equipState, item.id === equippedAvatarId && styles.equippedState]}>{item.id === equippedAvatarId ? t("shop.equipped") : equippingIds.has(item.id) ? t("shop.equipping") : t("shop.free")}</Text> : tab === "frames" ? <Text style={[styles.equipState, item.id === equippedFrameId && styles.equippedState]}>{item.id === equippedFrameId ? t("shop.equipped") : equippingIds.has(item.id) ? t("shop.equipping") : t("shop.free")}</Text> : item.free ? <Text style={styles.freeItem}>{t("shop.freeItem")}</Text> : <View style={styles.priceRow}><PointsIcon size={14} /><Text style={styles.price}>{item.price}</Text></View>}
               </Pressable>
             )} />
           )}
@@ -150,6 +206,8 @@ function InventoryCategory({ title, children }: { title: string; children: React
 }
 
 const styles = StyleSheet.create({
+  avatarPreloader: { position: "absolute", left: -200, top: 0, width: 70, height: 70, opacity: 0.01, overflow: "hidden" },
+  preloadedAvatar: { position: "absolute", width: 64, height: 64 },
   screen: { justifyContent: "flex-start", paddingTop: 10 },
   headerRow: { width: "100%", minHeight: 44, alignItems: "center", justifyContent: "center" },
   shopBody: { flex: 1, minHeight: 0, width: "100%", flexDirection: "row", gap: 12, marginTop: 4 },

@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, FlatList, Platform, StyleSheet } from "react-native";
 import { useTranslation } from "react-i18next";
 import { theme } from "../components/ui";
+import { FRAME_COSMETIC_COLORS } from "@confidence-trivia/shared";
 
 interface PlayerRow {
   id: string;
@@ -9,6 +10,7 @@ interface PlayerRow {
   score: number;
   streak: number;
   nameColor?: string;
+  frameId?: string;
 }
 
 /** Compact leaderboard embedded in the between-round reveal screen. */
@@ -34,7 +36,7 @@ export function LeaderboardStrip({
         contentContainerStyle={styles.playerListContent}
         showsVerticalScrollIndicator={ranked.length > 4}
         renderItem={({ item: player, index }) => (
-          <View style={styles.row}>
+          <View style={[styles.row, player.frameId ? { borderWidth: 2, borderColor: FRAME_COSMETIC_COLORS[player.frameId as keyof typeof FRAME_COSMETIC_COLORS] } : null]}>
             <Text style={styles.rank}>#{index + 1}</Text>
             <Text
               numberOfLines={1}
@@ -67,7 +69,7 @@ const styles = StyleSheet.create({
   title: { color: theme.textDim, fontWeight: "700", marginBottom: 8, fontSize: Platform.OS === "android" ? 11 : 13 },
   playerList: { flex: 1, minHeight: 0 },
   playerListContent: { paddingBottom: 8 },
-  row: { flexDirection: "row", alignItems: "center", paddingVertical: 6 },
+  row: { flexDirection: "row", alignItems: "center", paddingHorizontal: 6, paddingVertical: 6, borderRadius: 8, marginBottom: 3 },
   rank: { color: theme.textDim, width: 26, fontSize: Platform.OS === "android" ? 11 : 14, fontWeight: "700" },
   name: { color: theme.text, flex: 1, flexShrink: 1, fontSize: Platform.OS === "android" ? 11 : 14, fontWeight: "600", paddingRight: 6 },
   streak: { color: "#FFB84D", marginRight: 6, flexShrink: 0, fontSize: Platform.OS === "android" ? 11 : 14, fontWeight: "700" },

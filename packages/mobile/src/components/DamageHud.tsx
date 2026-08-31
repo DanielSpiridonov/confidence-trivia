@@ -6,13 +6,21 @@ import { theme } from "./ui";
 export function DamageHud({ state, myPlayerId }: { state: any; myPlayerId: string }) {
   const { t } = useTranslation();
   if (state?.gameMode !== "damage") return null;
-  const players = [...state.players.values()] as any[];
+  const allPlayers = [...state.players.values()] as any[];
+  const players = [
+    allPlayers.find((player) => player.id === myPlayerId),
+    ...allPlayers.filter((player) => player.id !== myPlayerId),
+  ].filter(Boolean) as any[];
 
   return (
     <View style={styles.hud}>
       {players.map((player, index) => (
         <React.Fragment key={player.id}>
-          {index === 1 ? <Text style={styles.vs}>VS</Text> : null}
+          {index === 1 ? (
+            <View style={styles.centerResult}>
+              <Text style={styles.vs}>VS</Text>
+            </View>
+          ) : null}
           <View style={styles.fighter}>
             {(() => {
               const shieldReady = player.shieldPending || player.shield > 0;
@@ -22,7 +30,7 @@ export function DamageHud({ state, myPlayerId }: { state: any; myPlayerId: strin
               <Text style={styles.healthText}>{player.health}/15 HP</Text>
             </View>
             <View style={[styles.healthTrack, shieldReady && styles.healthTrackShielded]}>
-              <View style={[styles.healthFill, shieldReady && player.health >= 15 && styles.healthFillShielded, { width: `${Math.max(0, Math.min(100, player.health / 15 * 100))}%` }]} />
+              <View style={[styles.healthFill, index === 1 && styles.healthFillOpponent, shieldReady && player.health >= 15 && styles.healthFillShielded, { width: `${Math.max(0, Math.min(100, player.health / 15 * 100))}%` }]} />
             </View>
             <View style={styles.statusRow}>
               <Text style={[styles.shield, shieldReady && styles.shieldReady]}>{t("damage.shield")}: {shieldReady ? t("damage.ready") : t("damage.notReady")}</Text>
@@ -45,6 +53,7 @@ const styles = StyleSheet.create({
   healthText: { color: "#FF8096", fontSize: 11, fontWeight: "900" },
   healthTrack: { width: "100%", height: 8, borderRadius: 4, overflow: "hidden", backgroundColor: "rgba(255,255,255,0.12)", marginTop: 3 },
   healthFill: { height: "100%", backgroundColor: "#FF5C7A" },
+  healthFillOpponent: { alignSelf: "flex-end" },
   healthTrackShielded: { backgroundColor: "#7CCBFF" },
   healthFillShielded: { backgroundColor: "#7CCBFF" },
   statusRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 2 },
@@ -52,4 +61,5 @@ const styles = StyleSheet.create({
   shieldReady: { color: "#A8DEFF" },
   streak: { color: "#FFD166", fontSize: 9, fontWeight: "800" },
   vs: { color: theme.textDim, fontSize: 10, fontWeight: "900" },
+  centerResult: { width: 42, alignItems: "center", justifyContent: "center" },
 });

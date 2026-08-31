@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, FlatList, Image, ImageSourcePropType, Platform, ScrollView, StyleSheet } from "react-native";
+import { Animated, View, Text, FlatList, Image, ImageSourcePropType, Platform, ScrollView, StyleSheet } from "react-native";
 import { useTranslation } from "react-i18next";
 import { Room } from "colyseus.js";
 import { ANDROID_GAME_UI_SCALE, Screen, Title, Subtitle, theme } from "../components/ui";
@@ -17,6 +17,12 @@ const DAMAGE_AVATARS: Record<string, ImageSourcePropType> = {
   detective_avatar: require("../../assets/avatars/detective.png"),
   living_globe: require("../../assets/avatars/globe.png"),
 };
+const QUIZ_BOT_CALCULATOR: ImageSourcePropType = require("../../assets/combat/quiz-bot-calculator.png");
+const SMART_OWL_BOOK: ImageSourcePropType = require("../../assets/combat/smart-owl-book.png");
+const PROJECTILE_BY_AVATAR: Record<string, ImageSourcePropType> = {
+  quiz_bot: QUIZ_BOT_CALCULATOR,
+  smart_owl: SMART_OWL_BOOK,
+};
 
 export function RevealScreen({ room }: { room: Room }) {
   const { t } = useTranslation();
@@ -31,12 +37,24 @@ export function RevealScreen({ room }: { room: Room }) {
     score: player.score,
     streak: player.streak,
     nameColor: player.nameColor,
+    frameId: player.frameId,
   }));
   const isOrderingReveal = state.currentQuestion?.qType === "ordering";
   const isClosestAnswerReveal = state.currentQuestion?.qType === "closest_answer";
 
   if (state.gameMode === "damage") {
-    return <DamageAvatarReveal state={state} results={results} />;
+    return (
+      <Screen style={styles.damageTransitionScreen} androidScale={ANDROID_GAME_UI_SCALE}>
+        <DamageHud state={state} myPlayerId={room.sessionId} />
+        <View style={styles.damageCorrectAnswerWrap}>
+          <Text style={styles.damageCorrectAnswerLabel}>{t("reveal.correctAnswer")}</Text>
+          <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={styles.damageCorrectAnswerText}>{state.correctAnswerText}</Text>
+        </View>
+        <View style={styles.damageBattleStage}>
+          <DamageAvatarPane state={state} results={results} myPlayerId={room.sessionId} />
+        </View>
+      </Screen>
+    );
   }
 
   if (isClosestAnswerReveal) {
@@ -188,77 +206,135 @@ export function RevealScreen({ room }: { room: Room }) {
   );
 }
 
-function DamageAvatarReveal({ state, results }: { state: any; results: any[] }) {
-  const { t } = useTranslation();
+function DamageAvatarPane({ state, results, myPlayerId }: { state: any; results: any[]; myPlayerId: string }) {
   const [showHit, setShowHit] = React.useState(false);
-  const players = [...state.players.values()].slice(0, 2) as any[];
+  const hitEndRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const allPlayers = [...state.players.values()] as any[];
+  const players = [
+    allPlayers.find((player) => player.id === myPlayerId),
+    ...allPlayers.filter((player) => player.id !== myPlayerId),
+  ].filter(Boolean).slice(0, 2) as any[];
+  const projectileAttack = players.some((player) => PROJECTILE_BY_AVATAR[player.avatarId] && (results.find((result: any) => result.playerId === player.id)?.damageDealt ?? 0) > 0);
 
-  React.useEffect(() => {
-    const hitStart = setTimeout(() => setShowHit(true), 420);
-    const hitEnd = setTimeout(() => setShowHit(false), 1_250);
-    return () => {
-      clearTimeout(hitStart);
-      clearTimeout(hitEnd);
-    };
+  const triggerImpact = React.useCallback(() => {
+    setShowHit(true);
+    if (hitEndRef.current) clearTimeout(hitEndRef.current);
+    hitEndRef.current = setTimeout(() => setShowHit(false), 1_000);
   }, []);
 
+  React.useEffect(() => {
+    if (projectileAttack) return;
+    const hitStart = setTimeout(triggerImpact, 420);
+    return () => {
+      clearTimeout(hitStart);
+      if (hitEndRef.current) clearTimeout(hitEndRef.current);
+    };
+  }, [projectileAttack, triggerImpact]);
+
   return (
-    <Screen style={styles.damageRevealScreen} androidScale={ANDROID_GAME_UI_SCALE}>
-      <PhaseTimer phaseEndsAt={state.phaseEndsAt} />
-      <View style={styles.damageAnswerHeader}>
-        <Text style={styles.damageAnswerLabel}>{t("reveal.correctAnswer")}</Text>
-        <Text numberOfLines={1} adjustsFontSizeToFit style={styles.damageCorrectAnswer}>{state.correctAnswerText}</Text>
-      </View>
-      <View style={styles.damageArena}>
+      <View style={styles.damageAvatarPane}>
         {players.map((player, index) => {
           const ownResult = results.find((result: any) => result.playerId === player.id);
           const opponent = players[index === 0 ? 1 : 0];
           const incomingDamage = results.find((result: any) => result.playerId === opponent?.id)?.damageDealt ?? 0;
           const isHit = showHit && incomingDamage > 0;
           return (
-            <View key={player.id} style={[styles.damageFighter, isHit && styles.damageFighterHit]}>
-              <View style={styles.damagePlayerLabel}>
-                <Text numberOfLines={1} style={[styles.damagePlayerName, { color: player.nameColor || theme.text }]}>{player.name}</Text>
-                <Text style={styles.damageHealth}>{player.health} HP</Text>
-              </View>
+            <DamageFighter key={player.id} isHit={isHit}>
               <Image
                 source={DAMAGE_AVATARS[player.avatarId] ?? DAMAGE_AVATARS.smart_owl}
                 resizeMode="contain"
-                style={[styles.damageAvatar, index === 1 && styles.damageAvatarFacingLeft, isHit && styles.damageAvatarHit]}
+                style={[styles.damageAvatar, index === 1 && styles.damageAvatarFacingLeft]}
               />
-              <View style={styles.damageResultLine}>
-                <Text style={[styles.damageResultText, ownResult?.correct ? styles.damageCorrect : styles.damageWrong]}>{ownResult?.correct ? t("board.correct") : t("board.wrong")}</Text>
-                {incomingDamage > 0 && isHit ? <Text style={styles.damageTaken}>-{incomingDamage} HP</Text> : null}
-              </View>
-            </View>
+              {isHit ? <Image source={DAMAGE_AVATARS[player.avatarId] ?? DAMAGE_AVATARS.smart_owl} resizeMode="contain" style={[styles.damageAvatarHitOverlay, index === 1 && styles.damageAvatarFacingLeft]} /> : null}
+              {incomingDamage > 0 && isHit ? <DamageNumber amount={incomingDamage} /> : null}
+              <Text numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7} style={styles.damagePlayerAnswer}>{ownResult?.answerText || "—"}</Text>
+            </DamageFighter>
           );
         })}
+        <AvatarProjectile players={players} results={results} onImpact={triggerImpact} />
         <Text style={styles.damageVersus}>VS</Text>
       </View>
-    </Screen>
   );
 }
 
+function AvatarProjectile({ players, results, onImpact }: { players: any[]; results: any[]; onImpact: () => void }) {
+  const progress = React.useRef(new Animated.Value(0)).current;
+  const [loaded, setLoaded] = React.useState(false);
+  const attackerIndex = players.findIndex((player) => PROJECTILE_BY_AVATAR[player.avatarId] && (results.find((result: any) => result.playerId === player.id)?.damageDealt ?? 0) > 0);
+
+  React.useEffect(() => {
+    if (attackerIndex < 0 || !loaded) return;
+    progress.setValue(0);
+    Animated.timing(progress, { toValue: 1, duration: 1_150, delay: 550, useNativeDriver: true }).start(({ finished }) => {
+      if (finished) onImpact();
+    });
+  }, [attackerIndex, loaded, onImpact, progress]);
+
+  if (attackerIndex < 0) return null;
+  const direction = attackerIndex === 1 ? -1 : 1;
+  return (
+    <Animated.Image
+      source={PROJECTILE_BY_AVATAR[players[attackerIndex].avatarId]}
+      onLoad={() => setLoaded(true)}
+      fadeDuration={0}
+      resizeMode="contain"
+      style={[
+        styles.quizBotProjectile,
+        attackerIndex === 1 ? styles.quizBotProjectileRight : styles.quizBotProjectileLeft,
+        {
+          opacity: loaded ? progress.interpolate({ inputRange: [0, 0.88, 1], outputRange: [1, 1, 0] }) : 0,
+          transform: [
+            { translateX: progress.interpolate({ inputRange: [0, 1], outputRange: [0, direction * 390] }) },
+            { translateY: progress.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, -52, 0] }) },
+            { rotate: progress.interpolate({ inputRange: [0, 1], outputRange: ["0deg", `${direction * 720}deg`] }) },
+          ],
+        },
+      ]}
+    />
+  );
+}
+
+function DamageFighter({ isHit, children }: { isHit: boolean; children: React.ReactNode }) {
+  const shake = React.useRef(new Animated.Value(0)).current;
+  React.useEffect(() => {
+    if (!isHit) return;
+    Animated.sequence([
+      Animated.timing(shake, { toValue: -7, duration: 45, useNativeDriver: true }),
+      Animated.timing(shake, { toValue: 7, duration: 70, useNativeDriver: true }),
+      Animated.timing(shake, { toValue: -5, duration: 70, useNativeDriver: true }),
+      Animated.timing(shake, { toValue: 4, duration: 65, useNativeDriver: true }),
+      Animated.timing(shake, { toValue: 0, duration: 60, useNativeDriver: true }),
+    ]).start();
+  }, [isHit, shake]);
+  return <Animated.View style={[styles.damageFighter, isHit && styles.damageFighterHit, { transform: [{ translateX: shake }] }]}>{children}</Animated.View>;
+}
+
+function DamageNumber({ amount }: { amount: number }) {
+  const rise = React.useRef(new Animated.Value(0)).current;
+  React.useEffect(() => {
+    Animated.timing(rise, { toValue: 1, duration: 850, useNativeDriver: true }).start();
+  }, [rise]);
+  return <Animated.Text style={[styles.damageTaken, { opacity: rise.interpolate({ inputRange: [0, 0.72, 1], outputRange: [1, 1, 0] }), transform: [{ translateY: rise.interpolate({ inputRange: [0, 1], outputRange: [0, -44] }) }] }]}>-{amount} HP</Animated.Text>;
+}
+
 const styles = StyleSheet.create({
-  damageRevealScreen: { justifyContent: "flex-start", paddingTop: 10 },
-  damageAnswerHeader: { width: "62%", alignSelf: "center", alignItems: "center", minHeight: 56 },
-  damageAnswerLabel: { color: theme.textDim, fontSize: 11, fontWeight: "800", textTransform: "uppercase" },
-  damageCorrectAnswer: { width: "100%", color: theme.text, fontSize: 22, fontWeight: "900", textAlign: "center" },
-  damageArena: { flex: 1, minHeight: 0, width: "86%", alignSelf: "center", flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", position: "relative", paddingHorizontal: 28 },
-  damageFighter: { width: "42%", height: "100%", alignItems: "center", justifyContent: "flex-end", borderRadius: 18, borderWidth: 2, borderColor: "rgba(124,92,255,0.25)", backgroundColor: "rgba(31,26,51,0.42)", overflow: "hidden" },
-  damageFighterHit: { borderColor: "#FF405F", backgroundColor: "rgba(180,25,48,0.34)" },
-  damagePlayerLabel: { position: "absolute", top: 8, left: 8, right: 8, zIndex: 2, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  damagePlayerName: { flex: 1, fontSize: 15, fontWeight: "900", marginRight: 8 },
-  damageHealth: { color: "#FFFFFF", fontSize: 14, fontWeight: "900" },
-  damageAvatar: { width: "88%", height: "82%" },
+  damageTransitionScreen: { justifyContent: "flex-start", paddingTop: 16 },
+  damageCorrectAnswerWrap: { width: "64%", minHeight: 38, alignSelf: "center", alignItems: "center", justifyContent: "center", marginTop: 2 },
+  damageCorrectAnswerLabel: { color: theme.textDim, fontSize: 10, fontWeight: "800", textTransform: "uppercase" },
+  damageCorrectAnswerText: { width: "100%", color: "#7CFFA0", fontSize: 19, lineHeight: 22, fontWeight: "900", textAlign: "center" },
+  damageBattleStage: { flex: 1, minHeight: 0, width: "104%", alignSelf: "center" },
+  damageAvatarPane: { flex: 1, minHeight: 0, marginTop: 8, flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", position: "relative", backgroundColor: "transparent", paddingHorizontal: 0, paddingBottom: 2, overflow: "hidden" },
+  damageFighter: { width: "40%", height: "100%", alignItems: "center", justifyContent: "flex-end", overflow: "hidden" },
+  damageFighterHit: { backgroundColor: "transparent" },
+  damageAvatar: { width: "100%", height: "86%" },
   damageAvatarFacingLeft: { transform: [{ scaleX: -1 }] },
-  damageAvatarHit: { tintColor: "#FF405F", opacity: 0.88 },
-  damageResultLine: { position: "absolute", left: 8, right: 8, bottom: 5, minHeight: 26, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 10, zIndex: 3 },
-  damageResultText: { fontSize: 12, fontWeight: "900", textTransform: "uppercase" },
-  damageCorrect: { color: "#7CFFA0" },
-  damageWrong: { color: theme.danger },
-  damageTaken: { color: "#FFFFFF", fontSize: 18, fontWeight: "900", textShadowColor: "#8F1028", textShadowRadius: 5 },
-  damageVersus: { position: "absolute", left: "47%", top: "42%", width: "6%", textAlign: "center", color: "#F7D85B", fontSize: 18, fontWeight: "900", zIndex: 4 },
+  damageAvatarHitOverlay: { position: "absolute", top: 0, width: "100%", height: "86%", tintColor: "#FF405F", opacity: 0.78, zIndex: 2 },
+  damageTaken: { position: "absolute", top: "42%", color: "#FFFFFF", fontSize: 18, fontWeight: "900", textShadowColor: "#8F1028", textShadowRadius: 5, zIndex: 3 },
+  quizBotProjectile: { position: "absolute", top: "39%", width: 82, height: 82, zIndex: 8 },
+  quizBotProjectileLeft: { left: "24%" },
+  quizBotProjectileRight: { right: "24%" },
+  damagePlayerAnswer: { width: "94%", minHeight: 25, color: theme.text, fontSize: 12, lineHeight: 14, fontWeight: "800", textAlign: "center", paddingHorizontal: 4 },
+  damageVersus: { position: "absolute", left: "42%", top: "45%", width: "16%", textAlign: "center", color: "#F7D85B", fontSize: 14, fontWeight: "900", zIndex: 4 },
   closestScreen: { justifyContent: "flex-start", paddingTop: 14 },
   revealBody: {
     flex: 1,
