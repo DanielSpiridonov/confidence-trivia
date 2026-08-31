@@ -168,7 +168,11 @@ export class GameRoom extends Room<RoomStateSchema> {
       getPlayerCustomization(deviceId),
     ]);
     if (stars !== null) player.stars = stars;
-    if (customization) player.nameColor = customization.nameColor;
+    if (customization) {
+      player.nameColor = customization.nameColor;
+      player.avatarId = customization.avatarId;
+      player.frameId = customization.frameId;
+    }
     void this.updateLobbyMetadata();
   }
 

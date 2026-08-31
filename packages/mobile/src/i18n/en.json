@@ -5,6 +5,8 @@
     "createGame": "Create Game",
     "joinGame": "Join Game",
     "settings": "Settings",
+    "profile": "Profile",
+    "ruleBook": "Rule Book",
     "dailyReward": "Daily Reward",
     "claimed": "Claimed",
     "rewardDay": "Day {{count}}",
@@ -153,6 +155,7 @@
     "finding": "Finding players...",
     "loading": "Loading leaderboard...",
     "empty": "No ranked players yet. Be the first.",
+    "noProfile": "Play Ranked to receive a rank.",
     "matchmaking": "Ranked Matchmaking",
     "playersFound": "Players found: {{count}} / 4",
     "waitingForPlayers": "Waiting for {{count}} more players...",
@@ -183,8 +186,19 @@
     "previewOnly": "Design preview — purchases disabled",
     "nameColorsFree": "Name colors — free for testing",
     "free": "Free · Equip",
+    "freeItem": "Free",
     "equipped": "Equipped",
     "equipping": "Equipping...",
+    "equip": "Equip",
+    "ownedItems": "Owned cosmetics",
+    "noOwnedAvatars": "No owned avatars yet.",
+    "noOwnedFrames": "No owned player borders yet.",
+    "playerBordersPreview": "Borders for avatar + name cards",
+    "inventoryCategories": {
+      "nameColors": "Name Colors",
+      "avatars": "Avatars",
+      "frames": "Frames"
+    },
     "nameColors": {
       "name_white": "White",
       "name_sky": "Sky",
@@ -193,10 +207,20 @@
       "name_coral": "Coral",
       "name_lilac": "Lilac"
     },
+    "avatarNames": {
+      "smart_owl": "Smart Owl",
+      "clever_fox": "Clever Fox",
+      "quiz_bot": "Quiz Bot",
+      "omniscient_avatar": "Omniscient",
+      "trivia_wizard": "Trivia Wizard",
+      "detective_avatar": "Detective",
+      "living_globe": "Living Globe"
+    },
     "tabs": {
       "featured": "Featured",
       "avatars": "Avatars",
       "frames": "Frames",
+      "inventory": "Inventory",
       "stars": "Buy Stars"
     }
   },

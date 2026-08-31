@@ -5,6 +5,8 @@
     "createGame": "Създай игра",
     "joinGame": "Присъедини се",
     "settings": "Настройки",
+    "profile": "Профил",
+    "ruleBook": "Правила",
     "dailyReward": "Дневна награда",
     "claimed": "Взета",
     "rewardDay": "Ден {{count}}",
@@ -153,6 +155,7 @@
     "finding": "Търсене на играчи...",
     "loading": "Зареждане на класирането...",
     "empty": "Все още няма класирани играчи. Бъди първият.",
+    "noProfile": "Играй рангова игра, за да получиш ранг.",
     "matchmaking": "Рангово търсене",
     "playersFound": "Намерени играчи: {{count}} / 4",
     "waitingForPlayers": "Изчакване на още {{count}} играчи...",
@@ -183,8 +186,19 @@
     "previewOnly": "Дизайн — покупките са изключени",
     "nameColorsFree": "Цветове за име — безплатни за тест",
     "free": "Безплатно · Сложи",
+    "freeItem": "Безплатно",
     "equipped": "Избрано",
     "equipping": "Задаване...",
+    "equip": "Сложи",
+    "ownedItems": "Притежавани предмети",
+    "noOwnedAvatars": "Все още няма притежавани аватари.",
+    "noOwnedFrames": "Все още няма притежавани рамки за играч.",
+    "playerBordersPreview": "Рамки за картите с аватар и име",
+    "inventoryCategories": {
+      "nameColors": "Цветове за име",
+      "avatars": "Аватари",
+      "frames": "Рамки"
+    },
     "nameColors": {
       "name_white": "Бяло",
       "name_sky": "Небесно",
@@ -193,10 +207,20 @@
       "name_coral": "Корал",
       "name_lilac": "Люляк"
     },
+    "avatarNames": {
+      "smart_owl": "Умният бухал",
+      "clever_fox": "Хитрата лисица",
+      "quiz_bot": "Куиз бот",
+      "omniscient_avatar": "Всезнаещият",
+      "trivia_wizard": "Магьосникът на въпросите",
+      "detective_avatar": "Детективът",
+      "living_globe": "Живият глобус"
+    },
     "tabs": {
       "featured": "Избрани",
       "avatars": "Аватари",
       "frames": "Рамки",
+      "inventory": "Инвентар",
       "stars": "Купи звезди"
     }
   },

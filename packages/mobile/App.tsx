@@ -422,9 +422,10 @@ export default function App() {
             <HomeScreen
               onCreate={() => setNav("create")}
               onJoin={() => setNav("join")}
+              onProfile={() => {}}
+              deviceId={deviceId}
                 onRanked={() => setNav("ranked")}
                 onShop={() => setNav("shop")}
-              onSettings={() => setNav("settings")}
               dailyReward={dailyReward}
               dailyRewardClaiming={dailyRewardClaiming}
               dailyRewardCelebration={dailyRewardCelebration}
@@ -432,7 +433,7 @@ export default function App() {
               onClaimDailyReward={() => void handleClaimDailyReward()}
             />
           )}
-          {nav === "create" && <CreateGameScreen onCreate={handleCreate} locale={locale} initialName={defaultPlayerName} onBack={() => setNav("home")} />}
+          {nav === "create" && deviceId ? <CreateGameScreen onCreate={handleCreate} locale={locale} deviceId={deviceId} initialName={defaultPlayerName} onBack={() => setNav("home")} /> : null}
           {nav === "join" && <JoinGameScreen onJoin={handleJoin} onJoinPublic={handleJoinPublic} initialName={defaultPlayerName} onBack={() => setNav("home")} />}
           {nav === "ranked" && deviceId ? (
             <RankedScreen
@@ -460,6 +461,16 @@ export default function App() {
           )}
         </>
       )}
+      {nav === "home" ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={i18n.t("home.settings")}
+          onPress={() => setNav("settings")}
+          style={({ pressed }) => [styles.homeSettingsButton, pressed && styles.homeSettingsButtonPressed]}
+        >
+          <Text style={styles.homeSettingsIcon}>{"\u2699"}</Text>
+        </Pressable>
+      ) : null}
       {nav !== "in-room" ? <StarsBadge stars={stars} gain={starGain} /> : null}
     </AppFrame>
   );
@@ -671,6 +682,22 @@ const styles = StyleSheet.create({
     zIndex: 20,
     alignItems: "center",
   },
+  homeSettingsButton: {
+    position: "absolute",
+    top: 18,
+    right: 122,
+    zIndex: 20,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(31, 26, 51, 0.92)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.10)",
+  },
+  homeSettingsButtonPressed: { opacity: 0.7, transform: [{ scale: 0.96 }] },
+  homeSettingsIcon: { color: theme.text, fontSize: 24, lineHeight: 27, fontWeight: "800" },
   pointsBadge: {
     minWidth: 76,
     height: 40,

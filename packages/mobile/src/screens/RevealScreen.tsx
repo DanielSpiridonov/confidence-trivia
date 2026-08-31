@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, FlatList, Platform, ScrollView, StyleSheet } from "react-native";
+import { View, Text, FlatList, Image, ImageSourcePropType, Platform, ScrollView, StyleSheet } from "react-native";
 import { useTranslation } from "react-i18next";
 import { Room } from "colyseus.js";
 import { ANDROID_GAME_UI_SCALE, Screen, Title, Subtitle, theme } from "../components/ui";
@@ -7,6 +7,16 @@ import { useRoomState } from "../network/client";
 import { PhaseTimer } from "../components/PhaseTimer";
 import { LeaderboardStrip } from "./LeaderboardScreen";
 import { DamageHud } from "../components/DamageHud";
+
+const DAMAGE_AVATARS: Record<string, ImageSourcePropType> = {
+  smart_owl: require("../../assets/avatars/smart-owl.png"),
+  clever_fox: require("../../assets/avatars/fox.png"),
+  quiz_bot: require("../../assets/avatars/quiz-bot.png"),
+  omniscient_avatar: require("../../assets/avatars/omniscient.png"),
+  trivia_wizard: require("../../assets/avatars/trivia-wizard.png"),
+  detective_avatar: require("../../assets/avatars/detective.png"),
+  living_globe: require("../../assets/avatars/globe.png"),
+};
 
 export function RevealScreen({ room }: { room: Room }) {
   const { t } = useTranslation();
@@ -24,6 +34,10 @@ export function RevealScreen({ room }: { room: Room }) {
   }));
   const isOrderingReveal = state.currentQuestion?.qType === "ordering";
   const isClosestAnswerReveal = state.currentQuestion?.qType === "closest_answer";
+
+  if (state.gameMode === "damage") {
+    return <DamageAvatarReveal state={state} results={results} />;
+  }
 
   if (isClosestAnswerReveal) {
     const guessMarkerWidth = Platform.OS === "android" ? 116 : 104;
@@ -174,7 +188,77 @@ export function RevealScreen({ room }: { room: Room }) {
   );
 }
 
+function DamageAvatarReveal({ state, results }: { state: any; results: any[] }) {
+  const { t } = useTranslation();
+  const [showHit, setShowHit] = React.useState(false);
+  const players = [...state.players.values()].slice(0, 2) as any[];
+
+  React.useEffect(() => {
+    const hitStart = setTimeout(() => setShowHit(true), 420);
+    const hitEnd = setTimeout(() => setShowHit(false), 1_250);
+    return () => {
+      clearTimeout(hitStart);
+      clearTimeout(hitEnd);
+    };
+  }, []);
+
+  return (
+    <Screen style={styles.damageRevealScreen} androidScale={ANDROID_GAME_UI_SCALE}>
+      <PhaseTimer phaseEndsAt={state.phaseEndsAt} />
+      <View style={styles.damageAnswerHeader}>
+        <Text style={styles.damageAnswerLabel}>{t("reveal.correctAnswer")}</Text>
+        <Text numberOfLines={1} adjustsFontSizeToFit style={styles.damageCorrectAnswer}>{state.correctAnswerText}</Text>
+      </View>
+      <View style={styles.damageArena}>
+        {players.map((player, index) => {
+          const ownResult = results.find((result: any) => result.playerId === player.id);
+          const opponent = players[index === 0 ? 1 : 0];
+          const incomingDamage = results.find((result: any) => result.playerId === opponent?.id)?.damageDealt ?? 0;
+          const isHit = showHit && incomingDamage > 0;
+          return (
+            <View key={player.id} style={[styles.damageFighter, isHit && styles.damageFighterHit]}>
+              <View style={styles.damagePlayerLabel}>
+                <Text numberOfLines={1} style={[styles.damagePlayerName, { color: player.nameColor || theme.text }]}>{player.name}</Text>
+                <Text style={styles.damageHealth}>{player.health} HP</Text>
+              </View>
+              <Image
+                source={DAMAGE_AVATARS[player.avatarId] ?? DAMAGE_AVATARS.smart_owl}
+                resizeMode="contain"
+                style={[styles.damageAvatar, index === 1 && styles.damageAvatarFacingLeft, isHit && styles.damageAvatarHit]}
+              />
+              <View style={styles.damageResultLine}>
+                <Text style={[styles.damageResultText, ownResult?.correct ? styles.damageCorrect : styles.damageWrong]}>{ownResult?.correct ? t("board.correct") : t("board.wrong")}</Text>
+                {incomingDamage > 0 && isHit ? <Text style={styles.damageTaken}>-{incomingDamage} HP</Text> : null}
+              </View>
+            </View>
+          );
+        })}
+        <Text style={styles.damageVersus}>VS</Text>
+      </View>
+    </Screen>
+  );
+}
+
 const styles = StyleSheet.create({
+  damageRevealScreen: { justifyContent: "flex-start", paddingTop: 10 },
+  damageAnswerHeader: { width: "62%", alignSelf: "center", alignItems: "center", minHeight: 56 },
+  damageAnswerLabel: { color: theme.textDim, fontSize: 11, fontWeight: "800", textTransform: "uppercase" },
+  damageCorrectAnswer: { width: "100%", color: theme.text, fontSize: 22, fontWeight: "900", textAlign: "center" },
+  damageArena: { flex: 1, minHeight: 0, width: "86%", alignSelf: "center", flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", position: "relative", paddingHorizontal: 28 },
+  damageFighter: { width: "42%", height: "100%", alignItems: "center", justifyContent: "flex-end", borderRadius: 18, borderWidth: 2, borderColor: "rgba(124,92,255,0.25)", backgroundColor: "rgba(31,26,51,0.42)", overflow: "hidden" },
+  damageFighterHit: { borderColor: "#FF405F", backgroundColor: "rgba(180,25,48,0.34)" },
+  damagePlayerLabel: { position: "absolute", top: 8, left: 8, right: 8, zIndex: 2, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  damagePlayerName: { flex: 1, fontSize: 15, fontWeight: "900", marginRight: 8 },
+  damageHealth: { color: "#FFFFFF", fontSize: 14, fontWeight: "900" },
+  damageAvatar: { width: "88%", height: "82%" },
+  damageAvatarFacingLeft: { transform: [{ scaleX: -1 }] },
+  damageAvatarHit: { tintColor: "#FF405F", opacity: 0.88 },
+  damageResultLine: { position: "absolute", left: 8, right: 8, bottom: 5, minHeight: 26, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 10, zIndex: 3 },
+  damageResultText: { fontSize: 12, fontWeight: "900", textTransform: "uppercase" },
+  damageCorrect: { color: "#7CFFA0" },
+  damageWrong: { color: theme.danger },
+  damageTaken: { color: "#FFFFFF", fontSize: 18, fontWeight: "900", textShadowColor: "#8F1028", textShadowRadius: 5 },
+  damageVersus: { position: "absolute", left: "47%", top: "42%", width: "6%", textAlign: "center", color: "#F7D85B", fontSize: 18, fontWeight: "900", zIndex: 4 },
   closestScreen: { justifyContent: "flex-start", paddingTop: 14 },
   revealBody: {
     flex: 1,

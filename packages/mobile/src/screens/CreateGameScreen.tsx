@@ -2,8 +2,9 @@ import React, { useState } from "react";
 import { TextInput, StyleSheet, Text, ScrollView, Pressable, View, Platform } from "react-native";
 import { useTranslation } from "react-i18next";
 import { ANDROID_COMPACT_MENU_UI_SCALE, BackIconButton, Screen, Title, BigButton, theme } from "../components/ui";
-import { DAMAGE_WAGER_OPTIONS, DEFAULT_DAMAGE_WAGER, DEFAULT_ROUND_COUNT } from "@confidence-trivia/shared";
+import { DAMAGE_WAGER_OPTIONS, DEFAULT_DAMAGE_WAGER, DEFAULT_ROUND_COUNT, getRankedDivision, RANKED_PLACEMENT_MATCHES } from "@confidence-trivia/shared";
 import { isValidPlayerName } from "../utils/playerName";
+import { getRankedLeaderboard, RankedLeaderboardEntry } from "../network/client";
 
 const ROUND_OPTIONS = [3, 5, 7, 9, 11, 13, 15];
 const DEFAULT_ROUNDS = ROUND_OPTIONS.reduce((closest, value) => {
@@ -15,11 +16,13 @@ const DEFAULT_ROUNDS = ROUND_OPTIONS.reduce((closest, value) => {
 export function CreateGameScreen({
   onCreate,
   locale,
+  deviceId,
   initialName,
   onBack,
 }: {
   onCreate: (name: string, rounds: number, gameMode: "classic" | "ranked" | "damage", visibility: "private" | "public", damageWager: number) => Promise<void>;
   locale: "en" | "bg";
+  deviceId: string;
   initialName: string;
   onBack: () => void;
 }) {
@@ -31,8 +34,23 @@ export function CreateGameScreen({
   const [damageWager, setDamageWager] = useState<number>(DEFAULT_DAMAGE_WAGER);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [rankedProfile, setRankedProfile] = useState<RankedLeaderboardEntry | null>(null);
+  const [rankedLoading, setRankedLoading] = useState(false);
   const trimmedName = name.trim();
   const hasInvalidNameCharacters = trimmedName.length > 0 && !isValidPlayerName(trimmedName);
+
+  React.useEffect(() => {
+    if (gameMode !== "ranked") return;
+    let cancelled = false;
+    setRankedLoading(true);
+    void getRankedLeaderboard(deviceId).then((leaderboard) => {
+      if (!cancelled) {
+        setRankedProfile(leaderboard?.currentPlayer ?? null);
+        setRankedLoading(false);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [deviceId, gameMode]);
 
   async function handleSubmit() {
     if (submitting || !isValidPlayerName(name)) return;
@@ -142,6 +160,26 @@ export function CreateGameScreen({
               </View>
             </View> : null}
           </View>
+          {gameMode === "ranked" ? (
+            <View style={styles.rankedSummary}>
+              {rankedLoading ? <Text style={styles.rankedLoading}>{t("ranked.loading")}</Text> : rankedProfile ? (
+                <>
+                  <View style={styles.rankedSummaryBlock}>
+                    <Text style={styles.rankedSummaryLabel}>{t("ranked.yourRank")}</Text>
+                    <Text style={[styles.rankedSummaryRank, { color: rankedProfile.placementMatches >= RANKED_PLACEMENT_MATCHES ? getRankedDivision(rankedProfile.lp).color : theme.textDim }]}>
+                      {t(`ranked.ranks.${rankedProfile.rankKey}`)}
+                    </Text>
+                  </View>
+                  <View style={styles.rankedDivider} />
+                  <View style={styles.rankedSummaryBlock}>
+                    <Text style={styles.rankedSummaryLabel}>{t("ranked.lp")}</Text>
+                    <Text style={styles.rankedSummaryLp}>{rankedProfile.placementMatches >= RANKED_PLACEMENT_MATCHES ? rankedProfile.lp : "—"}</Text>
+                  </View>
+                  {rankedProfile.placementMatches < RANKED_PLACEMENT_MATCHES ? <Text style={styles.rankedPlacements}>{t("ranked.placements", { current: rankedProfile.placementMatches, total: RANKED_PLACEMENT_MATCHES })}</Text> : null}
+                </>
+              ) : <Text style={styles.rankedLoading}>{t("ranked.noProfile")}</Text>}
+            </View>
+          ) : null}
         </View>
         <View style={styles.actionsColumn}>
           {error && <Text style={styles.error}>{t("network.createFailed", { message: error })}</Text>}
@@ -172,6 +210,14 @@ const styles = StyleSheet.create({
   formColumn: { width: "62%", maxWidth: 560 },
   actionsColumn: { width: "30%", maxWidth: 300, justifyContent: "center" },
   settingsRow: { width: "100%", flexDirection: "row", gap: 10 },
+  rankedSummary: { width: "100%", minHeight: 50, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 14, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 7, backgroundColor: "rgba(31, 26, 51, 0.88)", borderWidth: 1, borderColor: "rgba(184, 140, 255, 0.42)" },
+  rankedSummaryBlock: { minWidth: 75, alignItems: "center" },
+  rankedSummaryLabel: { color: theme.textDim, fontSize: 9, fontWeight: "900", textTransform: "uppercase" },
+  rankedSummaryRank: { color: theme.text, fontSize: 15, fontWeight: "900", marginTop: 1 },
+  rankedSummaryLp: { color: "#F7D85B", fontSize: 16, fontWeight: "900", marginTop: 1 },
+  rankedDivider: { width: 1, height: 30, backgroundColor: "rgba(255,255,255,0.14)" },
+  rankedPlacements: { color: theme.textDim, fontSize: 9, fontWeight: "700", textAlign: "center" },
+  rankedLoading: { color: theme.textDim, fontSize: 11, fontWeight: "700" },
   visibilitySection: { flex: 1, minWidth: 0, marginBottom: 12 },
   visibilityCard: { minHeight: 44 },
   input: {

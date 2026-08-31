@@ -8,6 +8,8 @@ export class PlayerSchema extends Schema {
   @type("string") id: string = "";
   @type("string") name: string = "";
   @type("string") nameColor: string = "#FFFFFF";
+  @type("string") avatarId: string = "smart_owl";
+  @type("string") frameId: string = "";
   @type("number") score: number = 0;
   @type("number") stars: number = 0;
   @type("number") starsEarnedThisGame: number = 0;

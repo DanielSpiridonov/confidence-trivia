@@ -28,6 +28,36 @@ export async function getPlayerStars(deviceId: string): Promise<number | null> {
 export interface PlayerCustomization {
   nameColorId: string;
   nameColor: string;
+  avatarId: string;
+  frameId: string;
+}
+
+export async function equipAvatar(deviceId: string, displayName: string, cosmeticId: string): Promise<PlayerCustomization | null> {
+  try {
+    const response = await fetch(`${HTTP_SERVER_URL}/players/${encodeURIComponent(deviceId)}/customization/avatar`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ displayName, cosmeticId }),
+    });
+    if (!response.ok) return null;
+    return await response.json() as PlayerCustomization;
+  } catch {
+    return null;
+  }
+}
+
+export async function equipFrame(deviceId: string, displayName: string, cosmeticId: string): Promise<PlayerCustomization | null> {
+  try {
+    const response = await fetch(`${HTTP_SERVER_URL}/players/${encodeURIComponent(deviceId)}/customization/frame`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ displayName, cosmeticId }),
+    });
+    if (!response.ok) return null;
+    return await response.json() as PlayerCustomization;
+  } catch {
+    return null;
+  }
 }
 
 export async function getPlayerCustomization(deviceId: string): Promise<PlayerCustomization | null> {

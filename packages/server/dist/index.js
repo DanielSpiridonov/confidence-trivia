@@ -55,6 +55,34 @@ app.post("/players/:deviceId/customization/name-color", async (req, res) => {
     }
     res.json(customization);
 });
+app.post("/players/:deviceId/customization/avatar", async (req, res) => {
+    if (!isDeviceId(req.params.deviceId)) {
+        res.status(400).json({ error: "Invalid device ID" });
+        return;
+    }
+    const cosmeticId = typeof req.body?.cosmeticId === "string" ? req.body.cosmeticId : "";
+    const displayName = typeof req.body?.displayName === "string" ? req.body.displayName.trim().slice(0, 20) : "Player";
+    const customization = await (0, database_1.equipFreeAvatar)(req.params.deviceId, cosmeticId, displayName);
+    if (!customization) {
+        res.status(400).json({ error: "Could not equip that avatar" });
+        return;
+    }
+    res.json(customization);
+});
+app.post("/players/:deviceId/customization/frame", async (req, res) => {
+    if (!isDeviceId(req.params.deviceId)) {
+        res.status(400).json({ error: "Invalid device ID" });
+        return;
+    }
+    const cosmeticId = typeof req.body?.cosmeticId === "string" ? req.body.cosmeticId : "";
+    const displayName = typeof req.body?.displayName === "string" ? req.body.displayName.trim().slice(0, 20) : "Player";
+    const customization = await (0, database_1.equipFreeFrame)(req.params.deviceId, cosmeticId, displayName);
+    if (!customization) {
+        res.status(400).json({ error: "Could not equip that frame" });
+        return;
+    }
+    res.json(customization);
+});
 function isDeviceId(value) {
     return /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }

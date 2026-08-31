@@ -1,13 +1,24 @@
 import React from "react";
 import { Animated, Image, ImageSourcePropType, Pressable, StyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
-import { ANDROID_MENU_UI_SCALE, Screen, Title, Subtitle, BigButton } from "../components/ui";
+import { ANDROID_MENU_UI_SCALE, Screen, Title, BigButton } from "../components/ui";
 import { PointsIcon } from "../components/PointsIcon";
+import { getPlayerCustomization } from "../network/client";
 
 const DAILY_REWARD_PLATFORM_IMAGE: ImageSourcePropType = require("../../assets/popup-platform.png");
 const DAILY_REWARD_PRESENT_IMAGE: ImageSourcePropType = require("../../assets/stars-gift.png");
 const CLAIMED_REWARD_PRESENT_IMAGE: ImageSourcePropType = require("../../assets/gift-opened-transparent.png");
 const RANKED_TROPHY_IMAGE: ImageSourcePropType = require("../../assets/trophy-transparent.png");
+const DEFAULT_AVATAR_HEAD_IMAGE: ImageSourcePropType = require("../../assets/avatar-heads/smart-owl.png");
+const AVATAR_HEAD_IMAGES: Record<string, ImageSourcePropType> = {
+  smart_owl: DEFAULT_AVATAR_HEAD_IMAGE,
+  clever_fox: require("../../assets/avatar-heads/fox.png"),
+  quiz_bot: require("../../assets/avatar-heads/quiz-bot.png"),
+  omniscient_avatar: require("../../assets/avatar-heads/omniscient.png"),
+  trivia_wizard: require("../../assets/avatar-heads/trivia-wizard.png"),
+  detective_avatar: require("../../assets/avatar-heads/detective.png"),
+  living_globe: require("../../assets/avatar-heads/globe.png"),
+};
 const REWARD_STAGES = [10, 20, 30, 50, 75] as const;
 const SIDEBAR_ITEM_WIDTH = 82;
 const SIDEBAR_ITEM_HEIGHT = 91;
@@ -51,9 +62,10 @@ function HomePopup({ label, amount, streakLabel, claimed, claimedLabel, countdow
 export function HomeScreen({
   onCreate,
   onJoin,
+  onProfile,
+  deviceId,
   onRanked,
   onShop,
-  onSettings,
   dailyReward,
   dailyRewardClaiming,
   dailyRewardCelebration,
@@ -62,9 +74,10 @@ export function HomeScreen({
 }: {
   onCreate: () => void;
   onJoin: () => void;
+  onProfile: () => void;
+  deviceId: string | null;
   onRanked: () => void;
   onShop: () => void;
-  onSettings: () => void;
   dailyReward: { available: boolean; amount: number; streakDay: number; nextClaimAt: string } | null;
   dailyRewardClaiming: boolean;
   dailyRewardCelebration: { id: number; amount: number; streakDay: number } | null;
@@ -75,8 +88,16 @@ export function HomeScreen({
   const [now, setNow] = React.useState(Date.now());
   const [showCelebration, setShowCelebration] = React.useState(false);
   const [activeCelebration, setActiveCelebration] = React.useState(dailyRewardCelebration);
+  const [avatarHead, setAvatarHead] = React.useState<ImageSourcePropType>(DEFAULT_AVATAR_HEAD_IMAGE);
   const celebrationOpacity = React.useRef(new Animated.Value(0)).current;
   const celebrationScale = React.useRef(new Animated.Value(0.94)).current;
+
+  React.useEffect(() => {
+    if (!deviceId) return;
+    void getPlayerCustomization(deviceId).then((customization) => {
+      if (customization) setAvatarHead(AVATAR_HEAD_IMAGES[customization.avatarId] ?? DEFAULT_AVATAR_HEAD_IMAGE);
+    });
+  }, [deviceId]);
 
   React.useEffect(() => {
     if (!dailyReward || dailyReward.available) return;
@@ -165,12 +186,14 @@ export function HomeScreen({
         </Pressable>
       </View>
       <Title>🔥 {t("home.title")}</Title>
-      <Subtitle>{t("home.tagline")}</Subtitle>
       <View style={styles.actions}>
         <BigButton label={t("home.createGame")} onPress={onCreate} />
         <BigButton label={t("home.joinGame")} onPress={onJoin} variant="secondary" />
-        <BigButton label={t("home.settings")} onPress={onSettings} variant="secondary" />
       </View>
+      <Pressable accessibilityRole="button" accessibilityLabel={t("home.profile")} onPress={onProfile} style={({ pressed }) => [styles.profileButton, pressed && styles.profileButtonPressed]}>
+        <Image source={avatarHead} resizeMode="contain" style={styles.profileAvatar} />
+        <Text numberOfLines={1} style={styles.profileLabel}>{t("home.profile")}</Text>
+      </Pressable>
       {showCelebration && activeCelebration ? (
         <View style={styles.celebrationBackdrop}>
           <Animated.View style={[styles.celebrationPanel, { opacity: celebrationOpacity, transform: [{ scale: celebrationScale }] }]}>
@@ -209,6 +232,10 @@ const styles = StyleSheet.create({
     maxWidth: 420,
     alignSelf: "center",
   },
+  profileButton: { position: "absolute", right: 8, bottom: 4, width: 126, height: 44, paddingHorizontal: 8, borderRadius: 14, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 2, borderColor: "#7C5CFF", backgroundColor: "transparent" },
+  profileButtonPressed: { opacity: 0.72, transform: [{ scale: 0.97 }] },
+  profileAvatar: { width: 34, height: 34 },
+  profileLabel: { color: "#7C5CFF", fontSize: 14, fontWeight: "800", flexShrink: 1 },
   popupRail: { position: "absolute", left: 1, top: 38, bottom: 12, width: SIDEBAR_ITEM_WIDTH, justifyContent: "flex-start", gap: 3, zIndex: 5 },
   popup: { width: SIDEBAR_ITEM_WIDTH, height: SIDEBAR_ITEM_HEIGHT, alignItems: "center", justifyContent: "flex-end", paddingBottom: 2 },
   popupDisabled: { opacity: 0.55 },

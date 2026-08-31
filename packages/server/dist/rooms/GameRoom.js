@@ -126,8 +126,11 @@ class GameRoom extends colyseus_1.Room {
         ]);
         if (stars !== null)
             player.stars = stars;
-        if (customization)
+        if (customization) {
             player.nameColor = customization.nameColor;
+            player.avatarId = customization.avatarId;
+            player.frameId = customization.frameId;
+        }
         void this.updateLobbyMetadata();
     }
     async onLeave(client, consented) {
