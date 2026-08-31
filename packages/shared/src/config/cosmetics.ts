@@ -22,15 +22,15 @@ export const AVATAR_COSMETIC_IDS = [
 
 export const DEFAULT_AVATAR_ID = AVATAR_COSMETIC_IDS[0];
 
-export const FRAME_COSMETIC_IDS = ["bronze", "silver", "gold", "flame", "ice", "royal"] as const;
+export const FRAME_COSMETIC_IDS = ["flame", "water", "leaves", "frost", "lightning", "ice"] as const;
 export const DEFAULT_FRAME_ID = "";
 export const FRAME_COSMETIC_COLORS: Record<typeof FRAME_COSMETIC_IDS[number], string> = {
-  bronze: "#CD7F32",
-  silver: "#C7D0DA",
-  gold: "#F7D85B",
   flame: "#FF6542",
+  water: "#55D9FF",
+  leaves: "#73D85B",
+  frost: "#C9F5FF",
+  lightning: "#FFE75C",
   ice: "#65D9FF",
-  royal: "#B887FF",
 };
 
 export function getNameColorCosmetic(id: unknown) {

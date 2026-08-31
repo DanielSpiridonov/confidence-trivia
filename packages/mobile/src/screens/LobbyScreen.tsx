@@ -7,6 +7,7 @@ import { FRAME_COSMETIC_COLORS, MIN_PLAYERS_TO_START } from "@confidence-trivia/
 import { ANDROID_GAME_UI_SCALE, Screen, Title, Subtitle, BigButton, theme } from "../components/ui";
 import { useRoomState } from "../network/client";
 import { playSound } from "../audio/sounds";
+import { PlayerFrameEffect } from "../components/PlayerFrameEffect";
 
 interface PublicPlayerView {
   id: string;
@@ -95,6 +96,7 @@ export function LobbyScreen({ room, mySessionId }: { room: Room; mySessionId: st
             <Text style={styles.columnTitle}>{t("lobby.players")}</Text>
             <FlatList style={styles.list} data={players} keyExtractor={(p) => p.id} contentContainerStyle={styles.listContent} nestedScrollEnabled showsVerticalScrollIndicator={players.length > 4} renderItem={({ item }) => (
               <View style={[styles.playerRow, item.frameId ? { borderWidth: 2, borderColor: FRAME_COSMETIC_COLORS[item.frameId as keyof typeof FRAME_COSMETIC_COLORS] } : null]}>
+                <PlayerFrameEffect frameId={item.frameId} />
                 <Text numberOfLines={1} style={[styles.playerName, { color: item.nameColor || theme.text }]}>{item.isHost ? "👑 " : ""}{item.name}{!item.connected ? " (reconnecting…)" : ""}</Text>
                 <Text style={item.ready ? styles.readyBadge : styles.notReadyBadge}>{item.ready ? t("lobby.ready") : t("lobby.notReady")}</Text>
               </View>

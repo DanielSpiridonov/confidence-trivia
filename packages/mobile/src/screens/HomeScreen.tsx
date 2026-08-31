@@ -63,6 +63,7 @@ export function HomeScreen({
   onCreate,
   onJoin,
   onProfile,
+  onInventory,
   deviceId,
   onRanked,
   onShop,
@@ -75,6 +76,7 @@ export function HomeScreen({
   onCreate: () => void;
   onJoin: () => void;
   onProfile: () => void;
+  onInventory: () => void;
   deviceId: string | null;
   onRanked: () => void;
   onShop: () => void;
@@ -196,6 +198,10 @@ export function HomeScreen({
         <Image source={avatarHead} fadeDuration={0} resizeMode="contain" style={styles.profileAvatar} />
         <Text numberOfLines={1} style={styles.profileLabel}>{t("home.profile")}</Text>
       </Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel={t("shop.tabs.inventory")} onPress={onInventory} style={({ pressed }) => [styles.profileButton, styles.inventoryButton, pressed && styles.profileButtonPressed]}>
+        <Text style={styles.inventoryIcon}>▤</Text>
+        <Text numberOfLines={1} style={styles.profileLabel}>{t("shop.tabs.inventory")}</Text>
+      </Pressable>
       {showCelebration && activeCelebration ? (
         <View style={styles.celebrationBackdrop}>
           <Animated.View style={[styles.celebrationPanel, { opacity: celebrationOpacity, transform: [{ scale: celebrationScale }] }]}>
@@ -235,6 +241,8 @@ const styles = StyleSheet.create({
     alignSelf: "center",
   },
   profileButton: { position: "absolute", right: 8, bottom: 4, width: 126, height: 44, paddingHorizontal: 8, borderRadius: 14, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 2, borderColor: "#7C5CFF", backgroundColor: "transparent" },
+  inventoryButton: { right: 142 },
+  inventoryIcon: { width: 30, color: "#7C5CFF", fontSize: 27, lineHeight: 31, fontWeight: "900", textAlign: "center" },
   profileButtonPressed: { opacity: 0.72, transform: [{ scale: 0.97 }] },
   profileAvatar: { width: 34, height: 34 },
   profileLabel: { color: "#7C5CFF", fontSize: 14, fontWeight: "800", flexShrink: 1 },

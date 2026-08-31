@@ -3,6 +3,7 @@ import { View, Text, FlatList, Platform, StyleSheet } from "react-native";
 import { useTranslation } from "react-i18next";
 import { theme } from "../components/ui";
 import { FRAME_COSMETIC_COLORS } from "@confidence-trivia/shared";
+import { PlayerFrameEffect } from "../components/PlayerFrameEffect";
 
 interface PlayerRow {
   id: string;
@@ -37,6 +38,7 @@ export function LeaderboardStrip({
         showsVerticalScrollIndicator={ranked.length > 4}
         renderItem={({ item: player, index }) => (
           <View style={[styles.row, player.frameId ? { borderWidth: 2, borderColor: FRAME_COSMETIC_COLORS[player.frameId as keyof typeof FRAME_COSMETIC_COLORS] } : null]}>
+            <PlayerFrameEffect frameId={player.frameId} />
             <Text style={styles.rank}>#{index + 1}</Text>
             <Text
               numberOfLines={1}

@@ -6,6 +6,7 @@ import { ANDROID_GAME_UI_SCALE, Screen, Title, Subtitle, BigButton, theme } from
 import { useRoomState } from "../network/client";
 import { PointsIcon } from "../components/PointsIcon";
 import { FRAME_COSMETIC_COLORS } from "@confidence-trivia/shared";
+import { PlayerFrameEffect } from "../components/PlayerFrameEffect";
 
 export function FinalResultsScreen({ room, onExit }: { room: Room; onExit: () => void }) {
   const { t } = useTranslation();
@@ -98,6 +99,7 @@ export function FinalResultsScreen({ room, onExit }: { room: Room; onExit: () =>
         showsVerticalScrollIndicator={players.length > 4}
         renderItem={({ item, index }) => (
           <View style={[styles.row, item.id === room.sessionId && styles.myRow, state.gameMode !== "damage" && item.frameId ? { borderWidth: 2, borderColor: FRAME_COSMETIC_COLORS[item.frameId as keyof typeof FRAME_COSMETIC_COLORS] } : null]}>
+            {state.gameMode !== "damage" ? <PlayerFrameEffect frameId={item.frameId} /> : null}
             <Text style={styles.rank}>#{index + 1}</Text>
             <View style={styles.playerBlock}>
               <Text style={[styles.name, { color: item.nameColor || theme.text }]}>{item.name}{item.id === room.sessionId ? " (You)" : ""}</Text>

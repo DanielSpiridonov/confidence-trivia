@@ -21,7 +21,7 @@ export declare const DEFAULT_NAME_COLOR_ID: "name_white";
 export declare const DEFAULT_NAME_COLOR: "#FFFFFF";
 export declare const AVATAR_COSMETIC_IDS: readonly ["smart_owl", "clever_fox", "quiz_bot", "omniscient_avatar", "trivia_wizard", "detective_avatar", "living_globe"];
 export declare const DEFAULT_AVATAR_ID: "smart_owl";
-export declare const FRAME_COSMETIC_IDS: readonly ["bronze", "silver", "gold", "flame", "ice", "royal"];
+export declare const FRAME_COSMETIC_IDS: readonly ["flame", "water", "leaves", "frost", "lightning", "ice"];
 export declare const DEFAULT_FRAME_ID = "";
 export declare const FRAME_COSMETIC_COLORS: Record<typeof FRAME_COSMETIC_IDS[number], string>;
 export declare function getNameColorCosmetic(id: unknown): {

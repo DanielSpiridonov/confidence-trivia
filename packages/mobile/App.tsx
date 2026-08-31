@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Animated, AppState, Image, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
+import { Animated, AppState, Image, Platform, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Room } from "colyseus.js";
@@ -48,7 +48,7 @@ const UI_PRELOAD_IMAGES = [
   require("./assets/ui-thumbnails/gift-opened.png"),
   require("./assets/ui-thumbnails/trophy.png"),
 ] as const;
-const COMBAT_PRELOAD_IMAGES = [
+const FULL_COMBAT_PRELOAD_IMAGES = [
   require("./assets/avatars/smart-owl.png"),
   require("./assets/avatars/fox.png"),
   require("./assets/avatars/quiz-bot.png"),
@@ -59,6 +59,18 @@ const COMBAT_PRELOAD_IMAGES = [
   require("./assets/combat/quiz-bot-calculator.png"),
   require("./assets/combat/smart-owl-book.png"),
 ] as const;
+const IOS_COMBAT_PRELOAD_IMAGES = [
+  require("./assets/combat-ios/smart-owl.png"),
+  require("./assets/combat-ios/fox.png"),
+  require("./assets/combat-ios/quiz-bot.png"),
+  require("./assets/combat-ios/omniscient.png"),
+  require("./assets/combat-ios/trivia-wizard.png"),
+  require("./assets/combat-ios/detective.png"),
+  require("./assets/combat-ios/globe.png"),
+  require("./assets/combat-ios/quiz-bot-calculator.png"),
+  require("./assets/combat-ios/smart-owl-book.png"),
+] as const;
+const COMBAT_PRELOAD_IMAGES = Platform.OS === "ios" ? IOS_COMBAT_PRELOAD_IMAGES : FULL_COMBAT_PRELOAD_IMAGES;
 
 function AssetPreloader({ sources, onReady }: { sources: readonly number[]; onReady?: () => void }) {
   const loaded = useRef(new Set<number>());
@@ -103,7 +115,7 @@ function AppFrame({ children, highContrast = false }: { children: React.ReactNod
   );
 }
 
-function StarsBadge({ stars, gain }: { stars: number; gain: { id: number; amount: number } | null }) {
+function StarsBadge({ stars, gain, onPress }: { stars: number; gain: { id: number; amount: number } | null; onPress: () => void }) {
   const gainOpacity = useRef(new Animated.Value(0)).current;
   const gainTranslateY = useRef(new Animated.Value(8)).current;
 
@@ -118,11 +130,11 @@ function StarsBadge({ stars, gain }: { stars: number; gain: { id: number; amount
   }, [gain?.id, gainOpacity, gainTranslateY]);
 
   return (
-    <View pointerEvents="none" style={styles.starsHud}>
-      <View style={styles.pointsBadge}>
+    <View pointerEvents="box-none" style={styles.starsHud}>
+      <Pressable accessibilityRole="button" accessibilityLabel={`${stars} stars`} onPress={onPress} style={({ pressed }) => [styles.pointsBadge, pressed && styles.pointsBadgePressed]}>
         <PointsIcon />
         <Text style={styles.pointsBadgeText}>{stars}</Text>
-      </View>
+      </Pressable>
       {gain ? (
         <Animated.Text style={[styles.starGainText, { opacity: gainOpacity, transform: [{ translateY: gainTranslateY }] }]}>+{gain.amount} stars</Animated.Text>
       ) : null}
@@ -132,6 +144,7 @@ function StarsBadge({ stars, gain }: { stars: number; gain: { id: number; amount
 
 export default function App() {
   const [nav, setNav] = useState<Nav>("home");
+  const [shopRequest, setShopRequest] = useState<{ tab: "featured" | "inventory" | "stars"; id: number }>({ tab: "featured", id: 0 });
   const [room, setRoom] = useState<Room | null>(null);
   const [locale, setLocale] = useState<"en" | "bg">("en");
   const [localeReady, setLocaleReady] = useState(false);
@@ -268,6 +281,11 @@ export default function App() {
     setRoom(null);
     setNav("home");
     intentionalLeaveRef.current = false;
+  }
+
+  function openShop(tab: "featured" | "inventory" | "stars") {
+    setShopRequest((current) => ({ tab, id: current.id + 1 }));
+    setNav("shop");
   }
 
   function handleChangeLocale(l: "en" | "bg") {
@@ -450,9 +468,10 @@ export default function App() {
           onCreate={() => setNav("create")}
           onJoin={() => setNav("join")}
           onProfile={() => {}}
+          onInventory={() => openShop("inventory")}
           deviceId={deviceId}
           onRanked={() => setNav("ranked")}
-          onShop={() => setNav("shop")}
+          onShop={() => openShop("featured")}
           dailyReward={dailyReward}
           dailyRewardClaiming={dailyRewardClaiming}
           dailyRewardCelebration={dailyRewardCelebration}
@@ -462,7 +481,7 @@ export default function App() {
       </View>
       {deviceId ? (
         <View pointerEvents={nav === "shop" ? "auto" : "none"} style={[styles.persistentScreen, nav !== "shop" && styles.persistentScreenHidden]}>
-          <ShopScreen deviceId={deviceId} displayName={defaultPlayerName} onBack={() => setNav("home")} />
+          <ShopScreen deviceId={deviceId} displayName={defaultPlayerName} requestedTab={shopRequest.tab} requestId={shopRequest.id} onBack={() => setNav("home")} />
         </View>
       ) : null}
       {nav === "in-room" && room ? (
@@ -519,7 +538,7 @@ export default function App() {
           <Text style={styles.homeSettingsIcon}>{"\u2699"}</Text>
         </Pressable>
       ) : null}
-      {nav !== "in-room" ? <StarsBadge stars={stars} gain={starGain} /> : null}
+      {nav !== "in-room" ? <StarsBadge stars={stars} gain={starGain} onPress={() => openShop("stars")} /> : null}
     </AppFrame>
   );
 }
@@ -616,7 +635,7 @@ function InRoomRouter({
       case "board_sidebet":
         return <ConfidenceBoardScreen room={room} mySessionId={room.sessionId} />;
       case "reveal":
-        return <RevealScreen room={room} />;
+        return state.gameMode === "damage" ? null : <RevealScreen room={room} />;
       case "final_results":
         return <FinalResultsScreen room={room} onExit={onExit} />;
       default:
@@ -697,6 +716,14 @@ function InRoomRouter({
       >
         <Text style={styles.menuButtonIcon}>⚙</Text>
       </Pressable>
+      {state.gameMode === "damage" ? (
+        <View
+          pointerEvents={state.phase === "reveal" ? "auto" : "none"}
+          style={[styles.persistentDamageReveal, state.phase !== "reveal" && styles.persistentScreenHidden]}
+        >
+          <RevealScreen room={room} active={state.phase === "reveal"} />
+        </View>
+      ) : null}
       {currentScreen}
     </>
   );
@@ -725,6 +752,7 @@ const styles = StyleSheet.create({
   },
   persistentScreen: { ...StyleSheet.absoluteFillObject, opacity: 1 },
   persistentScreenHidden: { opacity: 0 },
+  persistentDamageReveal: { ...StyleSheet.absoluteFillObject, opacity: 1 },
   combatPreloader: { position: "absolute", left: 0, top: 0, width: 192, height: 192, opacity: 0.001, overflow: "hidden" },
   combatPreloadImage: { position: "absolute", width: 192, height: 192 },
   starsHud: {
@@ -734,6 +762,7 @@ const styles = StyleSheet.create({
     zIndex: 20,
     alignItems: "center",
   },
+  pointsBadgePressed: { opacity: 0.76, transform: [{ scale: 0.97 }] },
   homeSettingsButton: {
     position: "absolute",
     top: 18,

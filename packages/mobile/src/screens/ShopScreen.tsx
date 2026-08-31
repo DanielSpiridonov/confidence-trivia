@@ -22,12 +22,12 @@ const COSMETICS: Record<Exclude<ShopTab, "stars" | "inventory">, CosmeticItem[]>
     { id: "living_globe", image: require("../../assets/avatar-thumbnails/globe.png"), name: "Living Globe", free: true },
   ],
   frames: [
-    { id: "bronze", icon: "◈", name: "Bronze Edge", price: 150 },
-    { id: "silver", icon: "◇", name: "Silver Edge", price: 250 },
-    { id: "gold", icon: "◆", name: "Golden Edge", price: 400 },
+    { id: "water", icon: "◉", name: "Water Frame", price: 450 },
+    { id: "leaves", icon: "❧", name: "Leaves Frame", price: 450 },
+    { id: "frost", icon: "✣", name: "Frost Frame", price: 500 },
+    { id: "lightning", icon: "ϟ", name: "Lightning Frame", price: 550 },
     { id: "flame", icon: "🔥", name: "Flame Frame", price: 450 },
     { id: "ice", icon: "❄️", name: "Frozen Frame", price: 450 },
-    { id: "royal", icon: "♛", name: "Royal Frame", price: 600 },
   ],
 };
 
@@ -42,7 +42,7 @@ const STAR_PACKS: Array<{ stars: number; price: string; bonus?: string }> = [
 const SHOP_AVATAR_IMAGES = COSMETICS.avatars.flatMap((item) => item.image ? [item.image] : []);
 const customizationCache = new Map<string, { nameColorId: string; avatarId: string; frameId: string }>();
 
-export function ShopScreen({ deviceId, displayName, onBack }: { deviceId: string; displayName: string; onBack: () => void }) {
+export function ShopScreen({ deviceId, displayName, requestedTab = "featured", requestId = 0, onBack }: { deviceId: string; displayName: string; requestedTab?: ShopTab; requestId?: number; onBack: () => void }) {
   const { t } = useTranslation();
   const cachedCustomization = customizationCache.get(deviceId);
   const [tab, setTab] = React.useState<ShopTab>("featured");
@@ -53,7 +53,11 @@ export function ShopScreen({ deviceId, displayName, onBack }: { deviceId: string
   const colorRequest = React.useRef(0);
   const avatarRequest = React.useRef(0);
   const frameRequest = React.useRef(0);
-  const tabs: ShopTab[] = ["featured", "avatars", "frames", "inventory", "stars"];
+  const tabs: ShopTab[] = ["featured", "avatars", "frames", "stars"];
+
+  React.useLayoutEffect(() => {
+    setTab(requestedTab);
+  }, [requestId, requestedTab]);
 
   React.useEffect(() => {
     void getPlayerCustomization(deviceId).then((customization) => {
@@ -142,17 +146,17 @@ export function ShopScreen({ deviceId, displayName, onBack }: { deviceId: string
       </View>
       <BackIconButton label={t("common.back")} onPress={onBack} />
       <View style={styles.headerRow}>
-        <Title>{t("shop.title")}</Title>
+        <Title>{tab === "inventory" ? t("shop.tabs.inventory") : t("shop.title")}</Title>
       </View>
       <View style={styles.shopBody}>
-        <View style={styles.tabRail}>
+        {tab !== "inventory" ? <View style={styles.tabRail}>
           {tabs.map((item) => (
             <Pressable key={item} onPress={() => setTab(item)} style={[styles.tab, tab === item && styles.tabSelected]}>
               <Text style={styles.tabIcon}>{item === "featured" ? "★" : item === "avatars" ? "☺" : item === "frames" ? "▣" : item === "inventory" ? "▤" : "✦"}</Text>
               <Text numberOfLines={1} style={[styles.tabText, tab === item && styles.tabTextSelected]}>{t(`shop.tabs.${item}`)}</Text>
             </Pressable>
           ))}
-        </View>
+        </View> : null}
 
         <View style={styles.catalogue}>
           <View style={styles.catalogueHeader}>
@@ -198,8 +202,10 @@ export function ShopScreen({ deviceId, displayName, onBack }: { deviceId: string
             <FlatList key={`cosmetics-${tab}`} data={COSMETICS[tab]} numColumns={3} keyExtractor={(item) => item.id} columnWrapperStyle={styles.cosmeticRow} contentContainerStyle={styles.cosmeticList} showsVerticalScrollIndicator={false} renderItem={({ item }) => (
               <Pressable onPress={() => item.color ? void equipColor(item.id) : item.image ? void equipPlayerAvatar(item.id) : tab === "frames" ? void equipPlayerFrame(item.id) : undefined} style={[styles.cosmeticCard, (item.id === equippedNameColorId || item.id === equippedAvatarId || item.id === equippedFrameId) && styles.cosmeticCardEquipped, tab === "frames" ? { borderColor: FRAME_COSMETIC_COLORS[item.id as keyof typeof FRAME_COSMETIC_COLORS], borderWidth: item.id === equippedFrameId ? 3 : 2 } : null]}>
                 {item.tag ? <Text style={styles.itemTag}>{item.tag}</Text> : null}
-                {item.image ? <Image source={item.image} fadeDuration={0} resizeMode="contain" style={styles.avatarImage} /> : <Text style={[styles.cosmeticIcon, item.color || tab === "frames" ? { color: item.color ?? FRAME_COSMETIC_COLORS[item.id as keyof typeof FRAME_COSMETIC_COLORS], textShadowColor: "rgba(0,0,0,0.8)", textShadowRadius: 2 } : null]}>{item.icon}</Text>}
-                <Text numberOfLines={1} style={[styles.cosmeticName, item.color ? { color: item.color, textTransform: "capitalize" } : null]}>{item.color ? t(`shop.nameColors.${item.id}`) : item.image ? t(`shop.avatarNames.${item.id}`) : item.name}</Text>
+                {item.color ? (
+                  <Text style={[styles.cosmeticIcon, { color: item.color, textShadowColor: "rgba(0,0,0,0.8)", textShadowRadius: 2 }]}>{item.icon}</Text>
+                ) : item.image ? <Image source={item.image} fadeDuration={0} resizeMode="contain" style={styles.avatarImage} /> : <Text style={[styles.cosmeticIcon, tab === "frames" ? { color: FRAME_COSMETIC_COLORS[item.id as keyof typeof FRAME_COSMETIC_COLORS], textShadowColor: "rgba(0,0,0,0.8)", textShadowRadius: 2 } : null]}>{item.icon}</Text>}
+                <Text numberOfLines={1} adjustsFontSizeToFit={Boolean(item.color)} minimumFontScale={0.7} style={[styles.cosmeticName, item.color ? { color: item.color } : null]}>{item.color ? (displayName || t("ranked.player")) : item.image ? t(`shop.avatarNames.${item.id}`) : item.name}</Text>
                 {item.color ? <Text style={[styles.equipState, item.id === equippedNameColorId && styles.equippedState]}>{item.id === equippedNameColorId ? t("shop.equipped") : equippingIds.has(item.id) ? t("shop.equipping") : t("shop.free")}</Text> : item.image ? <Text style={[styles.equipState, item.id === equippedAvatarId && styles.equippedState]}>{item.id === equippedAvatarId ? t("shop.equipped") : equippingIds.has(item.id) ? t("shop.equipping") : t("shop.free")}</Text> : tab === "frames" ? <Text style={[styles.equipState, item.id === equippedFrameId && styles.equippedState]}>{item.id === equippedFrameId ? t("shop.equipped") : equippingIds.has(item.id) ? t("shop.equipping") : t("shop.free")}</Text> : item.free ? <Text style={styles.freeItem}>{t("shop.freeItem")}</Text> : <View style={styles.priceRow}><PointsIcon size={14} /><Text style={styles.price}>{item.price}</Text></View>}
               </Pressable>
             )} />

@@ -8,7 +8,7 @@ import { PhaseTimer } from "../components/PhaseTimer";
 import { LeaderboardStrip } from "./LeaderboardScreen";
 import { DamageHud } from "../components/DamageHud";
 
-const DAMAGE_AVATARS: Record<string, ImageSourcePropType> = {
+const FULL_DAMAGE_AVATARS: Record<string, ImageSourcePropType> = {
   smart_owl: require("../../assets/avatars/smart-owl.png"),
   clever_fox: require("../../assets/avatars/fox.png"),
   quiz_bot: require("../../assets/avatars/quiz-bot.png"),
@@ -17,14 +17,37 @@ const DAMAGE_AVATARS: Record<string, ImageSourcePropType> = {
   detective_avatar: require("../../assets/avatars/detective.png"),
   living_globe: require("../../assets/avatars/globe.png"),
 };
-const QUIZ_BOT_CALCULATOR: ImageSourcePropType = require("../../assets/combat/quiz-bot-calculator.png");
-const SMART_OWL_BOOK: ImageSourcePropType = require("../../assets/combat/smart-owl-book.png");
+const IOS_DAMAGE_AVATARS: Record<string, ImageSourcePropType> = {
+  smart_owl: require("../../assets/combat-ios/smart-owl.png"),
+  clever_fox: require("../../assets/combat-ios/fox.png"),
+  quiz_bot: require("../../assets/combat-ios/quiz-bot.png"),
+  omniscient_avatar: require("../../assets/combat-ios/omniscient.png"),
+  trivia_wizard: require("../../assets/combat-ios/trivia-wizard.png"),
+  detective_avatar: require("../../assets/combat-ios/detective.png"),
+  living_globe: require("../../assets/combat-ios/globe.png"),
+};
+const DAMAGE_AVATARS = Platform.OS === "ios" ? IOS_DAMAGE_AVATARS : FULL_DAMAGE_AVATARS;
+const DAMAGE_AVATAR_PLACEHOLDERS: Record<string, number> = {
+  smart_owl: require("../../assets/avatar-thumbnails/smart-owl.png"),
+  clever_fox: require("../../assets/avatar-thumbnails/fox.png"),
+  quiz_bot: require("../../assets/avatar-thumbnails/quiz-bot.png"),
+  omniscient_avatar: require("../../assets/avatar-thumbnails/omniscient.png"),
+  trivia_wizard: require("../../assets/avatar-thumbnails/trivia-wizard.png"),
+  detective_avatar: require("../../assets/avatar-thumbnails/detective.png"),
+  living_globe: require("../../assets/avatar-thumbnails/globe.png"),
+};
+const QUIZ_BOT_CALCULATOR: ImageSourcePropType = Platform.OS === "ios"
+  ? require("../../assets/combat-ios/quiz-bot-calculator.png")
+  : require("../../assets/combat/quiz-bot-calculator.png");
+const SMART_OWL_BOOK: ImageSourcePropType = Platform.OS === "ios"
+  ? require("../../assets/combat-ios/smart-owl-book.png")
+  : require("../../assets/combat/smart-owl-book.png");
 const PROJECTILE_BY_AVATAR: Record<string, ImageSourcePropType> = {
   quiz_bot: QUIZ_BOT_CALCULATOR,
   smart_owl: SMART_OWL_BOOK,
 };
 
-export function RevealScreen({ room }: { room: Room }) {
+export function RevealScreen({ room, active = true }: { room: Room; active?: boolean }) {
   const { t } = useTranslation();
   const state = useRoomState<any>(room);
   if (!state) return null;
@@ -52,7 +75,7 @@ export function RevealScreen({ room }: { room: Room }) {
           <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={styles.damageCorrectAnswerText}>{state.correctAnswerText}</Text>
         </View>
         <View style={styles.damageBattleStage}>
-          <DamageAvatarPane state={state} results={results} myPlayerId={room.sessionId} />
+          <DamageAvatarPane state={state} results={results} myPlayerId={room.sessionId} active={active} />
           {mutualCorrectDraw ? (
             <View pointerEvents="none" style={styles.damageDrawBanner}>
               <Text style={styles.damageDrawTitle}>{t("damage.draw")}</Text>
@@ -213,7 +236,7 @@ export function RevealScreen({ room }: { room: Room }) {
   );
 }
 
-function DamageAvatarPane({ state, results, myPlayerId }: { state: any; results: any[]; myPlayerId: string }) {
+function DamageAvatarPane({ state, results, myPlayerId, active }: { state: any; results: any[]; myPlayerId: string; active: boolean }) {
   const [showHit, setShowHit] = React.useState(false);
   const hitEndRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const allPlayers = [...state.players.values()] as any[];
@@ -230,13 +253,14 @@ function DamageAvatarPane({ state, results, myPlayerId }: { state: any; results:
   }, []);
 
   React.useEffect(() => {
+    if (!active) return;
     if (projectileAttack) return;
     const hitStart = setTimeout(triggerImpact, 420);
     return () => {
       clearTimeout(hitStart);
       if (hitEndRef.current) clearTimeout(hitEndRef.current);
     };
-  }, [projectileAttack, triggerImpact]);
+  }, [active, projectileAttack, triggerImpact]);
 
   return (
       <View style={styles.damageAvatarPane}>
@@ -249,6 +273,8 @@ function DamageAvatarPane({ state, results, myPlayerId }: { state: any; results:
             <DamageFighter key={player.id} isHit={isHit}>
               <Image
                 source={DAMAGE_AVATARS[player.avatarId] ?? DAMAGE_AVATARS.smart_owl}
+                defaultSource={DAMAGE_AVATAR_PLACEHOLDERS[player.avatarId] ?? DAMAGE_AVATAR_PLACEHOLDERS.smart_owl}
+                fadeDuration={0}
                 resizeMode="contain"
                 style={[styles.damageAvatar, index === 1 && styles.damageAvatarFacingLeft]}
               />
@@ -258,24 +284,24 @@ function DamageAvatarPane({ state, results, myPlayerId }: { state: any; results:
             </DamageFighter>
           );
         })}
-        <AvatarProjectile players={players} results={results} onImpact={triggerImpact} />
+        <AvatarProjectile players={players} results={results} active={active} onImpact={triggerImpact} />
         <Text style={styles.damageVersus}>VS</Text>
       </View>
   );
 }
 
-function AvatarProjectile({ players, results, onImpact }: { players: any[]; results: any[]; onImpact: () => void }) {
+function AvatarProjectile({ players, results, active, onImpact }: { players: any[]; results: any[]; active: boolean; onImpact: () => void }) {
   const progress = React.useRef(new Animated.Value(0)).current;
   const [loaded, setLoaded] = React.useState(false);
   const attackerIndex = players.findIndex((player) => PROJECTILE_BY_AVATAR[player.avatarId] && (results.find((result: any) => result.playerId === player.id)?.damageDealt ?? 0) > 0);
 
   React.useEffect(() => {
-    if (attackerIndex < 0 || !loaded) return;
+    if (!active || attackerIndex < 0 || !loaded) return;
     progress.setValue(0);
     Animated.timing(progress, { toValue: 1, duration: 1_150, delay: 550, useNativeDriver: true }).start(({ finished }) => {
       if (finished) onImpact();
     });
-  }, [attackerIndex, loaded, onImpact, progress]);
+  }, [active, attackerIndex, loaded, onImpact, progress]);
 
   if (attackerIndex < 0) return null;
   const direction = attackerIndex === 1 ? -1 : 1;

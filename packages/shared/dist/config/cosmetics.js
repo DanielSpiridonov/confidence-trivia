@@ -24,15 +24,15 @@ exports.AVATAR_COSMETIC_IDS = [
     "living_globe",
 ];
 exports.DEFAULT_AVATAR_ID = exports.AVATAR_COSMETIC_IDS[0];
-exports.FRAME_COSMETIC_IDS = ["bronze", "silver", "gold", "flame", "ice", "royal"];
+exports.FRAME_COSMETIC_IDS = ["flame", "water", "leaves", "frost", "lightning", "ice"];
 exports.DEFAULT_FRAME_ID = "";
 exports.FRAME_COSMETIC_COLORS = {
-    bronze: "#CD7F32",
-    silver: "#C7D0DA",
-    gold: "#F7D85B",
     flame: "#FF6542",
+    water: "#55D9FF",
+    leaves: "#73D85B",
+    frost: "#C9F5FF",
+    lightning: "#FFE75C",
     ice: "#65D9FF",
-    royal: "#B887FF",
 };
 function getNameColorCosmetic(id) {
     return exports.NAME_COLOR_COSMETICS.find((item) => item.id === id) ?? null;
