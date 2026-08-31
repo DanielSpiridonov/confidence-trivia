@@ -67,6 +67,7 @@ export class RoomStateSchema extends Schema {
   @type("boolean") isPublic: boolean = false;
   @type("number") damageWager: number = 0;
   @type("number") damagePot: number = 0;
+  @type("number") pendingDamageBonus: number = 0;
   @type({ map: PlayerSchema }) players = new MapSchema<PlayerSchema>();
 
   @type("number") currentRoundIndex: number = 0; // 0-based

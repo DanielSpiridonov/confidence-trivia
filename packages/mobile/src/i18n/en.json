@@ -112,7 +112,9 @@
     "shieldReady": "Shield ready",
     "ready": "Ready",
     "notReady": "Not Ready",
-    "streak": "Streak {{count}}/3"
+    "streak": "Streak {{count}}/3",
+    "draw": "DRAW",
+    "potActivated": "Damage pot activated · Next hit +{{amount}}"
   },
   "board": {
     "title": "Side Bet",

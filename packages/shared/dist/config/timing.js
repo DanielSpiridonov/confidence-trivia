@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.RECONNECT_GRACE_MS = exports.DEFAULT_ROUND_COUNT = exports.GAME_START_COUNTDOWN_MS = exports.SIDEBET_ALL_DECIDED_COUNTDOWN_MS = exports.CONFIDENCE_ALL_DECIDED_COUNTDOWN_MS = exports.QUESTION_ALL_ANSWERED_COUNTDOWN_MS = exports.PHASE_DURATIONS_MS = void 0;
+exports.RECONNECT_GRACE_MS = exports.DEFAULT_ROUND_COUNT = exports.DAMAGE_REVEAL_DURATION_MS = exports.GAME_START_COUNTDOWN_MS = exports.SIDEBET_ALL_DECIDED_COUNTDOWN_MS = exports.CONFIDENCE_ALL_DECIDED_COUNTDOWN_MS = exports.QUESTION_ALL_ANSWERED_COUNTDOWN_MS = exports.PHASE_DURATIONS_MS = void 0;
 /**
  * All round-phase durations in milliseconds. The server is authoritative —
  * these values determine when the server advances the phase; clients only
@@ -16,6 +16,7 @@ exports.QUESTION_ALL_ANSWERED_COUNTDOWN_MS = 3000;
 exports.CONFIDENCE_ALL_DECIDED_COUNTDOWN_MS = 5000;
 exports.SIDEBET_ALL_DECIDED_COUNTDOWN_MS = 5000;
 exports.GAME_START_COUNTDOWN_MS = 3000;
+exports.DAMAGE_REVEAL_DURATION_MS = 4000;
 exports.DEFAULT_ROUND_COUNT = 10;
 /** Grace period before a disconnected player is treated as unresponsive
  * for the current round (their answer/confidence/sidebet stays "no answer"

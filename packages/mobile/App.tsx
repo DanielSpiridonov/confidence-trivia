@@ -35,6 +35,19 @@ const HAPTICS_STORAGE_KEY = "confidence-trivia:haptics-enabled";
 const HIGH_CONTRAST_STORAGE_KEY = "confidence-trivia:high-contrast-enabled";
 const RECENT_QUESTIONS_STORAGE_KEY = "confidence-trivia:recent-question-ids";
 const RECENT_QUESTION_LIMIT = 40;
+const UI_PRELOAD_IMAGES = [
+  require("./assets/avatar-thumbnails/smart-owl.png"),
+  require("./assets/avatar-thumbnails/fox.png"),
+  require("./assets/avatar-thumbnails/quiz-bot.png"),
+  require("./assets/avatar-thumbnails/omniscient.png"),
+  require("./assets/avatar-thumbnails/trivia-wizard.png"),
+  require("./assets/avatar-thumbnails/detective.png"),
+  require("./assets/avatar-thumbnails/globe.png"),
+  require("./assets/popup-platform.png"),
+  require("./assets/stars-gift.png"),
+  require("./assets/ui-thumbnails/gift-opened.png"),
+  require("./assets/ui-thumbnails/trophy.png"),
+] as const;
 const COMBAT_PRELOAD_IMAGES = [
   require("./assets/avatars/smart-owl.png"),
   require("./assets/avatars/fox.png"),
@@ -47,10 +60,18 @@ const COMBAT_PRELOAD_IMAGES = [
   require("./assets/combat/smart-owl-book.png"),
 ] as const;
 
-function CombatAssetPreloader() {
+function AssetPreloader({ sources, onReady }: { sources: readonly number[]; onReady?: () => void }) {
+  const loaded = useRef(new Set<number>());
+
+  const handleLoadEnd = (index: number) => {
+    if (loaded.current.has(index)) return;
+    loaded.current.add(index);
+    if (loaded.current.size === sources.length) onReady?.();
+  };
+
   return (
     <View pointerEvents="none" style={styles.combatPreloader}>
-      {COMBAT_PRELOAD_IMAGES.map((source, index) => <Image key={index} source={source} fadeDuration={0} style={styles.combatPreloadImage} />)}
+      {sources.map((source, index) => <Image key={index} source={source} fadeDuration={0} onLoadEnd={() => handleLoadEnd(index)} style={styles.combatPreloadImage} />)}
     </View>
   );
 }
@@ -114,6 +135,7 @@ export default function App() {
   const [room, setRoom] = useState<Room | null>(null);
   const [locale, setLocale] = useState<"en" | "bg">("en");
   const [localeReady, setLocaleReady] = useState(false);
+  const [uiImagesReady, setUiImagesReady] = useState(false);
   const [soundEffectsVolume, setSoundEffectsVolumeState] = useState(1);
   const [musicVolume, setMusicVolume] = useState(0.5);
   const [defaultPlayerName, setDefaultPlayerName] = useState("");
@@ -409,9 +431,10 @@ export default function App() {
     };
   }, [room]);
 
-  if (!localeReady) {
+  if (!localeReady || !uiImagesReady) {
     return (
       <AppFrame highContrast={highContrastEnabled}>
+        <AssetPreloader sources={UI_PRELOAD_IMAGES} onReady={() => setUiImagesReady(true)} />
         <View style={styles.loadingRoot} />
       </AppFrame>
     );
@@ -419,8 +442,29 @@ export default function App() {
 
   return (
     <AppFrame highContrast={highContrastEnabled}>
-      <CombatAssetPreloader />
+      <AssetPreloader sources={UI_PRELOAD_IMAGES} />
+      <AssetPreloader sources={COMBAT_PRELOAD_IMAGES} />
       <StatusBar style="light" />
+      <View pointerEvents={nav === "home" ? "auto" : "none"} style={[styles.persistentScreen, nav !== "home" && styles.persistentScreenHidden]}>
+        <HomeScreen
+          onCreate={() => setNav("create")}
+          onJoin={() => setNav("join")}
+          onProfile={() => {}}
+          deviceId={deviceId}
+          onRanked={() => setNav("ranked")}
+          onShop={() => setNav("shop")}
+          dailyReward={dailyReward}
+          dailyRewardClaiming={dailyRewardClaiming}
+          dailyRewardCelebration={dailyRewardCelebration}
+          onDailyRewardCelebrationShown={() => setDailyRewardCelebration(null)}
+          onClaimDailyReward={() => void handleClaimDailyReward()}
+        />
+      </View>
+      {deviceId ? (
+        <View pointerEvents={nav === "shop" ? "auto" : "none"} style={[styles.persistentScreen, nav !== "shop" && styles.persistentScreenHidden]}>
+          <ShopScreen deviceId={deviceId} displayName={defaultPlayerName} onBack={() => setNav("home")} />
+        </View>
+      ) : null}
       {nav === "in-room" && room ? (
         <InRoomRouter
           room={room}
@@ -438,21 +482,6 @@ export default function App() {
         />
       ) : (
         <>
-          {nav === "home" && (
-            <HomeScreen
-              onCreate={() => setNav("create")}
-              onJoin={() => setNav("join")}
-              onProfile={() => {}}
-              deviceId={deviceId}
-                onRanked={() => setNav("ranked")}
-                onShop={() => setNav("shop")}
-              dailyReward={dailyReward}
-              dailyRewardClaiming={dailyRewardClaiming}
-              dailyRewardCelebration={dailyRewardCelebration}
-              onDailyRewardCelebrationShown={() => setDailyRewardCelebration(null)}
-              onClaimDailyReward={() => void handleClaimDailyReward()}
-            />
-          )}
           {nav === "create" && deviceId ? <CreateGameScreen onCreate={handleCreate} locale={locale} deviceId={deviceId} initialName={defaultPlayerName} onBack={() => setNav("home")} /> : null}
           {nav === "join" && <JoinGameScreen onJoin={handleJoin} onJoinPublic={handleJoinPublic} initialName={defaultPlayerName} onBack={() => setNav("home")} />}
           {nav === "ranked" && deviceId ? (
@@ -461,7 +490,6 @@ export default function App() {
               onBack={() => setNav("home")}
             />
           ) : null}
-          {nav === "shop" && deviceId ? <ShopScreen deviceId={deviceId} displayName={defaultPlayerName} onBack={() => setNav("home")} /> : null}
           {nav === "settings" && (
             <SettingsScreen
               locale={locale}
@@ -695,8 +723,10 @@ const styles = StyleSheet.create({
   appContent: {
     flex: 1,
   },
-  combatPreloader: { position: "absolute", left: -200, top: 0, width: 70, height: 70, opacity: 0.01, overflow: "hidden" },
-  combatPreloadImage: { position: "absolute", width: 64, height: 64 },
+  persistentScreen: { ...StyleSheet.absoluteFillObject, opacity: 1 },
+  persistentScreenHidden: { opacity: 0 },
+  combatPreloader: { position: "absolute", left: 0, top: 0, width: 192, height: 192, opacity: 0.001, overflow: "hidden" },
+  combatPreloadImage: { position: "absolute", width: 192, height: 192 },
   starsHud: {
     position: "absolute",
     top: 18,

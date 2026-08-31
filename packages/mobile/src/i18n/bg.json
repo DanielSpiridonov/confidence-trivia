@@ -112,7 +112,9 @@
     "shieldReady": "Щитът е готов",
     "ready": "Готов",
     "notReady": "Не е готов",
-    "streak": "Серия {{count}}/3"
+    "streak": "Серия {{count}}/3",
+    "draw": "РАВЕНСТВО",
+    "potActivated": "Бонус щети · Следващ удар +{{amount}}"
   },
   "board": {
     "title": "Страничен залог",

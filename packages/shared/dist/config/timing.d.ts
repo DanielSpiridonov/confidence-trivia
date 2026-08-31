@@ -13,6 +13,7 @@ export declare const QUESTION_ALL_ANSWERED_COUNTDOWN_MS = 3000;
 export declare const CONFIDENCE_ALL_DECIDED_COUNTDOWN_MS = 5000;
 export declare const SIDEBET_ALL_DECIDED_COUNTDOWN_MS = 5000;
 export declare const GAME_START_COUNTDOWN_MS = 3000;
+export declare const DAMAGE_REVEAL_DURATION_MS = 4000;
 export declare const DEFAULT_ROUND_COUNT = 10;
 /** Grace period before a disconnected player is treated as unresponsive
  * for the current round (their answer/confidence/sidebet stays "no answer"

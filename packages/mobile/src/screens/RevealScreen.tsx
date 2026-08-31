@@ -43,6 +43,7 @@ export function RevealScreen({ room }: { room: Room }) {
   const isClosestAnswerReveal = state.currentQuestion?.qType === "closest_answer";
 
   if (state.gameMode === "damage") {
+    const mutualCorrectDraw = results.length === 2 && results.every((result: any) => result.correct && (result.damageDealt ?? 0) === 0);
     return (
       <Screen style={styles.damageTransitionScreen} androidScale={ANDROID_GAME_UI_SCALE}>
         <DamageHud state={state} myPlayerId={room.sessionId} />
@@ -52,6 +53,12 @@ export function RevealScreen({ room }: { room: Room }) {
         </View>
         <View style={styles.damageBattleStage}>
           <DamageAvatarPane state={state} results={results} myPlayerId={room.sessionId} />
+          {mutualCorrectDraw ? (
+            <View pointerEvents="none" style={styles.damageDrawBanner}>
+              <Text style={styles.damageDrawTitle}>{t("damage.draw")}</Text>
+              <Text style={styles.damageDrawSubtitle}>{t("damage.potActivated", { amount: state.pendingDamageBonus ?? 1 })}</Text>
+            </View>
+          ) : null}
         </View>
       </Screen>
     );
@@ -335,6 +342,9 @@ const styles = StyleSheet.create({
   quizBotProjectileRight: { right: "24%" },
   damagePlayerAnswer: { width: "94%", minHeight: 25, color: theme.text, fontSize: 12, lineHeight: 14, fontWeight: "800", textAlign: "center", paddingHorizontal: 4 },
   damageVersus: { position: "absolute", left: "42%", top: "45%", width: "16%", textAlign: "center", color: "#F7D85B", fontSize: 14, fontWeight: "900", zIndex: 4 },
+  damageDrawBanner: { position: "absolute", left: "28%", right: "28%", top: "28%", zIndex: 8, alignItems: "center", justifyContent: "center", borderRadius: 12, borderWidth: 2, borderColor: "#F7D85B", backgroundColor: "rgba(24, 18, 40, 0.94)", paddingHorizontal: 14, paddingVertical: 10 },
+  damageDrawTitle: { color: "#FFFFFF", fontSize: 28, lineHeight: 31, fontWeight: "900", textAlign: "center" },
+  damageDrawSubtitle: { color: "#F7D85B", fontSize: 12, lineHeight: 15, fontWeight: "900", textAlign: "center", textTransform: "uppercase", marginTop: 3 },
   closestScreen: { justifyContent: "flex-start", paddingTop: 14 },
   revealBody: {
     flex: 1,

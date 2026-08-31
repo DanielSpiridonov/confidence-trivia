@@ -6,6 +6,7 @@ import {
   CONFIDENCE_ALL_DECIDED_COUNTDOWN_MS,
   SIDEBET_ALL_DECIDED_COUNTDOWN_MS,
   GAME_START_COUNTDOWN_MS,
+  DAMAGE_REVEAL_DURATION_MS,
   DEFAULT_ROUND_COUNT,
   MIN_PLAYERS_TO_START,
   RECONNECT_GRACE_MS,
@@ -366,7 +367,7 @@ export class GameRoom extends Room<RoomStateSchema> {
         this.finalizeAnswerDrafts();
         if (this.state.gameMode === "damage") {
           this.resolveDamageRound();
-          this.setPhase("reveal", PHASE_DURATIONS_MS.reveal);
+          this.setPhase("reveal", DAMAGE_REVEAL_DURATION_MS);
           break;
         }
         this.setPhase("confidence", PHASE_DURATIONS_MS.confidence);
@@ -566,7 +567,6 @@ export class GameRoom extends Room<RoomStateSchema> {
         continue;
       }
 
-      attacks.set(player.id, damageValue);
       if (!player.shieldPending) {
         player.damageStreak += 1;
         if (player.damageStreak >= 3) {
@@ -574,6 +574,15 @@ export class GameRoom extends Room<RoomStateSchema> {
           player.damageStreak = 0;
         }
       }
+    }
+
+    const correctPlayers = [...this.state.players.values()].filter((player) => correctness.get(player.id));
+    const isMutualCorrectDraw = this.state.players.size === 2 && correctPlayers.length === 2;
+    if (isMutualCorrectDraw) {
+      this.state.pendingDamageBonus += 1;
+    } else if (correctPlayers.length === 1) {
+      attacks.set(correctPlayers[0].id, damageValue + this.state.pendingDamageBonus);
+      this.state.pendingDamageBonus = 0;
     }
 
     for (const attacker of this.state.players.values()) {
@@ -599,7 +608,9 @@ export class GameRoom extends Room<RoomStateSchema> {
       entry.damageDealt = attacks.get(player.id) ?? 0;
       entry.shieldGained = 0;
       entry.newStreak = player.damageStreak;
-      entry.detail = entry.correct ? `Damage ${entry.damageDealt}` : "No damage";
+      entry.detail = isMutualCorrectDraw
+        ? `Draw; next hit bonus +${this.state.pendingDamageBonus}`
+        : entry.correct ? `Damage ${entry.damageDealt}` : "No damage";
       this.state.revealResults.push(entry);
     }
 

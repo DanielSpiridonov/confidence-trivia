@@ -320,7 +320,7 @@ class GameRoom extends colyseus_1.Room {
                 this.finalizeAnswerDrafts();
                 if (this.state.gameMode === "damage") {
                     this.resolveDamageRound();
-                    this.setPhase("reveal", shared_1.PHASE_DURATIONS_MS.reveal);
+                    this.setPhase("reveal", shared_1.DAMAGE_REVEAL_DURATION_MS);
                     break;
                 }
                 this.setPhase("confidence", shared_1.PHASE_DURATIONS_MS.confidence);
@@ -520,7 +520,6 @@ class GameRoom extends colyseus_1.Room {
                     player.damageStreak = 0;
                 continue;
             }
-            attacks.set(player.id, damageValue);
             if (!player.shieldPending) {
                 player.damageStreak += 1;
                 if (player.damageStreak >= 3) {
@@ -528,6 +527,15 @@ class GameRoom extends colyseus_1.Room {
                     player.damageStreak = 0;
                 }
             }
+        }
+        const correctPlayers = [...this.state.players.values()].filter((player) => correctness.get(player.id));
+        const isMutualCorrectDraw = this.state.players.size === 2 && correctPlayers.length === 2;
+        if (isMutualCorrectDraw) {
+            this.state.pendingDamageBonus += 1;
+        }
+        else if (correctPlayers.length === 1) {
+            attacks.set(correctPlayers[0].id, damageValue + this.state.pendingDamageBonus);
+            this.state.pendingDamageBonus = 0;
         }
         for (const attacker of this.state.players.values()) {
             const damage = attacks.get(attacker.id) ?? 0;
@@ -555,7 +563,9 @@ class GameRoom extends colyseus_1.Room {
             entry.damageDealt = attacks.get(player.id) ?? 0;
             entry.shieldGained = 0;
             entry.newStreak = player.damageStreak;
-            entry.detail = entry.correct ? `Damage ${entry.damageDealt}` : "No damage";
+            entry.detail = isMutualCorrectDraw
+                ? `Draw; next hit bonus +${this.state.pendingDamageBonus}`
+                : entry.correct ? `Damage ${entry.damageDealt}` : "No damage";
             this.state.revealResults.push(entry);
         }
         this.state.correctAnswerText = (0, questions_1.localizeAnswer)(record, this.locale, correctAnswer);

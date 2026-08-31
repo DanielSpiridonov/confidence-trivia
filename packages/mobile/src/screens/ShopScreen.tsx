@@ -13,13 +13,13 @@ type CosmeticItem = { id: string; icon?: string; image?: ImageSourcePropType; na
 const COSMETICS: Record<Exclude<ShopTab, "stars" | "inventory">, CosmeticItem[]> = {
   featured: NAME_COLOR_COSMETICS.map((item) => ({ id: item.id, icon: "●", name: item.id.replace("name_", ""), color: item.color })),
   avatars: [
-    { id: "smart_owl", image: require("../../assets/avatars/smart-owl.png"), name: "Smart Owl", free: true },
-    { id: "clever_fox", image: require("../../assets/avatars/fox.png"), name: "Clever Fox", free: true },
-    { id: "quiz_bot", image: require("../../assets/avatars/quiz-bot.png"), name: "Quiz Bot", free: true },
-    { id: "omniscient_avatar", image: require("../../assets/avatars/omniscient.png"), name: "Omniscient", free: true },
-    { id: "trivia_wizard", image: require("../../assets/avatars/trivia-wizard.png"), name: "Trivia Wizard", free: true },
-    { id: "detective_avatar", image: require("../../assets/avatars/detective.png"), name: "Detective", free: true },
-    { id: "living_globe", image: require("../../assets/avatars/globe.png"), name: "Living Globe", free: true },
+    { id: "smart_owl", image: require("../../assets/avatar-thumbnails/smart-owl.png"), name: "Smart Owl", free: true },
+    { id: "clever_fox", image: require("../../assets/avatar-thumbnails/fox.png"), name: "Clever Fox", free: true },
+    { id: "quiz_bot", image: require("../../assets/avatar-thumbnails/quiz-bot.png"), name: "Quiz Bot", free: true },
+    { id: "omniscient_avatar", image: require("../../assets/avatar-thumbnails/omniscient.png"), name: "Omniscient", free: true },
+    { id: "trivia_wizard", image: require("../../assets/avatar-thumbnails/trivia-wizard.png"), name: "Trivia Wizard", free: true },
+    { id: "detective_avatar", image: require("../../assets/avatar-thumbnails/detective.png"), name: "Detective", free: true },
+    { id: "living_globe", image: require("../../assets/avatar-thumbnails/globe.png"), name: "Living Globe", free: true },
   ],
   frames: [
     { id: "bronze", icon: "◈", name: "Bronze Edge", price: 150 },
@@ -159,7 +159,16 @@ export function ShopScreen({ deviceId, displayName, onBack }: { deviceId: string
             <Text style={styles.sectionTitle}>{t(`shop.tabs.${tab}`)}</Text>
             <Text style={styles.previewBadge}>{tab === "featured" ? t("shop.nameColorsFree") : tab === "inventory" ? t("shop.ownedItems") : tab === "frames" ? t("shop.playerBordersPreview") : t("shop.previewOnly")}</Text>
           </View>
-          {tab === "stars" ? (
+          <View pointerEvents={tab === "avatars" ? "auto" : "none"} style={[styles.persistentAvatarCatalogue, tab !== "avatars" && styles.persistentCatalogueHidden]}>
+            <FlatList data={COSMETICS.avatars} numColumns={3} keyExtractor={(item) => item.id} columnWrapperStyle={styles.cosmeticRow} contentContainerStyle={styles.cosmeticList} showsVerticalScrollIndicator={false} renderItem={({ item }) => (
+              <Pressable onPress={() => void equipPlayerAvatar(item.id)} style={[styles.cosmeticCard, item.id === equippedAvatarId && styles.cosmeticCardEquipped]}>
+                <Image source={item.image} fadeDuration={0} resizeMode="contain" style={styles.avatarImage} />
+                <Text numberOfLines={1} style={styles.cosmeticName}>{t(`shop.avatarNames.${item.id}`)}</Text>
+                <Text style={[styles.equipState, item.id === equippedAvatarId && styles.equippedState]}>{item.id === equippedAvatarId ? t("shop.equipped") : equippingIds.has(item.id) ? t("shop.equipping") : t("shop.free")}</Text>
+              </Pressable>
+            )} />
+          </View>
+          {tab === "avatars" ? null : tab === "stars" ? (
             <FlatList key="star-packs" horizontal data={STAR_PACKS} keyExtractor={(item) => String(item.stars)} contentContainerStyle={styles.packList} showsHorizontalScrollIndicator={false} renderItem={({ item }) => (
               <View style={[styles.starPack, item.stars === 7000 && styles.starPackBest]}>
                 {item.bonus ? <Text style={styles.packBonus}>{item.bonus}</Text> : null}
@@ -189,7 +198,7 @@ export function ShopScreen({ deviceId, displayName, onBack }: { deviceId: string
             <FlatList key={`cosmetics-${tab}`} data={COSMETICS[tab]} numColumns={3} keyExtractor={(item) => item.id} columnWrapperStyle={styles.cosmeticRow} contentContainerStyle={styles.cosmeticList} showsVerticalScrollIndicator={false} renderItem={({ item }) => (
               <Pressable onPress={() => item.color ? void equipColor(item.id) : item.image ? void equipPlayerAvatar(item.id) : tab === "frames" ? void equipPlayerFrame(item.id) : undefined} style={[styles.cosmeticCard, (item.id === equippedNameColorId || item.id === equippedAvatarId || item.id === equippedFrameId) && styles.cosmeticCardEquipped, tab === "frames" ? { borderColor: FRAME_COSMETIC_COLORS[item.id as keyof typeof FRAME_COSMETIC_COLORS], borderWidth: item.id === equippedFrameId ? 3 : 2 } : null]}>
                 {item.tag ? <Text style={styles.itemTag}>{item.tag}</Text> : null}
-                {item.image ? <Image source={item.image} resizeMode="contain" style={styles.avatarImage} /> : <Text style={[styles.cosmeticIcon, item.color || tab === "frames" ? { color: item.color ?? FRAME_COSMETIC_COLORS[item.id as keyof typeof FRAME_COSMETIC_COLORS], textShadowColor: "rgba(0,0,0,0.8)", textShadowRadius: 2 } : null]}>{item.icon}</Text>}
+                {item.image ? <Image source={item.image} fadeDuration={0} resizeMode="contain" style={styles.avatarImage} /> : <Text style={[styles.cosmeticIcon, item.color || tab === "frames" ? { color: item.color ?? FRAME_COSMETIC_COLORS[item.id as keyof typeof FRAME_COSMETIC_COLORS], textShadowColor: "rgba(0,0,0,0.8)", textShadowRadius: 2 } : null]}>{item.icon}</Text>}
                 <Text numberOfLines={1} style={[styles.cosmeticName, item.color ? { color: item.color, textTransform: "capitalize" } : null]}>{item.color ? t(`shop.nameColors.${item.id}`) : item.image ? t(`shop.avatarNames.${item.id}`) : item.name}</Text>
                 {item.color ? <Text style={[styles.equipState, item.id === equippedNameColorId && styles.equippedState]}>{item.id === equippedNameColorId ? t("shop.equipped") : equippingIds.has(item.id) ? t("shop.equipping") : t("shop.free")}</Text> : item.image ? <Text style={[styles.equipState, item.id === equippedAvatarId && styles.equippedState]}>{item.id === equippedAvatarId ? t("shop.equipped") : equippingIds.has(item.id) ? t("shop.equipping") : t("shop.free")}</Text> : tab === "frames" ? <Text style={[styles.equipState, item.id === equippedFrameId && styles.equippedState]}>{item.id === equippedFrameId ? t("shop.equipped") : equippingIds.has(item.id) ? t("shop.equipping") : t("shop.free")}</Text> : item.free ? <Text style={styles.freeItem}>{t("shop.freeItem")}</Text> : <View style={styles.priceRow}><PointsIcon size={14} /><Text style={styles.price}>{item.price}</Text></View>}
               </Pressable>
@@ -206,8 +215,8 @@ function InventoryCategory({ title, children }: { title: string; children: React
 }
 
 const styles = StyleSheet.create({
-  avatarPreloader: { position: "absolute", left: -200, top: 0, width: 70, height: 70, opacity: 0.01, overflow: "hidden" },
-  preloadedAvatar: { position: "absolute", width: 64, height: 64 },
+  avatarPreloader: { position: "absolute", left: 0, top: 0, width: 192, height: 192, opacity: 0.001, overflow: "hidden" },
+  preloadedAvatar: { position: "absolute", width: 192, height: 192 },
   screen: { justifyContent: "flex-start", paddingTop: 10 },
   headerRow: { width: "100%", minHeight: 44, alignItems: "center", justifyContent: "center" },
   shopBody: { flex: 1, minHeight: 0, width: "100%", flexDirection: "row", gap: 12, marginTop: 4 },
@@ -218,6 +227,8 @@ const styles = StyleSheet.create({
   tabText: { flex: 1, color: theme.textDim, fontSize: 10, fontWeight: "800" },
   tabTextSelected: { color: theme.text },
   catalogue: { flex: 1, minWidth: 0, borderRadius: 14, backgroundColor: "rgba(31,26,51,0.88)", padding: 11 },
+  persistentAvatarCatalogue: { ...StyleSheet.absoluteFillObject, top: 43, paddingHorizontal: 11, paddingBottom: 11, opacity: 1 },
+  persistentCatalogueHidden: { opacity: 0 },
   catalogueHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 7 },
   sectionTitle: { color: theme.text, fontSize: 17, fontWeight: "900" },
   previewBadge: { color: theme.textDim, fontSize: 9, fontWeight: "800", textTransform: "uppercase" },
