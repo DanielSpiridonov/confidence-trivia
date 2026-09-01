@@ -47,6 +47,10 @@ const UI_PRELOAD_IMAGES = [
   require("./assets/stars-gift.png"),
   require("./assets/ui-thumbnails/gift-opened.png"),
   require("./assets/ui-thumbnails/trophy.png"),
+  require("./assets/ui-thumbnails/shop.png"),
+  require("./assets/shop-tabs/colors.png"),
+  require("./assets/shop-tabs/avatars.png"),
+  require("./assets/shop-tabs/frames.png"),
 ] as const;
 const FULL_COMBAT_PRELOAD_IMAGES = [
   require("./assets/avatars/smart-owl.png"),
@@ -58,6 +62,11 @@ const FULL_COMBAT_PRELOAD_IMAGES = [
   require("./assets/avatars/globe.png"),
   require("./assets/combat/quiz-bot-calculator.png"),
   require("./assets/combat/smart-owl-book.png"),
+  require("./assets/combat/fox-lightbulb.png"),
+  require("./assets/combat/omniscient-eye.png"),
+  require("./assets/combat/wizard-spell.png"),
+  require("./assets/combat/detective-magnifier.png"),
+  require("./assets/combat/globe-earth.png"),
 ] as const;
 const IOS_COMBAT_PRELOAD_IMAGES = [
   require("./assets/combat-ios/smart-owl.png"),
@@ -69,6 +78,11 @@ const IOS_COMBAT_PRELOAD_IMAGES = [
   require("./assets/combat-ios/globe.png"),
   require("./assets/combat-ios/quiz-bot-calculator.png"),
   require("./assets/combat-ios/smart-owl-book.png"),
+  require("./assets/combat-ios/fox-lightbulb.png"),
+  require("./assets/combat-ios/omniscient-eye.png"),
+  require("./assets/combat-ios/wizard-spell.png"),
+  require("./assets/combat-ios/detective-magnifier.png"),
+  require("./assets/combat-ios/globe-earth.png"),
 ] as const;
 const COMBAT_PRELOAD_IMAGES = Platform.OS === "ios" ? IOS_COMBAT_PRELOAD_IMAGES : FULL_COMBAT_PRELOAD_IMAGES;
 

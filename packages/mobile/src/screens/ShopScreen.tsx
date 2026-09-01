@@ -10,6 +10,12 @@ type ShopTab = "featured" | "avatars" | "frames" | "inventory" | "stars";
 
 type CosmeticItem = { id: string; icon?: string; image?: ImageSourcePropType; name: string; price?: number; tag?: string; color?: string; free?: boolean };
 
+const SHOP_TAB_IMAGES: Partial<Record<ShopTab, ImageSourcePropType>> = {
+  featured: require("../../assets/shop-tabs/colors.png"),
+  avatars: require("../../assets/shop-tabs/avatars.png"),
+  frames: require("../../assets/shop-tabs/frames.png"),
+};
+
 const COSMETICS: Record<Exclude<ShopTab, "stars" | "inventory">, CosmeticItem[]> = {
   featured: NAME_COLOR_COSMETICS.map((item) => ({ id: item.id, icon: "●", name: item.id.replace("name_", ""), color: item.color })),
   avatars: [
@@ -149,16 +155,18 @@ export function ShopScreen({ deviceId, displayName, requestedTab = "featured", r
         <Title>{tab === "inventory" ? t("shop.tabs.inventory") : t("shop.title")}</Title>
       </View>
       <View style={styles.shopBody}>
-        {tab !== "inventory" ? <View style={styles.tabRail}>
+        <View pointerEvents={tab === "inventory" ? "none" : "auto"} style={[styles.tabRail, tab === "inventory" && styles.tabRailHidden]}>
           {tabs.map((item) => (
             <Pressable key={item} onPress={() => setTab(item)} style={[styles.tab, tab === item && styles.tabSelected]}>
-              <Text style={styles.tabIcon}>{item === "featured" ? "★" : item === "avatars" ? "☺" : item === "frames" ? "▣" : item === "inventory" ? "▤" : "✦"}</Text>
+              <View style={styles.tabIconSlot}>
+                {item === "stars" ? <PointsIcon size={25} /> : <Image source={SHOP_TAB_IMAGES[item]} fadeDuration={0} resizeMode="contain" style={styles.tabIconImage} />}
+              </View>
               <Text numberOfLines={1} style={[styles.tabText, tab === item && styles.tabTextSelected]}>{t(`shop.tabs.${item}`)}</Text>
             </Pressable>
           ))}
-        </View> : null}
+        </View>
 
-        <View style={styles.catalogue}>
+        <View style={[styles.catalogue, tab !== "inventory" && styles.catalogueWithTabRail]}>
           <View style={styles.catalogueHeader}>
             <Text style={styles.sectionTitle}>{t(`shop.tabs.${tab}`)}</Text>
             <Text style={styles.previewBadge}>{tab === "featured" ? t("shop.nameColorsFree") : tab === "inventory" ? t("shop.ownedItems") : tab === "frames" ? t("shop.playerBordersPreview") : t("shop.previewOnly")}</Text>
@@ -225,14 +233,17 @@ const styles = StyleSheet.create({
   preloadedAvatar: { position: "absolute", width: 192, height: 192 },
   screen: { justifyContent: "flex-start", paddingTop: 10 },
   headerRow: { width: "100%", minHeight: 44, alignItems: "center", justifyContent: "center" },
-  shopBody: { flex: 1, minHeight: 0, width: "100%", flexDirection: "row", gap: 12, marginTop: 4 },
-  tabRail: { width: 112, gap: 7, justifyContent: "center" },
+  shopBody: { flex: 1, minHeight: 0, width: "100%", position: "relative", marginTop: 4 },
+  tabRail: { position: "absolute", left: 0, top: 0, bottom: 0, width: 112, gap: 7, justifyContent: "center", opacity: 1 },
+  tabRailHidden: { opacity: 0 },
   tab: { minHeight: 48, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 10, borderRadius: 10, backgroundColor: "rgba(31,26,51,0.84)", borderWidth: 1, borderColor: "rgba(185,176,214,0.16)" },
   tabSelected: { backgroundColor: "rgba(124,92,255,0.25)", borderColor: theme.primary },
-  tabIcon: { width: 18, color: "#F7D85B", fontSize: 16, fontWeight: "900", textAlign: "center" },
+  tabIconSlot: { width: 31, height: 31, alignItems: "center", justifyContent: "center" },
+  tabIconImage: { width: 31, height: 31 },
   tabText: { flex: 1, color: theme.textDim, fontSize: 10, fontWeight: "800" },
   tabTextSelected: { color: theme.text },
   catalogue: { flex: 1, minWidth: 0, borderRadius: 14, backgroundColor: "rgba(31,26,51,0.88)", padding: 11 },
+  catalogueWithTabRail: { marginLeft: 124 },
   persistentAvatarCatalogue: { ...StyleSheet.absoluteFillObject, top: 43, paddingHorizontal: 11, paddingBottom: 11, opacity: 1 },
   persistentCatalogueHidden: { opacity: 0 },
   catalogueHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 7 },

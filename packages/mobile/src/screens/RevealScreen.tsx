@@ -42,9 +42,29 @@ const QUIZ_BOT_CALCULATOR: ImageSourcePropType = Platform.OS === "ios"
 const SMART_OWL_BOOK: ImageSourcePropType = Platform.OS === "ios"
   ? require("../../assets/combat-ios/smart-owl-book.png")
   : require("../../assets/combat/smart-owl-book.png");
+const FOX_LIGHTBULB: ImageSourcePropType = Platform.OS === "ios"
+  ? require("../../assets/combat-ios/fox-lightbulb.png")
+  : require("../../assets/combat/fox-lightbulb.png");
+const OMNISCIENT_EYE: ImageSourcePropType = Platform.OS === "ios"
+  ? require("../../assets/combat-ios/omniscient-eye.png")
+  : require("../../assets/combat/omniscient-eye.png");
+const WIZARD_SPELL: ImageSourcePropType = Platform.OS === "ios"
+  ? require("../../assets/combat-ios/wizard-spell.png")
+  : require("../../assets/combat/wizard-spell.png");
+const DETECTIVE_MAGNIFIER: ImageSourcePropType = Platform.OS === "ios"
+  ? require("../../assets/combat-ios/detective-magnifier.png")
+  : require("../../assets/combat/detective-magnifier.png");
+const GLOBE_EARTH: ImageSourcePropType = Platform.OS === "ios"
+  ? require("../../assets/combat-ios/globe-earth.png")
+  : require("../../assets/combat/globe-earth.png");
 const PROJECTILE_BY_AVATAR: Record<string, ImageSourcePropType> = {
   quiz_bot: QUIZ_BOT_CALCULATOR,
   smart_owl: SMART_OWL_BOOK,
+  clever_fox: FOX_LIGHTBULB,
+  omniscient_avatar: OMNISCIENT_EYE,
+  trivia_wizard: WIZARD_SPELL,
+  detective_avatar: DETECTIVE_MAGNIFIER,
+  living_globe: GLOBE_EARTH,
 };
 
 export function RevealScreen({ room, active = true }: { room: Room; active?: boolean }) {
@@ -284,46 +304,73 @@ function DamageAvatarPane({ state, results, myPlayerId, active }: { state: any; 
             </DamageFighter>
           );
         })}
-        <AvatarProjectile players={players} results={results} active={active} onImpact={triggerImpact} />
+        <AvatarProjectile players={players} results={results} active={active} roundKey={state.currentRoundIndex} onImpact={triggerImpact} />
         <Text style={styles.damageVersus}>VS</Text>
       </View>
   );
 }
 
-function AvatarProjectile({ players, results, active, onImpact }: { players: any[]; results: any[]; active: boolean; onImpact: () => void }) {
+function AvatarProjectile({ players, results, active, roundKey, onImpact }: { players: any[]; results: any[]; active: boolean; roundKey: number; onImpact: () => void }) {
   const progress = React.useRef(new Animated.Value(0)).current;
   const [loaded, setLoaded] = React.useState(false);
   const attackerIndex = players.findIndex((player) => PROJECTILE_BY_AVATAR[player.avatarId] && (results.find((result: any) => result.playerId === player.id)?.damageDealt ?? 0) > 0);
+  const attackResult = attackerIndex >= 0 ? results.find((result: any) => result.playerId === players[attackerIndex].id) : null;
+  const isLethal = Boolean(attackResult?.lethalHit);
+  const usesDamagePot = (attackResult?.damageBonus ?? 0) > 0;
 
   React.useEffect(() => {
     if (!active || attackerIndex < 0 || !loaded) return;
     progress.setValue(0);
-    Animated.timing(progress, { toValue: 1, duration: 1_150, delay: 550, useNativeDriver: true }).start(({ finished }) => {
+    const animation = Animated.timing(progress, { toValue: 1, duration: 1_150, delay: 550, useNativeDriver: true });
+    animation.start(({ finished }) => {
       if (finished) onImpact();
     });
-  }, [active, attackerIndex, loaded, onImpact, progress]);
+    return () => animation.stop();
+  }, [active, attackerIndex, loaded, onImpact, progress, roundKey]);
 
   if (attackerIndex < 0) return null;
   const direction = attackerIndex === 1 ? -1 : 1;
+  const projectileLanes = isLethal
+    ? [
+        { y: -82, arc: -40, scale: 0.9, rotation: 620 },
+        { y: -42, arc: -68, scale: 1.12, rotation: 760 },
+        { y: 0, arc: -54, scale: 1.42, rotation: 900 },
+        { y: 42, arc: -38, scale: 1.12, rotation: 700 },
+        { y: 82, arc: -24, scale: 0.9, rotation: 580 },
+      ]
+    : usesDamagePot
+      ? [
+          { y: -62, arc: -42, scale: 0.92, rotation: 650 },
+          { y: 0, arc: -52, scale: 1, rotation: 720 },
+          { y: 62, arc: -34, scale: 0.92, rotation: 650 },
+        ]
+      : [{ y: 0, arc: -52, scale: 1, rotation: 720 }];
   return (
-    <Animated.Image
-      source={PROJECTILE_BY_AVATAR[players[attackerIndex].avatarId]}
-      onLoad={() => setLoaded(true)}
-      fadeDuration={0}
-      resizeMode="contain"
-      style={[
-        styles.quizBotProjectile,
-        attackerIndex === 1 ? styles.quizBotProjectileRight : styles.quizBotProjectileLeft,
-        {
-          opacity: loaded ? progress.interpolate({ inputRange: [0, 0.88, 1], outputRange: [1, 1, 0] }) : 0,
-          transform: [
-            { translateX: progress.interpolate({ inputRange: [0, 1], outputRange: [0, direction * 390] }) },
-            { translateY: progress.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, -52, 0] }) },
-            { rotate: progress.interpolate({ inputRange: [0, 1], outputRange: ["0deg", `${direction * 720}deg`] }) },
-          ],
-        },
-      ]}
-    />
+    <>
+      {projectileLanes.map((lane, index) => (
+        <Animated.Image
+          key={`${isLethal ? "lethal" : usesDamagePot ? "pot" : "normal"}-${index}`}
+          source={PROJECTILE_BY_AVATAR[players[attackerIndex].avatarId]}
+          onLoad={() => setLoaded(true)}
+          fadeDuration={0}
+          resizeMode="contain"
+          style={[
+            styles.quizBotProjectile,
+            attackerIndex === 1 ? styles.quizBotProjectileRight : styles.quizBotProjectileLeft,
+            {
+              marginTop: lane.y,
+              opacity: loaded ? progress.interpolate({ inputRange: [0, 0.88, 1], outputRange: [1, 1, 0] }) : 0,
+              transform: [
+                { translateX: progress.interpolate({ inputRange: [0, 1], outputRange: [0, direction * 390] }) },
+                { translateY: progress.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, lane.arc, 0] }) },
+                { rotate: progress.interpolate({ inputRange: [0, 1], outputRange: ["0deg", `${direction * lane.rotation}deg`] }) },
+                { scale: lane.scale },
+              ],
+            },
+          ]}
+        />
+      ))}
+    </>
   );
 }
 

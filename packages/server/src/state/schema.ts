@@ -56,6 +56,8 @@ export class RevealEntrySchema extends Schema {
   @type("string") detail: string = "";
   @type("number") newStreak: number = 0;
   @type("number") damageDealt: number = 0;
+  @type("number") damageBonus: number = 0;
+  @type("boolean") lethalHit: boolean = false;
   @type("number") shieldGained: number = 0;
 }
 

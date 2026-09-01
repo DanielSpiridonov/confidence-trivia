@@ -557,6 +557,8 @@ export class GameRoom extends Room<RoomStateSchema> {
       : isAnswerCorrect(record.type, value, correctAnswer);
     const correctness = new Map<string, boolean>();
     const attacks = new Map<string, number>();
+    const attackBonuses = new Map<string, number>();
+    const lethalAttackers = new Set<string>();
 
     for (const player of this.state.players.values()) {
       const answer = this.roundAnswers.get(player.id);
@@ -581,7 +583,9 @@ export class GameRoom extends Room<RoomStateSchema> {
     if (isMutualCorrectDraw) {
       this.state.pendingDamageBonus += 1;
     } else if (correctPlayers.length === 1) {
-      attacks.set(correctPlayers[0].id, damageValue + this.state.pendingDamageBonus);
+      const attackerId = correctPlayers[0].id;
+      attackBonuses.set(attackerId, this.state.pendingDamageBonus);
+      attacks.set(attackerId, damageValue + this.state.pendingDamageBonus);
       this.state.pendingDamageBonus = 0;
     }
 
@@ -593,7 +597,9 @@ export class GameRoom extends Room<RoomStateSchema> {
       const absorbed = target.shieldPending ? damage : Math.min(target.shield, damage);
       if (target.shieldPending) target.shieldPending = false;
       else target.shield -= absorbed;
+      const healthBeforeAttack = target.health;
       target.health = Math.max(0, target.health - (damage - absorbed));
+      if (healthBeforeAttack > 0 && target.health <= 0) lethalAttackers.add(attacker.id);
       attacker.score += damage;
     }
 
@@ -606,6 +612,8 @@ export class GameRoom extends Room<RoomStateSchema> {
       entry.correct = correctness.get(player.id) ?? false;
       entry.scoreDelta = attacks.get(player.id) ?? 0;
       entry.damageDealt = attacks.get(player.id) ?? 0;
+      entry.damageBonus = attackBonuses.get(player.id) ?? 0;
+      entry.lethalHit = lethalAttackers.has(player.id);
       entry.shieldGained = 0;
       entry.newStreak = player.damageStreak;
       entry.detail = isMutualCorrectDraw
