@@ -12,6 +12,8 @@ import {
   DEFAULT_NAME_COLOR_ID,
   DEFAULT_AVATAR_ID,
   DEFAULT_FRAME_ID,
+  CosmeticType,
+  getCosmeticStarPrice,
   getNameColorCosmetic,
   isAvatarCosmeticId,
   isFrameCosmeticId,
@@ -66,20 +68,32 @@ export interface PlayerCustomization {
   nameColor: string;
   avatarId: string;
   frameId: string;
+  stars: number;
+  rankKey: string;
+  ownedCosmeticIds: string[];
 }
 
 export async function getPlayerCustomization(deviceId: string): Promise<PlayerCustomization | null> {
-  if (!sql) return { nameColorId: DEFAULT_NAME_COLOR_ID, nameColor: DEFAULT_NAME_COLOR, avatarId: DEFAULT_AVATAR_ID, frameId: DEFAULT_FRAME_ID };
+  if (!sql) return { nameColorId: DEFAULT_NAME_COLOR_ID, nameColor: DEFAULT_NAME_COLOR, avatarId: DEFAULT_AVATAR_ID, frameId: DEFAULT_FRAME_ID, stars: 0, rankKey: "novice", ownedCosmeticIds: [DEFAULT_NAME_COLOR_ID, DEFAULT_AVATAR_ID] };
   try {
-    const equipped = await sql<{ cosmetic_id: string; cosmetic_type: string }[]>`
-      select cosmetic_id, cosmetic_type from public.player_cosmetics
-      where player_id = ${deviceId} and cosmetic_type in ('name_color', 'avatar', 'frame') and equipped = true
-    `;
+    const [equipped, owned, player] = await Promise.all([
+      sql<{ cosmetic_id: string; cosmetic_type: string }[]>`
+        select cosmetic_id, cosmetic_type from public.player_cosmetics
+        where player_id = ${deviceId} and cosmetic_type in ('name_color', 'avatar', 'frame') and equipped = true
+      `,
+      sql<{ cosmetic_id: string }[]>`select cosmetic_id from public.player_cosmetics where player_id = ${deviceId}`,
+      sql<{ stars: number; ranked_lp: number; ranked_placement_matches: number }[]>`
+        select stars, ranked_lp, ranked_placement_matches from public.players where id = ${deviceId}
+      `.then((rows) => rows[0]),
+    ]);
     const nameColorId = equipped.find((item) => item.cosmetic_type === "name_color")?.cosmetic_id;
     const avatarId = equipped.find((item) => item.cosmetic_type === "avatar")?.cosmetic_id;
     const frameId = equipped.find((item) => item.cosmetic_type === "frame")?.cosmetic_id;
     const cosmetic = getNameColorCosmetic(nameColorId) ?? getNameColorCosmetic(DEFAULT_NAME_COLOR_ID)!;
-    return { nameColorId: cosmetic.id, nameColor: cosmetic.color, avatarId: isAvatarCosmeticId(avatarId) ? avatarId : DEFAULT_AVATAR_ID, frameId: isFrameCosmeticId(frameId) ? frameId : DEFAULT_FRAME_ID };
+    const ownedCosmeticIds = [...new Set([DEFAULT_NAME_COLOR_ID, DEFAULT_AVATAR_ID, DEFAULT_FRAME_ID, ...owned.map((item) => item.cosmetic_id)])];
+    const rankKey = player && player.ranked_placement_matches >= RANKED_PLACEMENT_MATCHES ? getRankedDivision(player.ranked_lp).key : "novice";
+    const validAvatarId = isAvatarCosmeticId(avatarId) && (avatarId !== "omniscient_avatar" || rankKey === "omniscient") ? avatarId : DEFAULT_AVATAR_ID;
+    return { nameColorId: cosmetic.id, nameColor: cosmetic.color, avatarId: validAvatarId, frameId: isFrameCosmeticId(frameId) ? frameId : DEFAULT_FRAME_ID, stars: player?.stars ?? 0, rankKey, ownedCosmeticIds };
   } catch (error) {
     console.error("Could not load player customization", error);
     return null;
@@ -88,62 +102,21 @@ export async function getPlayerCustomization(deviceId: string): Promise<PlayerCu
 
 export async function equipFreeNameColor(deviceId: string, cosmeticId: string, displayName: string): Promise<PlayerCustomization | null> {
   const cosmetic = getNameColorCosmetic(cosmeticId);
-  if (!sql || !cosmetic) return null;
-  try {
-    await sql.begin(async (transaction) => {
-      await transaction`
-        insert into public.players (id, display_name, last_seen_at)
-        values (${deviceId}, ${displayName || "Player"}, now())
-        on conflict (id) do update set display_name = excluded.display_name, last_seen_at = excluded.last_seen_at
-      `;
-      await transaction`select id from public.players where id = ${deviceId} for update`;
-      await transaction`
-        update public.player_cosmetics set equipped = false, equipped_at = null
-        where player_id = ${deviceId} and cosmetic_type = 'name_color' and equipped = true
-      `;
-      await transaction`
-        insert into public.player_cosmetics (player_id, cosmetic_id, cosmetic_type, equipped, equipped_at)
-        values (${deviceId}, ${cosmetic.id}, 'name_color', true, now())
-        on conflict (player_id, cosmetic_id) do update
-        set equipped = true, equipped_at = now()
-      `;
-    });
-    return await getPlayerCustomization(deviceId);
-  } catch (error) {
-    console.error("Could not equip name color", error);
-    return null;
-  }
+  return cosmetic ? acquireAndEquipCosmetic(deviceId, cosmetic.id, "name_color", displayName) : null;
 }
 
 export async function equipFreeAvatar(deviceId: string, cosmeticId: string, displayName: string): Promise<PlayerCustomization | null> {
-  if (!sql || !isAvatarCosmeticId(cosmeticId)) return null;
-  try {
-    await sql.begin(async (transaction) => {
-      await transaction`
-        insert into public.players (id, display_name, last_seen_at)
-        values (${deviceId}, ${displayName || "Player"}, now())
-        on conflict (id) do update set display_name = excluded.display_name, last_seen_at = excluded.last_seen_at
-      `;
-      await transaction`select id from public.players where id = ${deviceId} for update`;
-      await transaction`
-        update public.player_cosmetics set equipped = false, equipped_at = null
-        where player_id = ${deviceId} and cosmetic_type = 'avatar' and equipped = true
-      `;
-      await transaction`
-        insert into public.player_cosmetics (player_id, cosmetic_id, cosmetic_type, equipped, equipped_at)
-        values (${deviceId}, ${cosmeticId}, 'avatar', true, now())
-        on conflict (player_id, cosmetic_id) do update set equipped = true, equipped_at = now()
-      `;
-    });
-    return await getPlayerCustomization(deviceId);
-  } catch (error) {
-    console.error("Could not equip avatar", error);
-    return null;
-  }
+  return isAvatarCosmeticId(cosmeticId) ? acquireAndEquipCosmetic(deviceId, cosmeticId, "avatar", displayName) : null;
 }
 
 export async function equipFreeFrame(deviceId: string, cosmeticId: string, displayName: string): Promise<PlayerCustomization | null> {
-  if (!sql || !isFrameCosmeticId(cosmeticId)) return null;
+  return isFrameCosmeticId(cosmeticId) ? acquireAndEquipCosmetic(deviceId, cosmeticId, "frame", displayName) : null;
+}
+
+async function acquireAndEquipCosmetic(deviceId: string, cosmeticId: string, cosmeticType: CosmeticType, displayName: string): Promise<PlayerCustomization | null> {
+  if (!sql) return null;
+  const price = getCosmeticStarPrice(cosmeticType, cosmeticId);
+  if (price === undefined) return null;
   try {
     await sql.begin(async (transaction) => {
       await transaction`
@@ -151,20 +124,41 @@ export async function equipFreeFrame(deviceId: string, cosmeticId: string, displ
         values (${deviceId}, ${displayName || "Player"}, now())
         on conflict (id) do update set display_name = excluded.display_name, last_seen_at = excluded.last_seen_at
       `;
-      await transaction`select id from public.players where id = ${deviceId} for update`;
+      const [player] = await transaction<{ stars: number; ranked_lp: number; ranked_placement_matches: number }[]>`
+        select stars, ranked_lp, ranked_placement_matches from public.players where id = ${deviceId} for update
+      `;
+      const [owned] = await transaction<{ cosmetic_id: string }[]>`
+        select cosmetic_id from public.player_cosmetics where player_id = ${deviceId} and cosmetic_id = ${cosmeticId}
+      `;
+      if (cosmeticId === "omniscient_avatar") {
+        const isOmniscient = player.ranked_placement_matches >= RANKED_PLACEMENT_MATCHES && getRankedDivision(player.ranked_lp).key === "omniscient";
+        if (!isOmniscient) throw new Error("omniscient_rank_required");
+      }
+      if (!owned) {
+        if (cosmeticId !== "omniscient_avatar") {
+          if (price === null || player.stars < price) throw new Error("insufficient_stars");
+          if (price > 0) {
+            await transaction`update public.players set stars = stars - ${price} where id = ${deviceId}`;
+            await transaction`
+              insert into public.star_transactions (id, player_id, amount, reason)
+              values (${randomUUID()}, ${deviceId}, ${-price}, ${`cosmetic_purchase:${cosmeticType}:${cosmeticId}`})
+            `;
+          }
+        }
+      }
       await transaction`
         update public.player_cosmetics set equipped = false, equipped_at = null
-        where player_id = ${deviceId} and cosmetic_type = 'frame' and equipped = true
+        where player_id = ${deviceId} and cosmetic_type = ${cosmeticType} and equipped = true
       `;
       await transaction`
         insert into public.player_cosmetics (player_id, cosmetic_id, cosmetic_type, equipped, equipped_at)
-        values (${deviceId}, ${cosmeticId}, 'frame', true, now())
+        values (${deviceId}, ${cosmeticId}, ${cosmeticType}, true, now())
         on conflict (player_id, cosmetic_id) do update set equipped = true, equipped_at = now()
       `;
     });
     return await getPlayerCustomization(deviceId);
   } catch (error) {
-    console.error("Could not equip frame", error);
+    console.error("Could not acquire or equip cosmetic", error);
     return null;
   }
 }

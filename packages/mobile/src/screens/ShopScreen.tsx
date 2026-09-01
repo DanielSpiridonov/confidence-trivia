@@ -3,7 +3,7 @@ import { FlatList, Image, ImageSourcePropType, Pressable, ScrollView, StyleSheet
 import { useTranslation } from "react-i18next";
 import { ANDROID_MENU_UI_SCALE, BackIconButton, Screen, Title, theme } from "../components/ui";
 import { PointsIcon } from "../components/PointsIcon";
-import { FRAME_COSMETIC_COLORS, NAME_COLOR_COSMETICS } from "@confidence-trivia/shared";
+import { FRAME_COSMETIC_COLORS, getCosmeticStarPrice, NAME_COLOR_COSMETICS } from "@confidence-trivia/shared";
 import { equipAvatar, equipFrame, equipNameColor, getPlayerCustomization } from "../network/client";
 
 type ShopTab = "featured" | "avatars" | "frames" | "inventory" | "stars";
@@ -28,6 +28,12 @@ const COSMETICS: Record<Exclude<ShopTab, "stars" | "inventory">, CosmeticItem[]>
     { id: "living_globe", image: require("../../assets/avatar-thumbnails/globe.png"), name: "Living Globe", free: true },
   ],
   frames: [
+    { id: "", icon: "×", name: "No Frame", price: 0 },
+    { id: "plain_crimson", icon: "□", name: "Crimson Frame", price: 100 },
+    { id: "plain_ocean", icon: "□", name: "Ocean Frame", price: 100 },
+    { id: "plain_emerald", icon: "□", name: "Emerald Frame", price: 100 },
+    { id: "plain_violet", icon: "□", name: "Violet Frame", price: 125 },
+    { id: "plain_gold", icon: "□", name: "Gold Frame", price: 150 },
     { id: "water", icon: "◉", name: "Water Frame", price: 450 },
     { id: "leaves", icon: "❧", name: "Leaves Frame", price: 450 },
     { id: "frost", icon: "✣", name: "Frost Frame", price: 500 },
@@ -46,15 +52,17 @@ const STAR_PACKS: Array<{ stars: number; price: string; bonus?: string }> = [
 ];
 
 const SHOP_AVATAR_IMAGES = COSMETICS.avatars.flatMap((item) => item.image ? [item.image] : []);
-const customizationCache = new Map<string, { nameColorId: string; avatarId: string; frameId: string }>();
+const customizationCache = new Map<string, { nameColorId: string; avatarId: string; frameId: string; stars?: number; rankKey?: string; ownedCosmeticIds?: string[] }>();
 
-export function ShopScreen({ deviceId, displayName, requestedTab = "featured", requestId = 0, onBack }: { deviceId: string; displayName: string; requestedTab?: ShopTab; requestId?: number; onBack: () => void }) {
+export function ShopScreen({ deviceId, displayName, stars, onStarsChange, requestedTab = "featured", requestId = 0, onBack }: { deviceId: string; displayName: string; stars: number; onStarsChange: (stars: number) => void; requestedTab?: ShopTab; requestId?: number; onBack: () => void }) {
   const { t } = useTranslation();
   const cachedCustomization = customizationCache.get(deviceId);
   const [tab, setTab] = React.useState<ShopTab>("featured");
   const [equippedNameColorId, setEquippedNameColorId] = React.useState(cachedCustomization?.nameColorId ?? "name_white");
   const [equippedAvatarId, setEquippedAvatarId] = React.useState(cachedCustomization?.avatarId ?? "smart_owl");
   const [equippedFrameId, setEquippedFrameId] = React.useState(cachedCustomization?.frameId ?? "");
+  const [ownedCosmeticIds, setOwnedCosmeticIds] = React.useState<Set<string>>(() => new Set(cachedCustomization?.ownedCosmeticIds ?? ["name_white", "smart_owl", ""]));
+  const [rankKey, setRankKey] = React.useState(cachedCustomization?.rankKey ?? "novice");
   const [equippingIds, setEquippingIds] = React.useState<Set<string>>(() => new Set());
   const colorRequest = React.useRef(0);
   const avatarRequest = React.useRef(0);
@@ -72,9 +80,12 @@ export function ShopScreen({ deviceId, displayName, requestedTab = "featured", r
         setEquippedNameColorId(customization.nameColorId);
         setEquippedAvatarId(customization.avatarId);
         setEquippedFrameId(customization.frameId);
+        setOwnedCosmeticIds(new Set(customization.ownedCosmeticIds));
+        setRankKey(customization.rankKey);
+        onStarsChange(customization.stars);
       }
     });
-  }, [deviceId]);
+  }, [deviceId, onStarsChange]);
 
   function setEquipping(cosmeticId: string, active: boolean) {
     setEquippingIds((current) => {
@@ -85,7 +96,15 @@ export function ShopScreen({ deviceId, displayName, requestedTab = "featured", r
   }
 
   function cacheCustomization(nameColorId: string, avatarId: string, frameId: string) {
-    customizationCache.set(deviceId, { nameColorId, avatarId, frameId });
+    customizationCache.set(deviceId, { nameColorId, avatarId, frameId, stars, rankKey, ownedCosmeticIds: [...ownedCosmeticIds] });
+  }
+
+  function acceptCustomization(customization: Awaited<ReturnType<typeof getPlayerCustomization>>) {
+    if (!customization) return;
+    customizationCache.set(deviceId, customization);
+    setOwnedCosmeticIds(new Set(customization.ownedCosmeticIds));
+    setRankKey(customization.rankKey);
+    onStarsChange(customization.stars);
   }
 
   async function equipColor(cosmeticId: string) {
@@ -101,6 +120,7 @@ export function ShopScreen({ deviceId, displayName, requestedTab = "featured", r
     if (customization) {
       customizationCache.set(deviceId, customization);
       setEquippedNameColorId(customization.nameColorId);
+      acceptCustomization(customization);
     } else {
       setEquippedNameColorId(previous);
       cacheCustomization(previous, equippedAvatarId, equippedFrameId);
@@ -120,6 +140,7 @@ export function ShopScreen({ deviceId, displayName, requestedTab = "featured", r
     if (customization) {
       customizationCache.set(deviceId, customization);
       setEquippedAvatarId(customization.avatarId);
+      acceptCustomization(customization);
     } else {
       setEquippedAvatarId(previous);
       cacheCustomization(equippedNameColorId, previous, equippedFrameId);
@@ -139,6 +160,7 @@ export function ShopScreen({ deviceId, displayName, requestedTab = "featured", r
     if (customization) {
       customizationCache.set(deviceId, customization);
       setEquippedFrameId(customization.frameId);
+      acceptCustomization(customization);
     } else {
       setEquippedFrameId(previous);
       cacheCustomization(equippedNameColorId, equippedAvatarId, previous);
@@ -169,16 +191,20 @@ export function ShopScreen({ deviceId, displayName, requestedTab = "featured", r
         <View style={[styles.catalogue, tab !== "inventory" && styles.catalogueWithTabRail]}>
           <View style={styles.catalogueHeader}>
             <Text style={styles.sectionTitle}>{t(`shop.tabs.${tab}`)}</Text>
-            <Text style={styles.previewBadge}>{tab === "featured" ? t("shop.nameColorsFree") : tab === "inventory" ? t("shop.ownedItems") : tab === "frames" ? t("shop.playerBordersPreview") : t("shop.previewOnly")}</Text>
+            <Text style={styles.previewBadge}>{tab === "inventory" ? t("shop.ownedItems") : tab === "stars" ? t("shop.previewOnly") : tab === "frames" ? t("shop.playerBordersPreview") : t("shop.starPricedCosmetics")}</Text>
           </View>
           <View pointerEvents={tab === "avatars" ? "auto" : "none"} style={[styles.persistentAvatarCatalogue, tab !== "avatars" && styles.persistentCatalogueHidden]}>
-            <FlatList data={COSMETICS.avatars} numColumns={3} keyExtractor={(item) => item.id} columnWrapperStyle={styles.cosmeticRow} contentContainerStyle={styles.cosmeticList} showsVerticalScrollIndicator={false} renderItem={({ item }) => (
-              <Pressable onPress={() => void equipPlayerAvatar(item.id)} style={[styles.cosmeticCard, item.id === equippedAvatarId && styles.cosmeticCardEquipped]}>
-                <Image source={item.image} fadeDuration={0} resizeMode="contain" style={styles.avatarImage} />
-                <Text numberOfLines={1} style={styles.cosmeticName}>{t(`shop.avatarNames.${item.id}`)}</Text>
-                <Text style={[styles.equipState, item.id === equippedAvatarId && styles.equippedState]}>{item.id === equippedAvatarId ? t("shop.equipped") : equippingIds.has(item.id) ? t("shop.equipping") : t("shop.free")}</Text>
-              </Pressable>
-            )} />
+            <FlatList data={COSMETICS.avatars} numColumns={3} keyExtractor={(item) => item.id} columnWrapperStyle={styles.cosmeticRow} contentContainerStyle={styles.cosmeticList} showsVerticalScrollIndicator={false} renderItem={({ item }) => {
+              const price = getCosmeticStarPrice("avatar", item.id);
+              const locked = item.id === "omniscient_avatar" && rankKey !== "omniscient";
+              return (
+                <Pressable disabled={locked} onPress={() => void equipPlayerAvatar(item.id)} style={[styles.cosmeticCard, item.id === equippedAvatarId && styles.cosmeticCardEquipped, locked && styles.cosmeticCardLocked]}>
+                  <Image source={item.image} fadeDuration={0} resizeMode="contain" style={styles.avatarImage} />
+                  <Text numberOfLines={1} style={styles.cosmeticName}>{t(`shop.avatarNames.${item.id}`)}</Text>
+                  <CosmeticStatus equipped={item.id === equippedAvatarId} equipping={equippingIds.has(item.id)} owned={ownedCosmeticIds.has(item.id)} price={price} locked={locked} />
+                </Pressable>
+              );
+            }} />
           </View>
           {tab === "avatars" ? null : tab === "stars" ? (
             <FlatList key="star-packs" horizontal data={STAR_PACKS} keyExtractor={(item) => String(item.stars)} contentContainerStyle={styles.packList} showsHorizontalScrollIndicator={false} renderItem={({ item }) => (
@@ -194,7 +220,7 @@ export function ShopScreen({ deviceId, displayName, requestedTab = "featured", r
             <ScrollView style={styles.inventoryScroll} contentContainerStyle={styles.inventoryContent} showsVerticalScrollIndicator={false}>
               <InventoryCategory title={t("shop.inventoryCategories.nameColors")}>
                 <View style={styles.inventoryItems}>
-                  {NAME_COLOR_COSMETICS.map((item) => (
+                  {NAME_COLOR_COSMETICS.filter((item) => ownedCosmeticIds.has(item.id)).map((item) => (
                     <Pressable key={item.id} onPress={() => void equipColor(item.id)} style={[styles.inventoryColorItem, item.id === equippedNameColorId && styles.inventoryItemEquipped]}>
                       <View style={[styles.colorSwatch, { backgroundColor: item.color }]} />
                       <Text numberOfLines={1} style={[styles.inventoryItemName, { color: item.color }]}>{t(`shop.nameColors.${item.id}`)}</Text>
@@ -208,13 +234,13 @@ export function ShopScreen({ deviceId, displayName, requestedTab = "featured", r
             </ScrollView>
           ) : (
             <FlatList key={`cosmetics-${tab}`} data={COSMETICS[tab]} numColumns={3} keyExtractor={(item) => item.id} columnWrapperStyle={styles.cosmeticRow} contentContainerStyle={styles.cosmeticList} showsVerticalScrollIndicator={false} renderItem={({ item }) => (
-              <Pressable onPress={() => item.color ? void equipColor(item.id) : item.image ? void equipPlayerAvatar(item.id) : tab === "frames" ? void equipPlayerFrame(item.id) : undefined} style={[styles.cosmeticCard, (item.id === equippedNameColorId || item.id === equippedAvatarId || item.id === equippedFrameId) && styles.cosmeticCardEquipped, tab === "frames" ? { borderColor: FRAME_COSMETIC_COLORS[item.id as keyof typeof FRAME_COSMETIC_COLORS], borderWidth: item.id === equippedFrameId ? 3 : 2 } : null]}>
+              <Pressable onPress={() => item.color ? void equipColor(item.id) : item.image ? void equipPlayerAvatar(item.id) : tab === "frames" ? void equipPlayerFrame(item.id) : undefined} style={[styles.cosmeticCard, (item.id === equippedNameColorId || item.id === equippedAvatarId || item.id === equippedFrameId) && styles.cosmeticCardEquipped, tab === "frames" && item.id ? { borderColor: FRAME_COSMETIC_COLORS[item.id as keyof typeof FRAME_COSMETIC_COLORS], borderWidth: item.id === equippedFrameId ? 3 : 2 } : null]}>
                 {item.tag ? <Text style={styles.itemTag}>{item.tag}</Text> : null}
                 {item.color ? (
                   <Text style={[styles.cosmeticIcon, { color: item.color, textShadowColor: "rgba(0,0,0,0.8)", textShadowRadius: 2 }]}>{item.icon}</Text>
-                ) : item.image ? <Image source={item.image} fadeDuration={0} resizeMode="contain" style={styles.avatarImage} /> : <Text style={[styles.cosmeticIcon, tab === "frames" ? { color: FRAME_COSMETIC_COLORS[item.id as keyof typeof FRAME_COSMETIC_COLORS], textShadowColor: "rgba(0,0,0,0.8)", textShadowRadius: 2 } : null]}>{item.icon}</Text>}
+                ) : item.image ? <Image source={item.image} fadeDuration={0} resizeMode="contain" style={styles.avatarImage} /> : <Text style={[styles.cosmeticIcon, tab === "frames" ? { color: item.id ? FRAME_COSMETIC_COLORS[item.id as keyof typeof FRAME_COSMETIC_COLORS] : theme.textDim, textShadowColor: "rgba(0,0,0,0.8)", textShadowRadius: 2 } : null]}>{item.icon}</Text>}
                 <Text numberOfLines={1} adjustsFontSizeToFit={Boolean(item.color)} minimumFontScale={0.7} style={[styles.cosmeticName, item.color ? { color: item.color } : null]}>{item.color ? (displayName || t("ranked.player")) : item.image ? t(`shop.avatarNames.${item.id}`) : item.name}</Text>
-                {item.color ? <Text style={[styles.equipState, item.id === equippedNameColorId && styles.equippedState]}>{item.id === equippedNameColorId ? t("shop.equipped") : equippingIds.has(item.id) ? t("shop.equipping") : t("shop.free")}</Text> : item.image ? <Text style={[styles.equipState, item.id === equippedAvatarId && styles.equippedState]}>{item.id === equippedAvatarId ? t("shop.equipped") : equippingIds.has(item.id) ? t("shop.equipping") : t("shop.free")}</Text> : tab === "frames" ? <Text style={[styles.equipState, item.id === equippedFrameId && styles.equippedState]}>{item.id === equippedFrameId ? t("shop.equipped") : equippingIds.has(item.id) ? t("shop.equipping") : t("shop.free")}</Text> : item.free ? <Text style={styles.freeItem}>{t("shop.freeItem")}</Text> : <View style={styles.priceRow}><PointsIcon size={14} /><Text style={styles.price}>{item.price}</Text></View>}
+                <CosmeticStatus equipped={item.id === equippedNameColorId || item.id === equippedFrameId} equipping={equippingIds.has(item.id)} owned={ownedCosmeticIds.has(item.id)} price={getCosmeticStarPrice(item.color ? "name_color" : "frame", item.id)} locked={false} />
               </Pressable>
             )} />
           )}
@@ -222,6 +248,16 @@ export function ShopScreen({ deviceId, displayName, requestedTab = "featured", r
       </View>
     </Screen>
   );
+}
+
+function CosmeticStatus({ equipped, equipping, owned, price, locked }: { equipped: boolean; equipping: boolean; owned: boolean; price: number | null | undefined; locked: boolean }) {
+  const { t } = useTranslation();
+  if (equipped) return <Text style={[styles.equipState, styles.equippedState]}>{t("shop.equipped")}</Text>;
+  if (equipping) return <Text style={styles.equipState}>{t("shop.equipping")}</Text>;
+  if (owned) return <Text style={styles.equipState}>{t("shop.ownedEquip")}</Text>;
+  if (locked) return <Text style={styles.rankLocked}>{t("shop.omniscientUnlock")}</Text>;
+  if (price === 0) return <Text style={styles.freeItem}>{t("shop.freeItem")}</Text>;
+  return <View style={styles.priceRow}><PointsIcon size={14} /><Text style={styles.price}>{price ?? "—"}</Text></View>;
 }
 
 function InventoryCategory({ title, children }: { title: string; children: React.ReactNode }) {
@@ -253,6 +289,7 @@ const styles = StyleSheet.create({
   cosmeticRow: { gap: 8, marginBottom: 8 },
   cosmeticCard: { flex: 1, minWidth: 0, height: 86, alignItems: "center", justifyContent: "center", borderRadius: 10, backgroundColor: "rgba(15,12,27,0.75)", borderWidth: 1, borderColor: "rgba(185,176,214,0.18)", paddingHorizontal: 7 },
   cosmeticCardEquipped: { borderColor: "#7CFFA0", backgroundColor: "rgba(56,104,68,0.22)" },
+  cosmeticCardLocked: { opacity: 0.58, borderColor: "rgba(255,114,210,0.55)" },
   cosmeticIcon: { fontSize: 27 },
   avatarImage: { width: 52, height: 52, marginTop: -2 },
   cosmeticName: { width: "100%", color: theme.text, fontSize: 10, fontWeight: "800", textAlign: "center", marginTop: 2 },
@@ -261,6 +298,7 @@ const styles = StyleSheet.create({
   price: { color: "#F7D85B", fontSize: 10, fontWeight: "900" },
   equipState: { color: theme.textDim, fontSize: 9, fontWeight: "900", marginTop: 3, textTransform: "uppercase" },
   equippedState: { color: "#7CFFA0" },
+  rankLocked: { color: "#FF72D2", fontSize: 7, fontWeight: "900", marginTop: 3, textTransform: "uppercase", textAlign: "center" },
   freeItem: { color: "#7CFFA0", fontSize: 9, fontWeight: "900", marginTop: 2, textTransform: "uppercase" },
   inventoryScroll: { flex: 1, minHeight: 0 },
   inventoryContent: { paddingBottom: 6, gap: 9 },

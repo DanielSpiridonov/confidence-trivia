@@ -278,7 +278,14 @@ export class GameRoom extends Room<RoomStateSchema> {
   private async handleStartGame(client: Client) {
     if (client.sessionId !== this.state.hostId) return; // only host may start
     if (this.state.gameStarted || this.gameStartPending) return;
-    if (this.state.gameMode === "damage" ? this.state.players.size !== 2 : this.state.players.size < MIN_PLAYERS_TO_START) return;
+    const requiredPlayerCount = this.state.gameMode === "damage"
+      ? 2
+      : this.state.gameMode === "ranked"
+        ? RANKED_PLAYER_COUNT
+        : MIN_PLAYERS_TO_START;
+    if (this.state.gameMode === "damage" || this.state.gameMode === "ranked"
+      ? this.state.players.size !== requiredPlayerCount
+      : this.state.players.size < requiredPlayerCount) return;
     if (this.state.gameMode === "damage") {
       this.gameStartPending = true;
       const playerEntries = [...this.state.players.values()].flatMap((player) => {

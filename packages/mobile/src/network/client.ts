@@ -30,6 +30,9 @@ export interface PlayerCustomization {
   nameColor: string;
   avatarId: string;
   frameId: string;
+  stars: number;
+  rankKey: string;
+  ownedCosmeticIds: string[];
 }
 
 export async function equipAvatar(deviceId: string, displayName: string, cosmeticId: string): Promise<PlayerCustomization | null> {

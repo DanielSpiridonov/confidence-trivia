@@ -777,7 +777,7 @@ Question categories include:
 * Logic
 * Words
 * Estimation
-* Visual questions
+* Visual questions — deferred as a possible paid mode/content pack rather than part of the free question pool
 
 ---
 
@@ -1434,13 +1434,13 @@ Improve:
 
 ## PHASE 6 — Friends Mode
 
-Only after Classic Mode is stable.
+Deferred until after account identity and ranked-room work. Only build it after Classic Mode is stable.
 
 ---
 
 ## PHASE 7 — Persistent player progression
 
-Status: In progress. Persistent stars and completion rewards are implemented; daily claims are the current step.
+Status: Complete for the current prototype. Persistent stars, completion rewards, daily claims, reward status, streak progression, and transaction history are implemented.
 
 Build on the device-based player profile and persistent stars system:
 
@@ -1453,9 +1453,9 @@ The daily reward is separate from stars earned by completing games.
 
 ### Shop prototype
 
-The mobile app includes a UI-only shop prototype with Featured, Avatars, Frames, and Buy Stars tabs. Cosmetic cards, prices, euro star bundles, and purchase controls are visual placeholders only. No inventory ownership, equipping, receipt validation, platform billing, or real-money transaction logic is enabled yet.
+The mobile app includes Colors, Avatars, Frames, and Buy Stars tabs. Colors, avatars, and frames have server-authoritative star prices; acquiring an unowned item deducts its price once and records the purchase in the star transaction ledger. Previously acquired prototype cosmetics remain owned. The default White name color and Smart Owl avatar are free. Real-money star bundles remain visual placeholders only; platform billing and receipt validation are not enabled yet.
 
-Name colors are the first functional cosmetic exception. During prototype testing all six colors are free, choosing one creates an inventory record, and the equipped selection persists on the device-based player profile and appears throughout multiplayer game-room UI. Prices and account-authenticated ownership will be added later.
+The Omniscient avatar cannot be purchased with stars. It can only be equipped by a player whose completed ranked placement and current LP place them in the Omniscient rank.
 
 ---
 
@@ -1492,6 +1492,8 @@ Keep combat rules server-authoritative and separate from Classic scoring so Clas
 
 Add competitive matchmaking and a persistent rating such as LP only after the core game is stable and player identity is secured.
 
+Next planning priority: replace device-only identity with proper recoverable player accounts. Dedicated matchmaking comes after that account-design discussion; the current ranked-room prototype requires exactly four players in the meantime.
+
 Required foundations:
 
 * Persistent authenticated accounts rather than device ID alone
@@ -1508,11 +1510,12 @@ The initial LP formula below is canonical for the prototype and should be valida
 
 * Ranked games use the Classic question and confidence loop.
 * Public ranked play is designed for exactly four-player games.
-* In the current prototype, Ranked is selected from Create Game and uses the normal room lobby/code flow. A host-created ranked test room may start with one player so the mode can be tested alone.
+* In the current prototype, Ranked is selected from Create Game and uses the normal room lobby/code flow.
+* Ranked rooms require exactly four players to start and are capped at four players.
 * Dedicated ranked matchmaking is future work and is not exposed from the leaderboard screen.
 * Ranked games use a fixed round count rather than a host-selected length.
 * LP is determined only by final placement. Raw in-game points decide placement but never convert directly into LP.
-* Before public ranked release, the temporary one-player start and code-based ranked rooms must be replaced by the dedicated four-player queue.
+* Before public ranked release, code-based ranked rooms may be replaced by a dedicated four-player queue after account identity is secured.
 * Leaving or abandoning a ranked game counts as fourth place.
 * LP cannot fall below zero.
 * Tied players receive the LP result for their shared placement.

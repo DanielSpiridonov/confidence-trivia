@@ -321,55 +321,62 @@ function AvatarProjectile({ players, results, active, roundKey, onImpact }: { pl
   React.useEffect(() => {
     if (!active || attackerIndex < 0 || !loaded) return;
     progress.setValue(0);
-    const animation = Animated.timing(progress, { toValue: 1, duration: 1_150, delay: 550, useNativeDriver: true });
+    const animation = Animated.timing(progress, { toValue: 1, duration: isLethal ? 1_550 : 1_150, delay: isLethal ? 350 : 550, useNativeDriver: true });
     animation.start(({ finished }) => {
       if (finished) onImpact();
     });
     return () => animation.stop();
-  }, [active, attackerIndex, loaded, onImpact, progress, roundKey]);
+  }, [active, attackerIndex, isLethal, loaded, onImpact, progress, roundKey]);
 
   if (attackerIndex < 0) return null;
   const direction = attackerIndex === 1 ? -1 : 1;
   const projectileLanes = isLethal
     ? [
-        { y: -82, arc: -40, scale: 0.9, rotation: 620 },
-        { y: -42, arc: -68, scale: 1.12, rotation: 760 },
-        { y: 0, arc: -54, scale: 1.42, rotation: 900 },
-        { y: 42, arc: -38, scale: 1.12, rotation: 700 },
-        { y: 82, arc: -24, scale: 0.9, rotation: 580 },
+        { y: -14, midY: -42, endY: 14, scale: 1.06, rotation: 620, start: 0, end: 0.5 },
+        { y: 10, midY: -24, endY: -10, scale: 1.06, rotation: 680, start: 0.12, end: 0.62 },
+        { y: -5, midY: -55, endY: 5, scale: 1.12, rotation: 740, start: 0.24, end: 0.74 },
+        { y: 16, midY: -18, endY: -16, scale: 1.06, rotation: 660, start: 0.36, end: 0.86 },
+        { y: 0, midY: -48, endY: 0, scale: 1.12, rotation: 720, start: 0.48, end: 0.98 },
       ]
     : usesDamagePot
       ? [
-          { y: -62, arc: -42, scale: 0.92, rotation: 650 },
-          { y: 0, arc: -52, scale: 1, rotation: 720 },
-          { y: 62, arc: -34, scale: 0.92, rotation: 650 },
+          { y: -58, midY: -38, endY: 58, scale: 0.94, rotation: 650, start: 0, end: 1 },
+          { y: 0, midY: 0, endY: 0, scale: 1, rotation: 720, start: 0, end: 1 },
+          { y: 58, midY: 30, endY: -58, scale: 0.94, rotation: 650, start: 0, end: 1 },
         ]
-      : [{ y: 0, arc: -52, scale: 1, rotation: 720 }];
+      : [{ y: 0, midY: -52, endY: 0, scale: 1, rotation: 720, start: 0, end: 1 }];
   return (
     <>
-      {projectileLanes.map((lane, index) => (
-        <Animated.Image
-          key={`${isLethal ? "lethal" : usesDamagePot ? "pot" : "normal"}-${index}`}
-          source={PROJECTILE_BY_AVATAR[players[attackerIndex].avatarId]}
-          onLoad={() => setLoaded(true)}
-          fadeDuration={0}
-          resizeMode="contain"
-          style={[
-            styles.quizBotProjectile,
-            attackerIndex === 1 ? styles.quizBotProjectileRight : styles.quizBotProjectileLeft,
-            {
-              marginTop: lane.y,
-              opacity: loaded ? progress.interpolate({ inputRange: [0, 0.88, 1], outputRange: [1, 1, 0] }) : 0,
-              transform: [
-                { translateX: progress.interpolate({ inputRange: [0, 1], outputRange: [0, direction * 390] }) },
-                { translateY: progress.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, lane.arc, 0] }) },
-                { rotate: progress.interpolate({ inputRange: [0, 1], outputRange: ["0deg", `${direction * lane.rotation}deg`] }) },
-                { scale: lane.scale },
-              ],
-            },
-          ]}
-        />
-      ))}
+      {projectileLanes.map((lane, index) => {
+        const midpoint = (lane.start + lane.end) / 2;
+        const fadeStart = Math.max(lane.start, lane.end - 0.06);
+        const opacity = lane.start === 0
+          ? progress.interpolate({ inputRange: [0, fadeStart, lane.end], outputRange: [1, 1, 0], extrapolate: "clamp" })
+          : progress.interpolate({ inputRange: [0, lane.start - 0.01, lane.start, fadeStart, lane.end], outputRange: [0, 0, 1, 1, 0], extrapolate: "clamp" });
+        return (
+          <Animated.Image
+            key={`${isLethal ? "lethal" : usesDamagePot ? "pot" : "normal"}-${index}`}
+            source={PROJECTILE_BY_AVATAR[players[attackerIndex].avatarId]}
+            onLoad={() => setLoaded(true)}
+            fadeDuration={0}
+            resizeMode="contain"
+            style={[
+              styles.quizBotProjectile,
+              attackerIndex === 1 ? styles.quizBotProjectileRight : styles.quizBotProjectileLeft,
+              {
+                marginTop: lane.y,
+                opacity: loaded ? opacity : 0,
+                transform: [
+                  { translateX: progress.interpolate({ inputRange: [lane.start, midpoint, lane.end], outputRange: [0, direction * 205, direction * 390], extrapolate: "clamp" }) },
+                  { translateY: progress.interpolate({ inputRange: [lane.start, midpoint, lane.end], outputRange: [0, lane.midY, lane.endY], extrapolate: "clamp" }) },
+                  { rotate: progress.interpolate({ inputRange: [lane.start, lane.end], outputRange: ["0deg", `${direction * lane.rotation}deg`], extrapolate: "clamp" }) },
+                  { scale: lane.scale },
+                ],
+              },
+            ]}
+          />
+        );
+      })}
     </>
   );
 }

@@ -495,7 +495,7 @@ export default function App() {
       </View>
       {deviceId ? (
         <View pointerEvents={nav === "shop" ? "auto" : "none"} style={[styles.persistentScreen, nav !== "shop" && styles.persistentScreenHidden]}>
-          <ShopScreen deviceId={deviceId} displayName={defaultPlayerName} requestedTab={shopRequest.tab} requestId={shopRequest.id} onBack={() => setNav("home")} />
+          <ShopScreen deviceId={deviceId} displayName={defaultPlayerName} stars={stars} onStarsChange={setStars} requestedTab={shopRequest.tab} requestId={shopRequest.id} onBack={() => setNav("home")} />
         </View>
       ) : null}
       {nav === "in-room" && room ? (

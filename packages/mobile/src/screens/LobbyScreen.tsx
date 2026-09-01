@@ -3,7 +3,7 @@ import { View, Text, FlatList, Platform, StyleSheet, Pressable } from "react-nat
 import * as Clipboard from "expo-clipboard";
 import { useTranslation } from "react-i18next";
 import { Room } from "colyseus.js";
-import { FRAME_COSMETIC_COLORS, MIN_PLAYERS_TO_START } from "@confidence-trivia/shared";
+import { FRAME_COSMETIC_COLORS, MIN_PLAYERS_TO_START, RANKED_PLAYER_COUNT } from "@confidence-trivia/shared";
 import { ANDROID_GAME_UI_SCALE, Screen, Title, Subtitle, BigButton, theme } from "../components/ui";
 import { useRoomState } from "../network/client";
 import { playSound } from "../audio/sounds";
@@ -79,8 +79,8 @@ export function LobbyScreen({ room, mySessionId }: { room: Room; mySessionId: st
 
   const me = players.find((p) => p.id === mySessionId);
   const isHost = me?.isHost ?? false;
-  const requiredPlayers = state.gameMode === "damage" ? 2 : MIN_PLAYERS_TO_START;
-  const canStart = isHost && players.length >= requiredPlayers;
+  const requiredPlayers = state.gameMode === "damage" ? 2 : state.gameMode === "ranked" ? RANKED_PLAYER_COUNT : MIN_PLAYERS_TO_START;
+  const canStart = isHost && (state.gameMode === "damage" || state.gameMode === "ranked" ? players.length === requiredPlayers : players.length >= requiredPlayers);
 
   async function handleCopyCode() {
     await Clipboard.setStringAsync(String(state.code));

@@ -21,9 +21,12 @@ export declare const DEFAULT_NAME_COLOR_ID: "name_white";
 export declare const DEFAULT_NAME_COLOR: "#FFFFFF";
 export declare const AVATAR_COSMETIC_IDS: readonly ["smart_owl", "clever_fox", "quiz_bot", "omniscient_avatar", "trivia_wizard", "detective_avatar", "living_globe"];
 export declare const DEFAULT_AVATAR_ID: "smart_owl";
-export declare const FRAME_COSMETIC_IDS: readonly ["flame", "water", "leaves", "frost", "lightning", "ice"];
+export declare const FRAME_COSMETIC_IDS: readonly ["", "plain_crimson", "plain_ocean", "plain_emerald", "plain_violet", "plain_gold", "flame", "water", "leaves", "frost", "lightning", "ice"];
 export declare const DEFAULT_FRAME_ID = "";
 export declare const FRAME_COSMETIC_COLORS: Record<typeof FRAME_COSMETIC_IDS[number], string>;
+export type CosmeticType = "name_color" | "avatar" | "frame";
+export declare const COSMETIC_STAR_PRICES: Record<CosmeticType, Record<string, number | null>>;
+export declare function getCosmeticStarPrice(type: CosmeticType, id: string): number | null | undefined;
 export declare function getNameColorCosmetic(id: unknown): {
     readonly id: "name_white";
     readonly color: "#FFFFFF";
