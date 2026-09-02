@@ -182,6 +182,24 @@
       "omniscient": "Omniscient"
     }
   },
+  "account": {
+    "title": "Profile",
+    "guest": "Guest account",
+    "signedInWith": "Signed in with {{provider}}",
+    "socialAccount": "social account",
+    "guestLimits": "Guests can play normal games, but Shop, Ranked, and friends require a linked account. Your current progress will transfer when you sign in.",
+    "configurationTitle": "Sign-in setup required",
+    "configurationRequired": "Google and Apple sign-in need the Supabase project URL, publishable key, and provider settings before they can be used.",
+    "google": "Continue with Google",
+    "apple": "Continue with Apple",
+    "signIn": "Sign in",
+    "signInRequired": "Account required",
+    "shopRequiresAccount": "Sign in with Google or Apple to access the Shop and Inventory.",
+    "rankedRequiresAccount": "Sign in with Google or Apple to play Ranked.",
+    "signInFailed": "Could not sign in",
+    "linkFailed": "Your account signed in, but the guest progress could not be linked.",
+    "progressProtected": "Your stars, cosmetics, and game progress are linked to this account."
+  },
   "shop": {
     "title": "Customization Shop",
     "shortTitle": "Shop",
@@ -195,6 +213,7 @@
     "ownedEquip": "Owned · Equip",
     "starPricedCosmetics": "Buy with stars",
     "omniscientUnlock": "Reach Omniscient",
+    "notEnoughStars": "You don't have enough stars",
     "ownedItems": "Owned cosmetics",
     "noOwnedAvatars": "No owned avatars yet.",
     "noOwnedFrames": "No owned player borders yet.",
@@ -264,7 +283,11 @@
     "back": "Back"
   },
   "validation": {
-    "nameSpecialCharacters": "Player names can only contain letters, numbers, and spaces."
+    "nameSpecialCharacters": "Player names can only contain letters, numbers, and spaces.",
+    "playerNameRequiredTitle": "Player name required",
+    "playerNameRequiredMessage": "Please choose a player name before creating a game.",
+    "setPlayerName": "Set name",
+    "cancel": "Cancel"
   },
   "network": {
     "unknownError": "Unknown error",

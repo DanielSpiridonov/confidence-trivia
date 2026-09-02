@@ -1455,7 +1455,7 @@ The daily reward is separate from stars earned by completing games.
 
 The mobile app includes Colors, Avatars, Frames, and Buy Stars tabs. Colors, avatars, and frames have server-authoritative star prices; acquiring an unowned item deducts its price once and records the purchase in the star transaction ledger. Previously acquired prototype cosmetics remain owned. The default White name color and Smart Owl avatar are free. Real-money star bundles remain visual placeholders only; platform billing and receipt validation are not enabled yet.
 
-The Omniscient avatar cannot be purchased with stars. It can only be equipped by a player whose completed ranked placement and current LP place them in the Omniscient rank.
+Rank-reward avatars, including the Omniscient avatar, are reserved for a future ranked reward system and are not listed in the normal cosmetic shop.
 
 ---
 
@@ -1492,7 +1492,7 @@ Keep combat rules server-authoritative and separate from Classic scoring so Clas
 
 Add competitive matchmaking and a persistent rating such as LP only after the core game is stable and player identity is secured.
 
-Next planning priority: replace device-only identity with proper recoverable player accounts. Dedicated matchmaking comes after that account-design discussion; the current ranked-room prototype requires exactly four players in the meantime.
+Account implementation is in progress. Fresh installations receive one persisted `Guest 100–999` identity. Guests can play unranked games but cannot access Shop, Inventory, Ranked, or future friends features. Google and Apple accounts upgrade the existing guest player row so its progression remains intact. Dedicated matchmaking comes after account identity; the current ranked-room prototype requires exactly four players in the meantime.
 
 Required foundations:
 

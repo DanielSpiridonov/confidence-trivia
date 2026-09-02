@@ -29,6 +29,13 @@ const sql = databaseUrl
 
 export type DatabaseStatus = "connected" | "not_configured" | "unavailable";
 
+export interface PlayerAccount {
+  playerId: string;
+  accountType: "guest" | "registered";
+  provider: string | null;
+  displayName: string;
+}
+
 export async function getDatabaseStatus(): Promise<DatabaseStatus> {
   if (!sql) return "not_configured";
   try {
@@ -37,6 +44,53 @@ export async function getDatabaseStatus(): Promise<DatabaseStatus> {
   } catch (error) {
     console.error("Database health check failed", error);
     return "unavailable";
+  }
+}
+
+export async function isRegisteredPlayer(playerId: string): Promise<boolean> {
+  if (!sql) return false;
+  const [player] = await sql<{ account_type: string }[]>`select account_type from public.players where id = ${playerId}`;
+  return player?.account_type === "registered";
+}
+
+export async function isAuthenticatedPlayer(playerId: string, authUserId: string): Promise<boolean> {
+  if (!sql) return false;
+  const [player] = await sql<{ id: string }[]>`
+    select id from public.players where id = ${playerId} and account_type = 'registered' and auth_user_id = ${authUserId}
+  `;
+  return Boolean(player);
+}
+
+export async function linkPlayerAccount(guestPlayerId: string, displayName: string, authUserId: string, provider: string): Promise<PlayerAccount | null> {
+  if (!sql) return null;
+  try {
+    return await sql.begin(async (transaction) => {
+      await transaction`
+        insert into public.players (id, display_name, last_seen_at)
+        values (${guestPlayerId}, ${displayName || "Guest"}, now())
+        on conflict (id) do update set last_seen_at = excluded.last_seen_at
+      `;
+      const [existing] = await transaction<{ id: string; account_type: string; auth_provider: string | null; display_name: string }[]>`
+        select id, account_type, auth_provider, display_name from public.players
+        where auth_user_id = ${authUserId} for update
+      `;
+      if (existing) return { playerId: existing.id, accountType: "registered", provider: existing.auth_provider, displayName: existing.display_name };
+
+      const [guest] = await transaction<{ id: string; display_name: string }[]>`
+        select id, display_name from public.players where id = ${guestPlayerId} for update
+      `;
+      if (!guest) return null;
+      const [linked] = await transaction<{ id: string; display_name: string }[]>`
+        update public.players
+        set account_type = 'registered', auth_user_id = ${authUserId}, auth_provider = ${provider}, linked_at = now()
+        where id = ${guestPlayerId} and account_type = 'guest'
+        returning id, display_name
+      `;
+      return linked ? { playerId: linked.id, accountType: "registered", provider, displayName: linked.display_name } : null;
+    });
+  } catch (error) {
+    console.error("Could not link player account", error);
+    return null;
   }
 }
 

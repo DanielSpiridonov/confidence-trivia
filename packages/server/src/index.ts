@@ -3,7 +3,8 @@ import express from "express";
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { GameRoom } from "./rooms/GameRoom";
-import { claimDailyReward, equipFreeAvatar, equipFreeFrame, equipFreeNameColor, getDailyRewardStatus, getDatabaseStatus, getPlayerCustomization, getPlayerStars, getRankedLeaderboard } from "./database";
+import { claimDailyReward, equipFreeAvatar, equipFreeFrame, equipFreeNameColor, getDailyRewardStatus, getDatabaseStatus, getPlayerCustomization, getPlayerStars, getRankedLeaderboard, isAuthenticatedPlayer, linkPlayerAccount } from "./database";
+import { verifySupabaseIdentity } from "./auth";
 
 const port = Number(process.env.PORT ?? 2567);
 const app = express();
@@ -12,6 +13,26 @@ app.use(express.json());
 app.get("/health", async (_req, res) => {
   const database = await getDatabaseStatus();
   res.json({ ok: true, database });
+});
+
+app.post("/accounts/link", async (req, res) => {
+  const guestPlayerId = typeof req.body?.guestPlayerId === "string" ? req.body.guestPlayerId : "";
+  const displayName = typeof req.body?.displayName === "string" ? req.body.displayName.trim().slice(0, 20) : "Guest";
+  if (!isDeviceId(guestPlayerId)) {
+    res.status(400).json({ error: "Invalid guest player ID" });
+    return;
+  }
+  const identity = await verifySupabaseIdentity(req.headers.authorization);
+  if (!identity) {
+    res.status(401).json({ error: "Invalid or expired account session" });
+    return;
+  }
+  const account = await linkPlayerAccount(guestPlayerId, displayName, identity.userId, identity.provider);
+  if (!account) {
+    res.status(503).json({ error: "Account linking is temporarily unavailable" });
+    return;
+  }
+  res.json(account);
 });
 app.get("/players/:deviceId/stars", async (req, res) => {
   const deviceId = req.params.deviceId;
@@ -46,6 +67,10 @@ app.post("/players/:deviceId/customization/name-color", async (req, res) => {
     res.status(400).json({ error: "Invalid device ID" });
     return;
   }
+  if (!await requestOwnsRegisteredPlayer(req.params.deviceId, req.headers.authorization)) {
+    res.status(403).json({ error: "Sign in to access the shop" });
+    return;
+  }
   const cosmeticId = typeof req.body?.cosmeticId === "string" ? req.body.cosmeticId : "";
   const displayName = typeof req.body?.displayName === "string" ? req.body.displayName.trim().slice(0, 20) : "Player";
   const customization = await equipFreeNameColor(req.params.deviceId, cosmeticId, displayName);
@@ -61,6 +86,10 @@ app.post("/players/:deviceId/customization/avatar", async (req, res) => {
     res.status(400).json({ error: "Invalid device ID" });
     return;
   }
+  if (!await requestOwnsRegisteredPlayer(req.params.deviceId, req.headers.authorization)) {
+    res.status(403).json({ error: "Sign in to access the shop" });
+    return;
+  }
   const cosmeticId = typeof req.body?.cosmeticId === "string" ? req.body.cosmeticId : "";
   const displayName = typeof req.body?.displayName === "string" ? req.body.displayName.trim().slice(0, 20) : "Player";
   const customization = await equipFreeAvatar(req.params.deviceId, cosmeticId, displayName);
@@ -74,6 +103,10 @@ app.post("/players/:deviceId/customization/avatar", async (req, res) => {
 app.post("/players/:deviceId/customization/frame", async (req, res) => {
   if (!isDeviceId(req.params.deviceId)) {
     res.status(400).json({ error: "Invalid device ID" });
+    return;
+  }
+  if (!await requestOwnsRegisteredPlayer(req.params.deviceId, req.headers.authorization)) {
+    res.status(403).json({ error: "Sign in to access the shop" });
     return;
   }
   const cosmeticId = typeof req.body?.cosmeticId === "string" ? req.body.cosmeticId : "";
@@ -123,6 +156,10 @@ app.get("/ranked/leaderboard", async (req, res) => {
     res.status(400).json({ error: "Invalid device ID" });
     return;
   }
+  if (!await requestOwnsRegisteredPlayer(deviceId, req.headers.authorization)) {
+    res.status(403).json({ error: "Sign in to access Ranked" });
+    return;
+  }
   const leaderboard = await getRankedLeaderboard(deviceId);
   if (!leaderboard) {
     res.status(503).json({ error: "Ranked leaderboard is temporarily unavailable" });
@@ -130,6 +167,11 @@ app.get("/ranked/leaderboard", async (req, res) => {
   }
   res.json(leaderboard);
 });
+
+async function requestOwnsRegisteredPlayer(playerId: string, authorization: string | undefined): Promise<boolean> {
+  const identity = await verifySupabaseIdentity(authorization);
+  return Boolean(identity && await isAuthenticatedPlayer(playerId, identity.userId));
+}
 
 const httpServer = http.createServer(app);
 const gameServer = new Server({

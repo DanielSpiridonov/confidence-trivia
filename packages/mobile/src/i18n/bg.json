@@ -182,6 +182,24 @@
       "omniscient": "Всезнаещ"
     }
   },
+  "account": {
+    "title": "Профил",
+    "guest": "Гост профил",
+    "signedInWith": "Вход чрез {{provider}}",
+    "socialAccount": "социален профил",
+    "guestLimits": "Гостите могат да играят обикновени игри, но Магазинът, Ranked и приятелите изискват свързан профил. Текущият ти прогрес ще се прехвърли при вход.",
+    "configurationTitle": "Необходима е настройка за вход",
+    "configurationRequired": "За вход с Google и Apple трябва да се настроят адресът и публичният ключ на Supabase, както и доставчиците.",
+    "google": "Продължи с Google",
+    "apple": "Продължи с Apple",
+    "signIn": "Вход",
+    "signInRequired": "Необходим е профил",
+    "shopRequiresAccount": "Влез с Google или Apple, за да използваш Магазина и Инвентара.",
+    "rankedRequiresAccount": "Влез с Google или Apple, за да играеш Ranked.",
+    "signInFailed": "Входът е неуспешен",
+    "linkFailed": "Входът е успешен, но прогресът на госта не можа да бъде свързан.",
+    "progressProtected": "Звездите, козметиките и прогресът ти са свързани с този профил."
+  },
   "shop": {
     "title": "Магазин за персонализация",
     "shortTitle": "Магазин",
@@ -195,6 +213,7 @@
     "ownedEquip": "Притежавано · Сложи",
     "starPricedCosmetics": "Купи със звезди",
     "omniscientUnlock": "Достигни Omniscient",
+    "notEnoughStars": "Нямаш достатъчно звезди",
     "ownedItems": "Притежавани предмети",
     "noOwnedAvatars": "Все още няма притежавани аватари.",
     "noOwnedFrames": "Все още няма притежавани рамки за играч.",
@@ -264,7 +283,11 @@
     "back": "Назад"
   },
   "validation": {
-    "nameSpecialCharacters": "Имената могат да съдържат само букви, цифри и интервали."
+    "nameSpecialCharacters": "Имената могат да съдържат само букви, цифри и интервали.",
+    "playerNameRequiredTitle": "Необходимо е име",
+    "playerNameRequiredMessage": "Избери име на играч, преди да създадеш игра.",
+    "setPlayerName": "Задай име",
+    "cancel": "Отказ"
   },
   "network": {
     "unknownError": "Непозната грешка",

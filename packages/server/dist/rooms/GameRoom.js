@@ -7,6 +7,7 @@ const shared_1 = require("@confidence-trivia/shared");
 const schema_1 = require("../state/schema");
 const questions_1 = require("../content/questions");
 const database_1 = require("../database");
+const auth_1 = require("../auth");
 const PLAYER_NAME_PATTERN = /^[\p{L}\p{N} ]+$/u;
 const DEVICE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 function isValidPlayerName(name) {
@@ -101,13 +102,19 @@ class GameRoom extends colyseus_1.Room {
         this.onMessage("submitSideBet", (client, msg) => this.handleSubmitSideBet(client, msg));
         this.onMessage("skipSideBet", (client) => this.handleSkipSideBet(client));
     }
-    onAuth(_client, options = {}) {
+    async onAuth(_client, options = {}) {
         // Reconnecting players use Colyseus' reconnection flow and do not pass
         // through this admission path. New players may only enter the lobby.
-        return !this.state.gameStarted
+        const basicAdmissionAllowed = !this.state.gameStarted
             && isValidPlayerName(options.name)
             && isValidDeviceId(options.deviceId)
             && ![...this.deviceIds.values()].includes(options.deviceId);
+        if (!basicAdmissionAllowed)
+            return false;
+        if (this.state.gameMode !== "ranked")
+            return true;
+        const identity = await (0, auth_1.verifySupabaseIdentity)(options.accessToken ? `Bearer ${options.accessToken}` : undefined);
+        return Boolean(identity && await (0, database_1.isAuthenticatedPlayer)(options.deviceId, identity.userId));
     }
     async onJoin(client, options = {}) {
         const player = new schema_1.PlayerSchema();
@@ -233,7 +240,14 @@ class GameRoom extends colyseus_1.Room {
             return; // only host may start
         if (this.state.gameStarted || this.gameStartPending)
             return;
-        if (this.state.gameMode === "damage" ? this.state.players.size !== 2 : this.state.players.size < shared_1.MIN_PLAYERS_TO_START)
+        const requiredPlayerCount = this.state.gameMode === "damage"
+            ? 2
+            : this.state.gameMode === "ranked"
+                ? shared_1.RANKED_PLAYER_COUNT
+                : shared_1.MIN_PLAYERS_TO_START;
+        if (this.state.gameMode === "damage" || this.state.gameMode === "ranked"
+            ? this.state.players.size !== requiredPlayerCount
+            : this.state.players.size < requiredPlayerCount)
             return;
         if (this.state.gameMode === "damage") {
             this.gameStartPending = true;
@@ -511,6 +525,8 @@ class GameRoom extends colyseus_1.Room {
             : (0, shared_1.isAnswerCorrect)(record.type, value, correctAnswer);
         const correctness = new Map();
         const attacks = new Map();
+        const attackBonuses = new Map();
+        const lethalAttackers = new Set();
         for (const player of this.state.players.values()) {
             const answer = this.roundAnswers.get(player.id);
             const correct = answer ? isWinningAnswer(answer.value) : false;
@@ -534,7 +550,9 @@ class GameRoom extends colyseus_1.Room {
             this.state.pendingDamageBonus += 1;
         }
         else if (correctPlayers.length === 1) {
-            attacks.set(correctPlayers[0].id, damageValue + this.state.pendingDamageBonus);
+            const attackerId = correctPlayers[0].id;
+            attackBonuses.set(attackerId, this.state.pendingDamageBonus);
+            attacks.set(attackerId, damageValue + this.state.pendingDamageBonus);
             this.state.pendingDamageBonus = 0;
         }
         for (const attacker of this.state.players.values()) {
@@ -549,7 +567,10 @@ class GameRoom extends colyseus_1.Room {
                 target.shieldPending = false;
             else
                 target.shield -= absorbed;
+            const healthBeforeAttack = target.health;
             target.health = Math.max(0, target.health - (damage - absorbed));
+            if (healthBeforeAttack > 0 && target.health <= 0)
+                lethalAttackers.add(attacker.id);
             attacker.score += damage;
         }
         this.state.revealResults.clear();
@@ -561,6 +582,8 @@ class GameRoom extends colyseus_1.Room {
             entry.correct = correctness.get(player.id) ?? false;
             entry.scoreDelta = attacks.get(player.id) ?? 0;
             entry.damageDealt = attacks.get(player.id) ?? 0;
+            entry.damageBonus = attackBonuses.get(player.id) ?? 0;
+            entry.lethalHit = lethalAttackers.has(player.id);
             entry.shieldGained = 0;
             entry.newStreak = player.damageStreak;
             entry.detail = isMutualCorrectDraw

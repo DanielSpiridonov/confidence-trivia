@@ -1,5 +1,6 @@
 import { Client, Room } from "colyseus.js";
 import { useEffect, useRef, useState } from "react";
+import { getAccessToken } from "../auth/supabase";
 
 // Set this through EXPO_PUBLIC_SERVER_URL. Use the Docker host's LAN IP when
 // testing on a physical device; localhost only reaches the device itself.
@@ -7,6 +8,27 @@ export const SERVER_URL =
   process.env.EXPO_PUBLIC_SERVER_URL ?? "ws://localhost:2567";
 const HTTP_SERVER_URL = SERVER_URL.replace(/^ws/, "http").replace(/\/$/, "");
 const ROOM_REQUEST_TIMEOUT_MS = 10_000;
+
+export interface PlayerAccount {
+  playerId: string;
+  accountType: "guest" | "registered";
+  provider: string | null;
+  displayName: string;
+}
+
+export async function linkPlayerAccount(guestPlayerId: string, displayName: string, accessToken: string): Promise<PlayerAccount | null> {
+  try {
+    const response = await fetch(`${HTTP_SERVER_URL}/accounts/link`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({ guestPlayerId, displayName }),
+    });
+    if (!response.ok) return null;
+    return await response.json() as PlayerAccount;
+  } catch {
+    return null;
+  }
+}
 
 let client: Client | null = null;
 export function getClient(): Client {
@@ -37,9 +59,10 @@ export interface PlayerCustomization {
 
 export async function equipAvatar(deviceId: string, displayName: string, cosmeticId: string): Promise<PlayerCustomization | null> {
   try {
+    const accessToken = await getAccessToken();
     const response = await fetch(`${HTTP_SERVER_URL}/players/${encodeURIComponent(deviceId)}/customization/avatar`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
       body: JSON.stringify({ displayName, cosmeticId }),
     });
     if (!response.ok) return null;
@@ -51,9 +74,10 @@ export async function equipAvatar(deviceId: string, displayName: string, cosmeti
 
 export async function equipFrame(deviceId: string, displayName: string, cosmeticId: string): Promise<PlayerCustomization | null> {
   try {
+    const accessToken = await getAccessToken();
     const response = await fetch(`${HTTP_SERVER_URL}/players/${encodeURIComponent(deviceId)}/customization/frame`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
       body: JSON.stringify({ displayName, cosmeticId }),
     });
     if (!response.ok) return null;
@@ -75,9 +99,10 @@ export async function getPlayerCustomization(deviceId: string): Promise<PlayerCu
 
 export async function equipNameColor(deviceId: string, displayName: string, cosmeticId: string): Promise<PlayerCustomization | null> {
   try {
+    const accessToken = await getAccessToken();
     const response = await fetch(`${HTTP_SERVER_URL}/players/${encodeURIComponent(deviceId)}/customization/name-color`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
       body: JSON.stringify({ displayName, cosmeticId }),
     });
     if (!response.ok) return null;
@@ -136,7 +161,8 @@ export interface RankedLeaderboardResponse {
 
 export async function getRankedLeaderboard(deviceId: string): Promise<RankedLeaderboardResponse | null> {
   try {
-    const response = await fetch(`${HTTP_SERVER_URL}/ranked/leaderboard?deviceId=${encodeURIComponent(deviceId)}`);
+    const accessToken = await getAccessToken();
+    const response = await fetch(`${HTTP_SERVER_URL}/ranked/leaderboard?deviceId=${encodeURIComponent(deviceId)}`, { headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {} });
     if (!response.ok) return null;
     return await response.json() as RankedLeaderboardResponse;
   } catch {
@@ -170,6 +196,7 @@ export async function createRoom(
   visibility: "private" | "public" = "private",
   damageWager = 5,
 ) {
+  const accessToken = await getAccessToken();
   const room = await withRoomRequestTimeout(
     getClient().create("confidence_trivia", {
       roundCount,
@@ -180,13 +207,15 @@ export async function createRoom(
       name: playerName,
       visibility,
       damageWager,
+      accessToken,
     })
   );
   return room;
 }
 
 export async function joinRoom(roomCode: string, deviceId: string, playerName: string) {
-  const room = await withRoomRequestTimeout(getClient().joinById(roomCode, { deviceId, name: playerName }));
+  const accessToken = await getAccessToken();
+  const room = await withRoomRequestTimeout(getClient().joinById(roomCode, { deviceId, name: playerName, accessToken }));
   return room;
 }
 
@@ -231,7 +260,8 @@ export async function listPublicRooms(): Promise<PublicRoomListing[]> {
 }
 
 export async function joinPublicRoom(roomId: string, deviceId: string, playerName: string) {
-  return withRoomRequestTimeout(getClient().joinById(roomId, { deviceId, name: playerName }));
+  const accessToken = await getAccessToken();
+  return withRoomRequestTimeout(getClient().joinById(roomId, { deviceId, name: playerName, accessToken }));
 }
 
 export async function reconnectRoom(reconnectionToken: string) {

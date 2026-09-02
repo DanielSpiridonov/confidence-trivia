@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const DEVICE_ID_STORAGE_KEY = "confidence-trivia:device-id";
+const GUEST_NAME_STORAGE_KEY = "confidence-trivia:guest-name";
 const DEVICE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function generateDeviceId(): string {
@@ -37,4 +38,12 @@ export async function getOrCreateDeviceId(): Promise<string> {
   const deviceId = generateDeviceId();
   await AsyncStorage.setItem(DEVICE_ID_STORAGE_KEY, deviceId);
   return deviceId;
+}
+
+export async function getOrCreateGuestName(): Promise<string> {
+  const storedName = await AsyncStorage.getItem(GUEST_NAME_STORAGE_KEY);
+  if (storedName && /^Guest [1-9][0-9]{2}$/.test(storedName)) return storedName;
+  const guestName = `Guest ${Math.floor(100 + Math.random() * 900)}`;
+  await AsyncStorage.setItem(GUEST_NAME_STORAGE_KEY, guestName);
+  return guestName;
 }

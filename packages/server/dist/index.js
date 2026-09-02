@@ -9,12 +9,32 @@ const colyseus_1 = require("colyseus");
 const ws_transport_1 = require("@colyseus/ws-transport");
 const GameRoom_1 = require("./rooms/GameRoom");
 const database_1 = require("./database");
+const auth_1 = require("./auth");
 const port = Number(process.env.PORT ?? 2567);
 const app = (0, express_1.default)();
 app.use(express_1.default.json());
 app.get("/health", async (_req, res) => {
     const database = await (0, database_1.getDatabaseStatus)();
     res.json({ ok: true, database });
+});
+app.post("/accounts/link", async (req, res) => {
+    const guestPlayerId = typeof req.body?.guestPlayerId === "string" ? req.body.guestPlayerId : "";
+    const displayName = typeof req.body?.displayName === "string" ? req.body.displayName.trim().slice(0, 20) : "Guest";
+    if (!isDeviceId(guestPlayerId)) {
+        res.status(400).json({ error: "Invalid guest player ID" });
+        return;
+    }
+    const identity = await (0, auth_1.verifySupabaseIdentity)(req.headers.authorization);
+    if (!identity) {
+        res.status(401).json({ error: "Invalid or expired account session" });
+        return;
+    }
+    const account = await (0, database_1.linkPlayerAccount)(guestPlayerId, displayName, identity.userId, identity.provider);
+    if (!account) {
+        res.status(503).json({ error: "Account linking is temporarily unavailable" });
+        return;
+    }
+    res.json(account);
 });
 app.get("/players/:deviceId/stars", async (req, res) => {
     const deviceId = req.params.deviceId;
@@ -46,6 +66,10 @@ app.post("/players/:deviceId/customization/name-color", async (req, res) => {
         res.status(400).json({ error: "Invalid device ID" });
         return;
     }
+    if (!await requestOwnsRegisteredPlayer(req.params.deviceId, req.headers.authorization)) {
+        res.status(403).json({ error: "Sign in to access the shop" });
+        return;
+    }
     const cosmeticId = typeof req.body?.cosmeticId === "string" ? req.body.cosmeticId : "";
     const displayName = typeof req.body?.displayName === "string" ? req.body.displayName.trim().slice(0, 20) : "Player";
     const customization = await (0, database_1.equipFreeNameColor)(req.params.deviceId, cosmeticId, displayName);
@@ -60,6 +84,10 @@ app.post("/players/:deviceId/customization/avatar", async (req, res) => {
         res.status(400).json({ error: "Invalid device ID" });
         return;
     }
+    if (!await requestOwnsRegisteredPlayer(req.params.deviceId, req.headers.authorization)) {
+        res.status(403).json({ error: "Sign in to access the shop" });
+        return;
+    }
     const cosmeticId = typeof req.body?.cosmeticId === "string" ? req.body.cosmeticId : "";
     const displayName = typeof req.body?.displayName === "string" ? req.body.displayName.trim().slice(0, 20) : "Player";
     const customization = await (0, database_1.equipFreeAvatar)(req.params.deviceId, cosmeticId, displayName);
@@ -72,6 +100,10 @@ app.post("/players/:deviceId/customization/avatar", async (req, res) => {
 app.post("/players/:deviceId/customization/frame", async (req, res) => {
     if (!isDeviceId(req.params.deviceId)) {
         res.status(400).json({ error: "Invalid device ID" });
+        return;
+    }
+    if (!await requestOwnsRegisteredPlayer(req.params.deviceId, req.headers.authorization)) {
+        res.status(403).json({ error: "Sign in to access the shop" });
         return;
     }
     const cosmeticId = typeof req.body?.cosmeticId === "string" ? req.body.cosmeticId : "";
@@ -117,6 +149,10 @@ app.get("/ranked/leaderboard", async (req, res) => {
         res.status(400).json({ error: "Invalid device ID" });
         return;
     }
+    if (!await requestOwnsRegisteredPlayer(deviceId, req.headers.authorization)) {
+        res.status(403).json({ error: "Sign in to access Ranked" });
+        return;
+    }
     const leaderboard = await (0, database_1.getRankedLeaderboard)(deviceId);
     if (!leaderboard) {
         res.status(503).json({ error: "Ranked leaderboard is temporarily unavailable" });
@@ -124,6 +160,10 @@ app.get("/ranked/leaderboard", async (req, res) => {
     }
     res.json(leaderboard);
 });
+async function requestOwnsRegisteredPlayer(playerId, authorization) {
+    const identity = await (0, auth_1.verifySupabaseIdentity)(authorization);
+    return Boolean(identity && await (0, database_1.isAuthenticatedPlayer)(playerId, identity.userId));
+}
 const httpServer = http_1.default.createServer(app);
 const gameServer = new colyseus_1.Server({
     transport: new ws_transport_1.WebSocketTransport({ server: httpServer }),

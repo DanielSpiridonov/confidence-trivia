@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Animated, AppState, Image, Platform, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
+import { Alert, Animated, AppState, Image, Platform, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Room } from "colyseus.js";
@@ -20,12 +20,14 @@ import { FinalResultsScreen } from "./src/screens/FinalResultsScreen";
 import { SettingsScreen, VolumeControl } from "./src/screens/SettingsScreen";
 import { RankedScreen } from "./src/screens/RankedScreen";
 import { ShopScreen } from "./src/screens/ShopScreen";
-import { claimDailyReward, createRoom, DailyRewardStatus, getDailyRewardStatus, getPlayerStars, joinPublicRoom, joinRoom, reconnectRoom, useRoomState } from "./src/network/client";
+import { ProfileScreen } from "./src/screens/ProfileScreen";
+import { claimDailyReward, createRoom, DailyRewardStatus, getDailyRewardStatus, getPlayerStars, joinPublicRoom, joinRoom, linkPlayerAccount, reconnectRoom, useRoomState } from "./src/network/client";
 import { prepareSoundEffects, setSoundEffectsVolume, stopAllSoundEffects } from "./src/audio/sounds";
 import { pauseMusicForBackground, prepareMusic, setMusicVolume as applyMusicVolume, startMenuMusic, stopMenuMusic } from "./src/audio/music";
-import { getOrCreateDeviceId } from "./src/utils/deviceId";
+import { getOrCreateDeviceId, getOrCreateGuestName } from "./src/utils/deviceId";
+import { authConfigured, getStoredSession, signInWithSocialProvider } from "./src/auth/supabase";
 
-type Nav = "home" | "create" | "join" | "ranked" | "shop" | "settings" | "in-room";
+type Nav = "home" | "create" | "join" | "ranked" | "shop" | "settings" | "profile" | "in-room";
 type RoomRecoveryState = "reconnecting" | "failed";
 const LANGUAGE_STORAGE_KEY = "confidence-trivia:locale";
 const SFX_VOLUME_STORAGE_KEY = "confidence-trivia:sfx-volume";
@@ -167,6 +169,9 @@ export default function App() {
   const [musicVolume, setMusicVolume] = useState(0.5);
   const [defaultPlayerName, setDefaultPlayerName] = useState("");
   const [deviceId, setDeviceId] = useState<string | null>(null);
+  const [guestPlayerId, setGuestPlayerId] = useState<string | null>(null);
+  const [registeredAccount, setRegisteredAccount] = useState<{ provider: string | null } | null>(null);
+  const [authBusy, setAuthBusy] = useState(false);
   const [stars, setStars] = useState(0);
   const [starGain, setStarGain] = useState<{ id: number; amount: number } | null>(null);
   const [dailyRewardCelebration, setDailyRewardCelebration] = useState<{ id: number; amount: number; streakDay: number } | null>(null);
@@ -184,7 +189,7 @@ export default function App() {
 
     async function loadLocale() {
       try {
-        const [saved, savedSfxVolume, savedMusicVolume, savedPlayerName, savedHaptics, savedHighContrast, storedDeviceId] = await Promise.all([
+        const [saved, savedSfxVolume, savedMusicVolume, savedPlayerName, savedHaptics, savedHighContrast, storedDeviceId, storedGuestName] = await Promise.all([
           AsyncStorage.getItem(LANGUAGE_STORAGE_KEY),
           AsyncStorage.getItem(SFX_VOLUME_STORAGE_KEY),
           AsyncStorage.getItem(MUSIC_VOLUME_STORAGE_KEY),
@@ -192,13 +197,17 @@ export default function App() {
           AsyncStorage.getItem(HAPTICS_STORAGE_KEY),
           AsyncStorage.getItem(HIGH_CONTRAST_STORAGE_KEY),
           getOrCreateDeviceId(),
+          getOrCreateGuestName(),
         ]);
+        const initialPlayerName = savedPlayerName?.trim() || storedGuestName;
         if (!cancelled) {
-          setDefaultPlayerName(savedPlayerName ?? "");
+          setDefaultPlayerName(initialPlayerName);
           setDeviceId(storedDeviceId);
+          setGuestPlayerId(storedDeviceId);
           setHapticsEnabled(savedHaptics !== "false");
           setHighContrastEnabled(savedHighContrast === "true");
         }
+        if (!savedPlayerName?.trim()) void AsyncStorage.setItem(PLAYER_NAME_STORAGE_KEY, initialPlayerName);
         void getPlayerStars(storedDeviceId).then((storedStars) => {
           if (!cancelled && storedStars !== null) setStars(storedStars);
         });
@@ -246,6 +255,59 @@ export default function App() {
       if (storedStars !== null) setStars(storedStars);
     });
     return storedDeviceId;
+  }
+
+  const applyAuthenticatedSession = React.useCallback(async (guestId: string, accessToken: string) => {
+    const account = await linkPlayerAccount(guestId, defaultPlayerName, accessToken);
+    if (!account) throw new Error(i18n.t("account.linkFailed"));
+    setDeviceId(account.playerId);
+    setRegisteredAccount({ provider: account.provider });
+    if (account.displayName) setDefaultPlayerName(account.displayName);
+    const accountStars = await getPlayerStars(account.playerId);
+    if (accountStars !== null) setStars(accountStars);
+  }, [defaultPlayerName]);
+
+  useEffect(() => {
+    if (!guestPlayerId || !authConfigured) return;
+    let cancelled = false;
+    void getStoredSession().then(async (session) => {
+      if (!session || cancelled) return;
+      try {
+        await applyAuthenticatedSession(guestPlayerId, session.access_token);
+      } catch {
+        // The Profile screen remains available for retrying a failed account link.
+      }
+    });
+    return () => { cancelled = true; };
+  }, [applyAuthenticatedSession, guestPlayerId]);
+
+  async function handleSocialSignIn(provider: "google" | "apple") {
+    if (!authConfigured) {
+      Alert.alert(i18n.t("account.configurationTitle"), i18n.t("account.configurationRequired"));
+      return;
+    }
+    if (!guestPlayerId || authBusy) return;
+    setAuthBusy(true);
+    try {
+      const session = await signInWithSocialProvider(provider);
+      await applyAuthenticatedSession(guestPlayerId, session.access_token);
+    } catch (error) {
+      if (error instanceof Error && error.message === "auth_cancelled") return;
+      Alert.alert(i18n.t("account.signInFailed"), error instanceof Error ? error.message : i18n.t("network.unknownError"));
+    } finally {
+      setAuthBusy(false);
+    }
+  }
+
+  function openRegisteredFeature(destination: "shop" | "ranked", open: () => void) {
+    if (registeredAccount) {
+      open();
+      return;
+    }
+    Alert.alert(i18n.t("account.signInRequired"), i18n.t(`account.${destination}RequiresAccount`), [
+      { text: i18n.t("validation.cancel"), style: "cancel" },
+      { text: i18n.t("account.signIn"), onPress: () => setNav("profile") },
+    ]);
   }
 
   async function handleCreate(name: string, rounds: number, gameMode: "classic" | "ranked" | "damage", visibility: "private" | "public", damageWager: number) {
@@ -479,13 +541,26 @@ export default function App() {
       <StatusBar style="light" />
       <View pointerEvents={nav === "home" ? "auto" : "none"} style={[styles.persistentScreen, nav !== "home" && styles.persistentScreenHidden]}>
         <HomeScreen
-          onCreate={() => setNav("create")}
+          onCreate={() => {
+            if (!defaultPlayerName.trim()) {
+              Alert.alert(
+                i18n.t("validation.playerNameRequiredTitle"),
+                i18n.t("validation.playerNameRequiredMessage"),
+                [
+                  { text: i18n.t("validation.cancel"), style: "cancel" },
+                  { text: i18n.t("validation.setPlayerName"), onPress: () => setNav("settings") },
+                ],
+              );
+              return;
+            }
+            setNav("create");
+          }}
           onJoin={() => setNav("join")}
-          onProfile={() => {}}
-          onInventory={() => openShop("inventory")}
+          onProfile={() => setNav("profile")}
+          onInventory={() => openRegisteredFeature("shop", () => openShop("inventory"))}
           deviceId={deviceId}
-          onRanked={() => setNav("ranked")}
-          onShop={() => openShop("featured")}
+          onRanked={() => openRegisteredFeature("ranked", () => setNav("ranked"))}
+          onShop={() => openRegisteredFeature("shop", () => openShop("featured"))}
           dailyReward={dailyReward}
           dailyRewardClaiming={dailyRewardClaiming}
           dailyRewardCelebration={dailyRewardCelebration}
@@ -515,7 +590,7 @@ export default function App() {
         />
       ) : (
         <>
-          {nav === "create" && deviceId ? <CreateGameScreen onCreate={handleCreate} locale={locale} deviceId={deviceId} initialName={defaultPlayerName} onBack={() => setNav("home")} /> : null}
+          {nav === "create" && deviceId ? <CreateGameScreen onCreate={handleCreate} locale={locale} deviceId={deviceId} stars={stars} registered={Boolean(registeredAccount)} onSignInRequired={() => setNav("profile")} initialName={defaultPlayerName} onBack={() => setNav("home")} /> : null}
           {nav === "join" && <JoinGameScreen onJoin={handleJoin} onJoinPublic={handleJoinPublic} initialName={defaultPlayerName} onBack={() => setNav("home")} />}
           {nav === "ranked" && deviceId ? (
             <RankedScreen
@@ -537,6 +612,18 @@ export default function App() {
               onChangeDefaultPlayerName={handleDefaultPlayerName}
               onChangeHapticsEnabled={handleHapticsEnabled}
               onChangeHighContrastEnabled={handleHighContrastEnabled}
+              onBack={() => setNav("home")}
+            />
+          )}
+          {nav === "profile" && (
+            <ProfileScreen
+              displayName={defaultPlayerName}
+              registered={Boolean(registeredAccount)}
+              provider={registeredAccount?.provider ?? null}
+              busy={authBusy}
+              authAvailable={authConfigured}
+              onGoogle={() => void handleSocialSignIn("google")}
+              onApple={() => void handleSocialSignIn("apple")}
               onBack={() => setNav("home")}
             />
           )}

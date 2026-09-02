@@ -1,5 +1,5 @@
 import React from "react";
-import { FlatList, Image, ImageSourcePropType, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, FlatList, Image, ImageSourcePropType, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { ANDROID_MENU_UI_SCALE, BackIconButton, Screen, Title, theme } from "../components/ui";
 import { PointsIcon } from "../components/PointsIcon";
@@ -17,29 +17,30 @@ const SHOP_TAB_IMAGES: Partial<Record<ShopTab, ImageSourcePropType>> = {
 };
 
 const COSMETICS: Record<Exclude<ShopTab, "stars" | "inventory">, CosmeticItem[]> = {
-  featured: NAME_COLOR_COSMETICS.map((item) => ({ id: item.id, icon: "●", name: item.id.replace("name_", ""), color: item.color })),
+  featured: [...NAME_COLOR_COSMETICS]
+    .sort((left, right) => (getCosmeticStarPrice("name_color", left.id) ?? 0) - (getCosmeticStarPrice("name_color", right.id) ?? 0))
+    .map((item) => ({ id: item.id, icon: "●", name: item.id.replace("name_", ""), color: item.color })),
   avatars: [
     { id: "smart_owl", image: require("../../assets/avatar-thumbnails/smart-owl.png"), name: "Smart Owl", free: true },
-    { id: "clever_fox", image: require("../../assets/avatar-thumbnails/fox.png"), name: "Clever Fox", free: true },
-    { id: "quiz_bot", image: require("../../assets/avatar-thumbnails/quiz-bot.png"), name: "Quiz Bot", free: true },
-    { id: "omniscient_avatar", image: require("../../assets/avatar-thumbnails/omniscient.png"), name: "Omniscient", free: true },
-    { id: "trivia_wizard", image: require("../../assets/avatar-thumbnails/trivia-wizard.png"), name: "Trivia Wizard", free: true },
-    { id: "detective_avatar", image: require("../../assets/avatar-thumbnails/detective.png"), name: "Detective", free: true },
-    { id: "living_globe", image: require("../../assets/avatar-thumbnails/globe.png"), name: "Living Globe", free: true },
+    { id: "clever_fox", image: require("../../assets/avatar-thumbnails/fox.png"), name: "Clever Fox", price: 400 },
+    { id: "living_globe", image: require("../../assets/avatar-thumbnails/globe.png"), name: "Living Globe", price: 550 },
+    { id: "detective_avatar", image: require("../../assets/avatar-thumbnails/detective.png"), name: "Detective", price: 600 },
+    { id: "quiz_bot", image: require("../../assets/avatar-thumbnails/quiz-bot.png"), name: "Quiz Bot", price: 650 },
+    { id: "trivia_wizard", image: require("../../assets/avatar-thumbnails/trivia-wizard.png"), name: "Trivia Wizard", price: 700 },
   ],
   frames: [
     { id: "", icon: "×", name: "No Frame", price: 0 },
-    { id: "plain_crimson", icon: "□", name: "Crimson Frame", price: 100 },
-    { id: "plain_ocean", icon: "□", name: "Ocean Frame", price: 100 },
-    { id: "plain_emerald", icon: "□", name: "Emerald Frame", price: 100 },
-    { id: "plain_violet", icon: "□", name: "Violet Frame", price: 125 },
-    { id: "plain_gold", icon: "□", name: "Gold Frame", price: 150 },
-    { id: "water", icon: "◉", name: "Water Frame", price: 450 },
-    { id: "leaves", icon: "❧", name: "Leaves Frame", price: 450 },
-    { id: "frost", icon: "✣", name: "Frost Frame", price: 500 },
-    { id: "lightning", icon: "ϟ", name: "Lightning Frame", price: 550 },
-    { id: "flame", icon: "🔥", name: "Flame Frame", price: 450 },
-    { id: "ice", icon: "❄️", name: "Frozen Frame", price: 450 },
+    { id: "plain_crimson", icon: "□", name: "Crimson Frame", price: 200 },
+    { id: "plain_ocean", icon: "□", name: "Ocean Frame", price: 200 },
+    { id: "plain_emerald", icon: "□", name: "Emerald Frame", price: 200 },
+    { id: "plain_violet", icon: "□", name: "Violet Frame", price: 225 },
+    { id: "plain_gold", icon: "□", name: "Gold Frame", price: 250 },
+    { id: "water", icon: "◉", name: "Water Frame", price: 550 },
+    { id: "leaves", icon: "❧", name: "Leaves Frame", price: 550 },
+    { id: "flame", icon: "🔥", name: "Flame Frame", price: 550 },
+    { id: "ice", icon: "❄️", name: "Frozen Frame", price: 550 },
+    { id: "frost", icon: "✣", name: "Frost Frame", price: 600 },
+    { id: "lightning", icon: "ϟ", name: "Lightning Frame", price: 650 },
   ],
 };
 
@@ -107,8 +108,19 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
     onStarsChange(customization.stars);
   }
 
+  function canAcquire(cosmeticType: "name_color" | "avatar" | "frame", cosmeticId: string) {
+    if (ownedCosmeticIds.has(cosmeticId)) return true;
+    const price = getCosmeticStarPrice(cosmeticType, cosmeticId);
+    if (typeof price === "number" && price > stars) {
+      Alert.alert(t("shop.notEnoughStars"));
+      return false;
+    }
+    return true;
+  }
+
   async function equipColor(cosmeticId: string) {
     if (cosmeticId === equippedNameColorId) return;
+    if (!canAcquire("name_color", cosmeticId)) return;
     const previous = equippedNameColorId;
     const request = ++colorRequest.current;
     setEquippedNameColorId(cosmeticId);
@@ -129,6 +141,7 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
 
   async function equipPlayerAvatar(cosmeticId: string) {
     if (cosmeticId === equippedAvatarId) return;
+    if (!canAcquire("avatar", cosmeticId)) return;
     const previous = equippedAvatarId;
     const request = ++avatarRequest.current;
     setEquippedAvatarId(cosmeticId);
@@ -149,6 +162,7 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
 
   async function equipPlayerFrame(cosmeticId: string) {
     if (cosmeticId === equippedFrameId) return;
+    if (!canAcquire("frame", cosmeticId)) return;
     const previous = equippedFrameId;
     const request = ++frameRequest.current;
     setEquippedFrameId(cosmeticId);

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { TextInput, StyleSheet, Text, ScrollView, Pressable, View, Platform } from "react-native";
+import { Alert, TextInput, StyleSheet, Text, ScrollView, Pressable, View, Platform } from "react-native";
 import { useTranslation } from "react-i18next";
 import { ANDROID_COMPACT_MENU_UI_SCALE, BackIconButton, Screen, Title, BigButton, theme } from "../components/ui";
 import { DAMAGE_WAGER_OPTIONS, DEFAULT_DAMAGE_WAGER, DEFAULT_ROUND_COUNT, getRankedDivision, RANKED_PLACEMENT_MATCHES } from "@confidence-trivia/shared";
@@ -17,12 +17,18 @@ export function CreateGameScreen({
   onCreate,
   locale,
   deviceId,
+  stars,
+  registered,
+  onSignInRequired,
   initialName,
   onBack,
 }: {
   onCreate: (name: string, rounds: number, gameMode: "classic" | "ranked" | "damage", visibility: "private" | "public", damageWager: number) => Promise<void>;
   locale: "en" | "bg";
   deviceId: string;
+  stars: number;
+  registered: boolean;
+  onSignInRequired: () => void;
   initialName: string;
   onBack: () => void;
 }) {
@@ -54,6 +60,10 @@ export function CreateGameScreen({
 
   async function handleSubmit() {
     if (submitting || !isValidPlayerName(name)) return;
+    if (gameMode === "damage" && damageWager > stars) {
+      Alert.alert(t("shop.notEnoughStars"));
+      return;
+    }
 
     try {
       setSubmitting(true);
@@ -95,7 +105,16 @@ export function CreateGameScreen({
                 <Text style={styles.modeTitle}>{t("create.classic")}</Text>
               </Pressable>
               <Pressable
-                onPress={() => setGameMode("ranked")}
+                onPress={() => {
+                  if (!registered) {
+                    Alert.alert(t("account.signInRequired"), t("account.rankedRequiresAccount"), [
+                      { text: t("validation.cancel"), style: "cancel" },
+                      { text: t("account.signIn"), onPress: onSignInRequired },
+                    ]);
+                    return;
+                  }
+                  setGameMode("ranked");
+                }}
                 style={[styles.modeCard, gameMode === "ranked" && styles.modeCardSelected]}
               >
                 <Text style={styles.modeTitle}>{t("create.ranked")}</Text>
@@ -138,7 +157,13 @@ export function CreateGameScreen({
                 {DAMAGE_WAGER_OPTIONS.map((value) => {
                   const isSelected = damageWager === value;
                   return (
-                    <Pressable key={value} onPress={() => setDamageWager(value)} style={[styles.wagerChip, isSelected && styles.wagerChipSelected]}>
+                    <Pressable key={value} onPress={() => {
+                      if (value > stars) {
+                        Alert.alert(t("shop.notEnoughStars"));
+                        return;
+                      }
+                      setDamageWager(value);
+                    }} style={[styles.wagerChip, isSelected && styles.wagerChipSelected]}>
                       <Text style={[styles.wagerChipText, isSelected && styles.wagerChipTextSelected]}>★ {value}</Text>
                     </Pressable>
                   );

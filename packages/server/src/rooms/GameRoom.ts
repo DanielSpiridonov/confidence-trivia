@@ -31,11 +31,13 @@ import {
   RevealEntrySchema,
 } from "../state/schema";
 import { getLocalizedCorrectAnswer, getQuestionSet, localize, localizeAnswer, localizeAnswerItems } from "../content/questions";
-import { getPlayerCustomization, reserveDamageWager, saveCompletedMatch, settleDamageWager, upsertPlayer } from "../database";
+import { getPlayerCustomization, isAuthenticatedPlayer, reserveDamageWager, saveCompletedMatch, settleDamageWager, upsertPlayer } from "../database";
+import { verifySupabaseIdentity } from "../auth";
 
 interface JoinOptions {
   deviceId?: string;
   name?: string;
+  accessToken?: string;
 }
 
 interface CreateOptions extends JoinOptions {
@@ -145,13 +147,17 @@ export class GameRoom extends Room<RoomStateSchema> {
     this.onMessage("skipSideBet", (client) => this.handleSkipSideBet(client));
   }
 
-  onAuth(_client: Client, options: JoinOptions = {}) {
+  async onAuth(_client: Client, options: JoinOptions = {}) {
     // Reconnecting players use Colyseus' reconnection flow and do not pass
     // through this admission path. New players may only enter the lobby.
-    return !this.state.gameStarted
+    const basicAdmissionAllowed = !this.state.gameStarted
       && isValidPlayerName(options.name)
       && isValidDeviceId(options.deviceId)
       && ![...this.deviceIds.values()].includes(options.deviceId);
+    if (!basicAdmissionAllowed) return false;
+    if (this.state.gameMode !== "ranked") return true;
+    const identity = await verifySupabaseIdentity(options.accessToken ? `Bearer ${options.accessToken}` : undefined);
+    return Boolean(identity && await isAuthenticatedPlayer(options.deviceId!, identity.userId));
   }
 
   async onJoin(client: Client, options: JoinOptions = {}) {

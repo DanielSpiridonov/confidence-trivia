@@ -2,16 +2,21 @@
   "expo": {
     "name": "Confidence Trivia",
     "slug": "confidence-trivia",
+    "scheme": "confidence-trivia",
     "version": "0.1.0",
     "orientation": "landscape",
     "backgroundColor": "#14101F",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "usesAppleSignIn": true
     },
     "android": {},
     "plugins": [
-      "expo-audio"
+      "expo-audio",
+      "expo-secure-store",
+      "expo-web-browser"
+      ,"expo-apple-authentication"
     ]
   }
 }

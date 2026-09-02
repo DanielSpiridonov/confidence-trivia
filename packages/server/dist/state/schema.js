@@ -185,6 +185,8 @@ class RevealEntrySchema extends schema_1.Schema {
         this.detail = "";
         this.newStreak = 0;
         this.damageDealt = 0;
+        this.damageBonus = 0;
+        this.lethalHit = false;
         this.shieldGained = 0;
     }
 }
@@ -229,6 +231,14 @@ __decorate([
     (0, schema_1.type)("number"),
     __metadata("design:type", Number)
 ], RevealEntrySchema.prototype, "damageDealt", void 0);
+__decorate([
+    (0, schema_1.type)("number"),
+    __metadata("design:type", Number)
+], RevealEntrySchema.prototype, "damageBonus", void 0);
+__decorate([
+    (0, schema_1.type)("boolean"),
+    __metadata("design:type", Boolean)
+], RevealEntrySchema.prototype, "lethalHit", void 0);
 __decorate([
     (0, schema_1.type)("number"),
     __metadata("design:type", Number)

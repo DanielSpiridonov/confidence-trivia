@@ -120,3 +120,18 @@ an `EXPO_PUBLIC_` variable or commit it to Git.
 
 The database integration is optional locally. Without `DATABASE_URL`, the
 server runs normally but skips player persistence.
+
+## Google and Apple accounts
+
+Account linking uses Supabase Auth. Run migration `009_create_player_accounts.sql`,
+enable Google and Apple in Supabase Authentication providers, and add the app
+redirect URL using the `confidence-trivia://auth/callback` scheme.
+
+Set `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in the
+mobile `.env.local`. Set the matching `SUPABASE_URL` and
+`SUPABASE_PUBLISHABLE_KEY` on the server. Never expose `DATABASE_URL` to Expo.
+
+Fresh installations receive a persisted `Guest 100–999` identity. Guests can
+play unranked games but Shop, Inventory, and Ranked require Google or Apple
+sign-in. Linking upgrades the existing guest player row, preserving its stars,
+cosmetics, daily rewards, and match history.
