@@ -36,6 +36,43 @@ app.post("/accounts/link", async (req, res) => {
     }
     res.json(account);
 });
+app.get("/accounts/me", async (req, res) => {
+    const playerId = typeof req.query.playerId === "string" ? req.query.playerId : "";
+    const identity = await (0, auth_1.verifySupabaseIdentity)(req.headers.authorization);
+    if (!isDeviceId(playerId) || !identity) {
+        res.status(401).json({ error: "Invalid or expired account session" });
+        return;
+    }
+    const profile = await (0, database_1.getAccountProfile)(playerId, identity.userId);
+    if (!profile) {
+        res.status(404).json({ error: "Account profile not found" });
+        return;
+    }
+    res.json({ ...profile, email: identity.email });
+});
+app.patch("/accounts/me/name", async (req, res) => {
+    const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
+    const displayName = typeof req.body?.displayName === "string" ? req.body.displayName.trim() : "";
+    const identity = await (0, auth_1.verifySupabaseIdentity)(req.headers.authorization);
+    if (!isDeviceId(playerId) || !identity) {
+        res.status(401).json({ error: "Invalid or expired account session" });
+        return;
+    }
+    if (!/^[\p{L}\p{N} _-]{3,20}$/u.test(displayName)) {
+        res.status(400).json({ error: "Name must be 3-20 characters using letters, numbers, spaces, _ or -" });
+        return;
+    }
+    const profile = await (0, database_1.updateAccountDisplayName)(playerId, identity.userId, displayName);
+    if (profile === "taken") {
+        res.status(409).json({ error: "That name is already taken" });
+        return;
+    }
+    if (!profile) {
+        res.status(503).json({ error: "Could not update profile" });
+        return;
+    }
+    res.json({ ...profile, email: identity.email });
+});
 app.get("/players/:deviceId/stars", async (req, res) => {
     const deviceId = req.params.deviceId;
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(deviceId)) {

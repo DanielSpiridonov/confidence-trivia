@@ -3,6 +3,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.getAccountProfile = getAccountProfile;
+exports.updateAccountDisplayName = updateAccountDisplayName;
 exports.getDatabaseStatus = getDatabaseStatus;
 exports.isRegisteredPlayer = isRegisteredPlayer;
 exports.isAuthenticatedPlayer = isAuthenticatedPlayer;
@@ -28,6 +30,35 @@ const databaseUrl = process.env.DATABASE_URL;
 const sql = databaseUrl
     ? (0, postgres_1.default)(databaseUrl, { max: 3, idle_timeout: 20 })
     : null;
+async function getAccountProfile(playerId, authUserId) {
+    if (!sql)
+        return null;
+    const [player] = await sql `
+    select id, display_name, auth_provider, stars, games_played, wins, ranked_lp, ranked_placement_matches
+    from public.players where id = ${playerId} and auth_user_id = ${authUserId} and account_type = 'registered'
+  `;
+    if (!player)
+        return null;
+    return { playerId: player.id, accountType: "registered", provider: player.auth_provider, displayName: player.display_name, stars: player.stars, gamesPlayed: player.games_played, wins: player.wins, rankedLp: player.ranked_lp, rankKey: player.ranked_placement_matches < shared_1.RANKED_PLACEMENT_MATCHES ? "novice" : (0, shared_1.getRankedDivision)(player.ranked_lp).key };
+}
+async function updateAccountDisplayName(playerId, authUserId, displayName) {
+    if (!sql)
+        return null;
+    const normalized = displayName.toLocaleLowerCase("en-US");
+    try {
+        const [updated] = await sql `
+      update public.players set display_name = ${displayName}, normalized_display_name = ${normalized}, last_seen_at = now()
+      where id = ${playerId} and auth_user_id = ${authUserId} and account_type = 'registered' returning id
+    `;
+        return updated ? getAccountProfile(playerId, authUserId) : null;
+    }
+    catch (error) {
+        if (typeof error === "object" && error && "code" in error && error.code === "23505")
+            return "taken";
+        console.error("Could not update account display name", error);
+        return null;
+    }
+}
 async function getDatabaseStatus() {
     if (!sql)
         return "not_configured";

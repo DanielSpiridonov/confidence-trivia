@@ -36,6 +36,40 @@ export interface PlayerAccount {
   displayName: string;
 }
 
+export interface AccountProfile extends PlayerAccount {
+  stars: number;
+  gamesPlayed: number;
+  wins: number;
+  rankedLp: number;
+  rankKey: string;
+}
+
+export async function getAccountProfile(playerId: string, authUserId: string): Promise<AccountProfile | null> {
+  if (!sql) return null;
+  const [player] = await sql<{ id: string; display_name: string; auth_provider: string | null; stars: number; games_played: number; wins: number; ranked_lp: number; ranked_placement_matches: number }[]>`
+    select id, display_name, auth_provider, stars, games_played, wins, ranked_lp, ranked_placement_matches
+    from public.players where id = ${playerId} and auth_user_id = ${authUserId} and account_type = 'registered'
+  `;
+  if (!player) return null;
+  return { playerId: player.id, accountType: "registered", provider: player.auth_provider, displayName: player.display_name, stars: player.stars, gamesPlayed: player.games_played, wins: player.wins, rankedLp: player.ranked_lp, rankKey: player.ranked_placement_matches < RANKED_PLACEMENT_MATCHES ? "novice" : getRankedDivision(player.ranked_lp).key };
+}
+
+export async function updateAccountDisplayName(playerId: string, authUserId: string, displayName: string): Promise<AccountProfile | "taken" | null> {
+  if (!sql) return null;
+  const normalized = displayName.toLocaleLowerCase("en-US");
+  try {
+    const [updated] = await sql<{ id: string }[]>`
+      update public.players set display_name = ${displayName}, normalized_display_name = ${normalized}, last_seen_at = now()
+      where id = ${playerId} and auth_user_id = ${authUserId} and account_type = 'registered' returning id
+    `;
+    return updated ? getAccountProfile(playerId, authUserId) : null;
+  } catch (error) {
+    if (typeof error === "object" && error && "code" in error && error.code === "23505") return "taken";
+    console.error("Could not update account display name", error);
+    return null;
+  }
+}
+
 export async function getDatabaseStatus(): Promise<DatabaseStatus> {
   if (!sql) return "not_configured";
   try {

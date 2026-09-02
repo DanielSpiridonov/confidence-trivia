@@ -50,3 +50,11 @@ export async function getAccessToken(): Promise<string | null> {
 export async function signOutAccount() {
   if (authConfigured) await supabase.auth.signOut();
 }
+
+export function subscribeToAuthChanges(onSignedOut: () => void): () => void {
+  if (!authConfigured) return () => undefined;
+  const { data } = supabase.auth.onAuthStateChange((event) => {
+    if (event === "SIGNED_OUT") onSignedOut();
+  });
+  return () => data.subscription.unsubscribe();
+}

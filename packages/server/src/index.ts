@@ -3,7 +3,7 @@ import express from "express";
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { GameRoom } from "./rooms/GameRoom";
-import { claimDailyReward, equipFreeAvatar, equipFreeFrame, equipFreeNameColor, getDailyRewardStatus, getDatabaseStatus, getPlayerCustomization, getPlayerStars, getRankedLeaderboard, isAuthenticatedPlayer, linkPlayerAccount } from "./database";
+import { claimDailyReward, equipFreeAvatar, equipFreeFrame, equipFreeNameColor, getAccountProfile, getDailyRewardStatus, getDatabaseStatus, getPlayerCustomization, getPlayerStars, getRankedLeaderboard, isAuthenticatedPlayer, linkPlayerAccount, updateAccountDisplayName } from "./database";
 import { verifySupabaseIdentity } from "./auth";
 
 const port = Number(process.env.PORT ?? 2567);
@@ -33,6 +33,25 @@ app.post("/accounts/link", async (req, res) => {
     return;
   }
   res.json(account);
+});
+app.get("/accounts/me", async (req, res) => {
+  const playerId = typeof req.query.playerId === "string" ? req.query.playerId : "";
+  const identity = await verifySupabaseIdentity(req.headers.authorization);
+  if (!isDeviceId(playerId) || !identity) { res.status(401).json({ error: "Invalid or expired account session" }); return; }
+  const profile = await getAccountProfile(playerId, identity.userId);
+  if (!profile) { res.status(404).json({ error: "Account profile not found" }); return; }
+  res.json({ ...profile, email: identity.email });
+});
+app.patch("/accounts/me/name", async (req, res) => {
+  const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
+  const displayName = typeof req.body?.displayName === "string" ? req.body.displayName.trim() : "";
+  const identity = await verifySupabaseIdentity(req.headers.authorization);
+  if (!isDeviceId(playerId) || !identity) { res.status(401).json({ error: "Invalid or expired account session" }); return; }
+  if (!/^[\p{L}\p{N} _-]{3,20}$/u.test(displayName)) { res.status(400).json({ error: "Name must be 3-20 characters using letters, numbers, spaces, _ or -" }); return; }
+  const profile = await updateAccountDisplayName(playerId, identity.userId, displayName);
+  if (profile === "taken") { res.status(409).json({ error: "That name is already taken" }); return; }
+  if (!profile) { res.status(503).json({ error: "Could not update profile" }); return; }
+  res.json({ ...profile, email: identity.email });
 });
 app.get("/players/:deviceId/stars", async (req, res) => {
   const deviceId = req.params.deviceId;

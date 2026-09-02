@@ -11,12 +11,23 @@
       "supportsTablet": false,
       "usesAppleSignIn": true
     },
-    "android": {},
+    "android": {
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ],
+      "package": "com.daniespi.confidencetrivia"
+    },
     "plugins": [
       "expo-audio",
       "expo-secure-store",
-      "expo-web-browser"
-      ,"expo-apple-authentication"
-    ]
+      "expo-web-browser",
+      "expo-apple-authentication"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "a0f50448-01fb-4a56-aa8f-4b822429acc2"
+      }
+    }
   }
 }

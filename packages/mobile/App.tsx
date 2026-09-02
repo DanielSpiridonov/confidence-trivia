@@ -21,11 +21,11 @@ import { SettingsScreen, VolumeControl } from "./src/screens/SettingsScreen";
 import { RankedScreen } from "./src/screens/RankedScreen";
 import { ShopScreen } from "./src/screens/ShopScreen";
 import { ProfileScreen } from "./src/screens/ProfileScreen";
-import { claimDailyReward, createRoom, DailyRewardStatus, getDailyRewardStatus, getPlayerStars, joinPublicRoom, joinRoom, linkPlayerAccount, reconnectRoom, useRoomState } from "./src/network/client";
+import { AccountProfile, claimDailyReward, createRoom, DailyRewardStatus, getAccountProfile, getDailyRewardStatus, getPlayerStars, joinPublicRoom, joinRoom, linkPlayerAccount, reconnectRoom, updateAccountName, useRoomState } from "./src/network/client";
 import { prepareSoundEffects, setSoundEffectsVolume, stopAllSoundEffects } from "./src/audio/sounds";
 import { pauseMusicForBackground, prepareMusic, setMusicVolume as applyMusicVolume, startMenuMusic, stopMenuMusic } from "./src/audio/music";
-import { getOrCreateDeviceId, getOrCreateGuestName } from "./src/utils/deviceId";
-import { authConfigured, getStoredSession, signInWithSocialProvider } from "./src/auth/supabase";
+import { createFreshGuestIdentity, getOrCreateDeviceId, getOrCreateGuestName } from "./src/utils/deviceId";
+import { authConfigured, getStoredSession, signInWithSocialProvider, signOutAccount, subscribeToAuthChanges } from "./src/auth/supabase";
 
 type Nav = "home" | "create" | "join" | "ranked" | "shop" | "settings" | "profile" | "in-room";
 type RoomRecoveryState = "reconnecting" | "failed";
@@ -170,7 +170,7 @@ export default function App() {
   const [defaultPlayerName, setDefaultPlayerName] = useState("");
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [guestPlayerId, setGuestPlayerId] = useState<string | null>(null);
-  const [registeredAccount, setRegisteredAccount] = useState<{ provider: string | null } | null>(null);
+  const [registeredAccount, setRegisteredAccount] = useState<AccountProfile | null>(null);
   const [authBusy, setAuthBusy] = useState(false);
   const [stars, setStars] = useState(0);
   const [starGain, setStarGain] = useState<{ id: number; amount: number } | null>(null);
@@ -183,6 +183,15 @@ export default function App() {
   const [roomRecoveryMessage, setRoomRecoveryMessage] = useState<string | null>(null);
   const intentionalLeaveRef = useRef(false);
   const reconnectionTokenRef = useRef<string | null>(null);
+  const intentionalSignOutRef = useRef(false);
+
+  useEffect(() => subscribeToAuthChanges(() => {
+    if (intentionalSignOutRef.current || !registeredAccount) return;
+    void createFreshGuestIdentity().then((guest) => {
+      setGuestPlayerId(guest.deviceId); setDeviceId(guest.deviceId); setDefaultPlayerName(guest.displayName); setRegisteredAccount(null); setStars(0);
+      Alert.alert(i18n.t("account.sessionExpired"), i18n.t("account.sessionExpiredMessage"));
+    });
+  }), [registeredAccount]);
 
   useEffect(() => {
     let cancelled = false;
@@ -261,7 +270,8 @@ export default function App() {
     const account = await linkPlayerAccount(guestId, defaultPlayerName, accessToken);
     if (!account) throw new Error(i18n.t("account.linkFailed"));
     setDeviceId(account.playerId);
-    setRegisteredAccount({ provider: account.provider });
+    const profile = await getAccountProfile(account.playerId);
+    setRegisteredAccount(profile);
     if (account.displayName) setDefaultPlayerName(account.displayName);
     const accountStars = await getPlayerStars(account.playerId);
     if (accountStars !== null) setStars(accountStars);
@@ -297,6 +307,33 @@ export default function App() {
     } finally {
       setAuthBusy(false);
     }
+  }
+
+  async function handleAccountName(displayName: string) {
+    if (!registeredAccount || authBusy) return;
+    setAuthBusy(true);
+    try {
+      const profile = await updateAccountName(registeredAccount.playerId, displayName);
+      setRegisteredAccount(profile); setDefaultPlayerName(profile.displayName);
+      await AsyncStorage.setItem(PLAYER_NAME_STORAGE_KEY, profile.displayName);
+      Alert.alert(i18n.t("account.nameUpdated"));
+    } catch (error) { Alert.alert(i18n.t("account.nameUpdateFailed"), error instanceof Error ? error.message : i18n.t("network.unknownError")); }
+    finally { setAuthBusy(false); }
+  }
+
+  function handleSignOut() {
+    Alert.alert(i18n.t("account.signOut"), i18n.t("account.signOutConfirm"), [
+      { text: i18n.t("validation.cancel"), style: "cancel" },
+      { text: i18n.t("account.signOut"), style: "destructive", onPress: () => void (async () => {
+        setAuthBusy(true);
+        try {
+          intentionalSignOutRef.current = true;
+          await signOutAccount();
+          const guest = await createFreshGuestIdentity();
+          setGuestPlayerId(guest.deviceId); setDeviceId(guest.deviceId); setDefaultPlayerName(guest.displayName); setRegisteredAccount(null); setStars(0);
+        } finally { intentionalSignOutRef.current = false; setAuthBusy(false); }
+      })() },
+    ]);
   }
 
   function openRegisteredFeature(destination: "shop" | "ranked", open: () => void) {
@@ -620,10 +657,12 @@ export default function App() {
               displayName={defaultPlayerName}
               registered={Boolean(registeredAccount)}
               provider={registeredAccount?.provider ?? null}
+              profile={registeredAccount}
               busy={authBusy}
               authAvailable={authConfigured}
               onGoogle={() => void handleSocialSignIn("google")}
-              onApple={() => void handleSocialSignIn("apple")}
+              onSaveName={(name) => void handleAccountName(name)}
+              onSignOut={handleSignOut}
               onBack={() => setNav("home")}
             />
           )}

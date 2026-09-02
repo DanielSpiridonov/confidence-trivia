@@ -1,51 +1,15 @@
 import React from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
+import { AccountProfile } from "../network/client";
 import { ANDROID_MENU_UI_SCALE, BackIconButton, Screen, Title, theme } from "../components/ui";
 
-export function ProfileScreen({ displayName, registered, provider, busy, authAvailable, onGoogle, onApple, onBack }: {
-  displayName: string;
-  registered: boolean;
-  provider: string | null;
-  busy: boolean;
-  authAvailable: boolean;
-  onGoogle: () => void;
-  onApple: () => void;
-  onBack: () => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <Screen style={styles.screen} androidScale={ANDROID_MENU_UI_SCALE}>
-      <BackIconButton label={t("common.back")} onPress={onBack} disabled={busy} />
-      <Title>{t("account.title")}</Title>
-      <View style={styles.card}>
-        <Text style={styles.name}>{displayName}</Text>
-        <Text style={styles.status}>{registered ? t("account.signedInWith", { provider: provider ?? t("account.socialAccount") }) : t("account.guest")}</Text>
-        {!registered ? <Text style={styles.explanation}>{t("account.guestLimits")}</Text> : null}
-        {!authAvailable ? <Text style={styles.warning}>{t("account.configurationRequired")}</Text> : null}
-        {busy ? <ActivityIndicator color={theme.primary} /> : registered ? (
-          <Text style={styles.linked}>{t("account.progressProtected")}</Text>
-        ) : (
-          <View style={styles.actions}>
-            <Pressable onPress={onGoogle} style={styles.button}><Text style={styles.buttonText}>{t("account.google")}</Text></Pressable>
-            <Pressable onPress={onApple} style={[styles.button, styles.appleButton]}><Text style={styles.buttonText}>{t("account.apple")}</Text></Pressable>
-          </View>
-        )}
-      </View>
-    </Screen>
-  );
+export function ProfileScreen({ displayName, registered, provider, profile, busy, authAvailable, onGoogle, onSaveName, onSignOut, onBack }: { displayName:string; registered:boolean; provider:string|null; profile:AccountProfile|null; busy:boolean; authAvailable:boolean; onGoogle:()=>void; onSaveName:(name:string)=>void; onSignOut:()=>void; onBack:()=>void }) {
+ const {t}=useTranslation(); const [name,setName]=React.useState(displayName); React.useEffect(()=>setName(displayName),[displayName]); const valid=/^[\p{L}\p{N} _-]{3,20}$/u.test(name.trim());
+ return <Screen style={s.screen} androidScale={ANDROID_MENU_UI_SCALE}><BackIconButton label={t("common.back")} onPress={onBack} disabled={busy}/><Title>{t("account.title")}</Title><ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled"><View style={s.card}>
+  <View style={s.header}><View><Text style={s.name}>{displayName}</Text><Text style={s.status}>{registered?t("account.signedInWith",{provider:provider??"Google"}):t("account.guest")}</Text></View><Text style={s.badge}>{registered?t("account.protected"):t("account.localOnly")}</Text></View>
+  {registered&&profile?<><View style={s.row}><Text style={s.label}>{t("account.email")}</Text><Text numberOfLines={1} style={s.value}>{profile.email??"—"}</Text></View><View style={s.editor}><TextInput value={name} onChangeText={setName} maxLength={20} style={s.input} placeholder={t("account.namePlaceholder")} placeholderTextColor={theme.textDim}/><Pressable disabled={busy||!valid||name.trim()===displayName} onPress={()=>onSaveName(name.trim())} style={[s.save,(!valid||name.trim()===displayName)&&s.disabled]}><Text style={s.buttonText}>{t("account.saveName")}</Text></Pressable></View>{!valid&&name.length>0?<Text style={s.error}>{t("account.nameRules")}</Text>:null}<View style={s.stats}><Stat l={t("account.stars")} v={profile.stars}/><Stat l={t("account.games")} v={profile.gamesPlayed}/><Stat l={t("account.wins")} v={profile.wins}/><Stat l={t("account.rank")} v={t(`ranked.ranks.${profile.rankKey}`)}/><Stat l="LP" v={profile.rankedLp}/></View><Text style={s.linked}>{t("account.progressProtected")}</Text><Pressable disabled={busy} onPress={onSignOut} style={s.signOut}><Text style={s.signOutText}>{t("account.signOut")}</Text></Pressable></>:<><Text style={s.explain}>{t("account.guestLimits")}</Text>{!authAvailable?<Text style={s.warning}>{t("account.configurationRequired")}</Text>:null}<Pressable disabled={busy||!authAvailable} onPress={onGoogle} style={s.google}><Text style={s.buttonText}>{t("account.google")}</Text></Pressable></>}{busy?<ActivityIndicator style={s.loader} color={theme.primary}/>:null}
+ </View></ScrollView></Screen>;
 }
-
-const styles = StyleSheet.create({
-  screen: { justifyContent: "flex-start", paddingTop: 12 },
-  card: { width: "72%", maxWidth: 560, alignSelf: "center", marginTop: 20, padding: 20, borderRadius: 16, alignItems: "center", backgroundColor: "rgba(31,26,51,0.92)", borderWidth: 1, borderColor: "rgba(185,176,214,0.24)" },
-  name: { color: theme.text, fontSize: 24, fontWeight: "900" },
-  status: { color: "#7CFFA0", fontSize: 12, fontWeight: "800", marginTop: 4 },
-  explanation: { color: theme.textDim, fontSize: 12, textAlign: "center", marginTop: 12, lineHeight: 18 },
-  warning: { color: "#F7D85B", fontSize: 11, textAlign: "center", marginTop: 10 },
-  linked: { color: theme.textDim, fontSize: 12, textAlign: "center", marginTop: 16 },
-  actions: { width: "100%", gap: 10, marginTop: 16 },
-  button: { minHeight: 44, alignItems: "center", justifyContent: "center", borderRadius: 10, backgroundColor: "#4285F4" },
-  appleButton: { backgroundColor: "#050505", borderWidth: 1, borderColor: "rgba(255,255,255,0.35)" },
-  buttonText: { color: "#FFFFFF", fontSize: 14, fontWeight: "900" },
-});
+function Stat({l,v}:{l:string;v:string|number}){return <View style={s.stat}><Text style={s.statValue}>{v}</Text><Text style={s.statLabel}>{l}</Text></View>}
+const s=StyleSheet.create({screen:{justifyContent:"flex-start",paddingTop:12},scroll:{paddingBottom:24},card:{width:"78%",maxWidth:700,alignSelf:"center",marginTop:14,padding:18,borderRadius:16,backgroundColor:"rgba(31,26,51,.94)",borderWidth:1,borderColor:"rgba(185,176,214,.28)"},header:{flexDirection:"row",justifyContent:"space-between",alignItems:"center"},name:{color:theme.text,fontSize:24,fontWeight:"900"},status:{color:"#7CFFA0",fontSize:12,fontWeight:"800"},badge:{color:"#CBBEFF",fontSize:11,fontWeight:"900",borderWidth:1,borderColor:"#7C5CFF",borderRadius:10,padding:6},row:{marginTop:14,flexDirection:"row",justifyContent:"space-between",gap:12},label:{color:theme.textDim,fontSize:12},value:{color:theme.text,fontSize:12,fontWeight:"800",flexShrink:1},editor:{flexDirection:"row",gap:8,marginTop:12},input:{flex:1,minHeight:42,borderRadius:10,borderWidth:1,borderColor:"#62558E",backgroundColor:"#171329",color:theme.text,paddingHorizontal:12,fontWeight:"800"},save:{paddingHorizontal:18,justifyContent:"center",borderRadius:10,backgroundColor:theme.primary},buttonText:{color:"#fff",fontWeight:"900"},disabled:{opacity:.4},error:{color:"#FF8B8B",fontSize:10,marginTop:5},stats:{flexDirection:"row",gap:8,marginTop:16},stat:{flex:1,minWidth:65,alignItems:"center",paddingVertical:9,borderRadius:10,backgroundColor:"rgba(124,92,255,.13)"},statValue:{color:theme.text,fontSize:15,fontWeight:"900"},statLabel:{color:theme.textDim,fontSize:9,fontWeight:"800"},linked:{color:theme.textDim,textAlign:"center",fontSize:11,marginTop:12},explain:{color:theme.textDim,textAlign:"center",fontSize:12,lineHeight:18,marginTop:16},warning:{color:"#F7D85B",textAlign:"center",fontSize:11,marginTop:10},google:{minHeight:44,alignItems:"center",justifyContent:"center",borderRadius:10,backgroundColor:"#4285F4",marginTop:16},signOut:{alignSelf:"center",marginTop:12,paddingHorizontal:24,paddingVertical:9,borderRadius:10,borderWidth:1,borderColor:"#FF7777"},signOutText:{color:"#FF9B9B",fontWeight:"900"},loader:{marginTop:10}});

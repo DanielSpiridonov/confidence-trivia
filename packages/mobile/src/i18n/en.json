@@ -198,7 +198,8 @@
     "rankedRequiresAccount": "Sign in with Google or Apple to play Ranked.",
     "signInFailed": "Could not sign in",
     "linkFailed": "Your account signed in, but the guest progress could not be linked.",
-    "progressProtected": "Your stars, cosmetics, and game progress are linked to this account."
+    "progressProtected": "Your stars, cosmetics, and game progress are linked to this account.",
+    "protected": "PROTECTED", "localOnly": "LOCAL GUEST", "email": "Email", "namePlaceholder": "Permanent player name", "saveName": "Save", "nameRules": "Use 3-20 letters, numbers, spaces, _ or -.", "nameUpdated": "Player name updated", "nameUpdateFailed": "Could not update name", "stars": "Stars", "games": "Games", "wins": "Wins", "rank": "Rank", "signOut": "Sign out", "signOutConfirm": "Your linked progress will stay safe. This device will return to a new guest profile.", "sessionExpired": "Session expired", "sessionExpiredMessage": "Please sign in again. Your linked progress remains safe."
   },
   "shop": {
     "title": "Customization Shop",

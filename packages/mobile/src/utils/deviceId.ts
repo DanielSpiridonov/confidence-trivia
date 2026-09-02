@@ -47,3 +47,10 @@ export async function getOrCreateGuestName(): Promise<string> {
   await AsyncStorage.setItem(GUEST_NAME_STORAGE_KEY, guestName);
   return guestName;
 }
+
+export async function createFreshGuestIdentity(): Promise<{ deviceId: string; displayName: string }> {
+  const deviceId = generateDeviceId();
+  const displayName = `Guest ${Math.floor(100 + Math.random() * 900)}`;
+  await AsyncStorage.multiSet([[DEVICE_ID_STORAGE_KEY, deviceId], [GUEST_NAME_STORAGE_KEY, displayName], ["confidence-trivia:player-name", displayName]]);
+  return { deviceId, displayName };
+}

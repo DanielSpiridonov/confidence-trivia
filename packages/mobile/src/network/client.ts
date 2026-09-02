@@ -15,18 +15,35 @@ export interface PlayerAccount {
   provider: string | null;
   displayName: string;
 }
+export interface AccountProfile extends PlayerAccount { email: string | null; stars: number; gamesPlayed: number; wins: number; rankedLp: number; rankKey: string; }
 
-export async function linkPlayerAccount(guestPlayerId: string, displayName: string, accessToken: string): Promise<PlayerAccount | null> {
+async function accountRequest(path: string, options?: RequestInit): Promise<AccountProfile> {
+  const accessToken = await getAccessToken();
+  if (!accessToken) throw new Error("Your session expired. Please sign in again.");
+  const response = await fetch(`${HTTP_SERVER_URL}${path}`, { ...options, headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}`, ...options?.headers } });
+  const payload = await response.json().catch(() => null) as (AccountProfile & { error?: string }) | null;
+  if (!response.ok) throw new Error(payload?.error ?? `Server returned ${response.status}`);
+  return payload as AccountProfile;
+}
+export const getAccountProfile = (playerId: string) => accountRequest(`/accounts/me?playerId=${encodeURIComponent(playerId)}`);
+export const updateAccountName = (playerId: string, displayName: string) => accountRequest("/accounts/me/name", { method: "PATCH", body: JSON.stringify({ playerId, displayName }) });
+
+export async function linkPlayerAccount(guestPlayerId: string, displayName: string, accessToken: string): Promise<PlayerAccount> {
   try {
     const response = await fetch(`${HTTP_SERVER_URL}/accounts/link`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
       body: JSON.stringify({ guestPlayerId, displayName }),
     });
-    if (!response.ok) return null;
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null) as { error?: unknown } | null;
+      const serverMessage = typeof payload?.error === "string" ? payload.error : `Server returned ${response.status}`;
+      throw new Error(`Account link failed (${response.status}): ${serverMessage}`);
+    }
     return await response.json() as PlayerAccount;
-  } catch {
-    return null;
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith("Account link failed")) throw error;
+    throw new Error(`Could not reach the account server: ${error instanceof Error ? error.message : "Unknown network error"}`);
   }
 }
 
