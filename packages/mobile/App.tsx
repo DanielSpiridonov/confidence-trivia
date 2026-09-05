@@ -7,6 +7,7 @@ import "./src/i18n";
 import i18n from "./src/i18n";
 import { BigButton, GAME_BACKGROUND, theme } from "./src/components/ui";
 import { PointsIcon } from "./src/components/PointsIcon";
+import { RANK_IMAGE_SOURCES } from "./src/components/RankIcon";
 
 import { HomeScreen } from "./src/screens/HomeScreen";
 import { CreateGameScreen } from "./src/screens/CreateGameScreen";
@@ -39,6 +40,7 @@ const HIGH_CONTRAST_STORAGE_KEY = "confidence-trivia:high-contrast-enabled";
 const RECENT_QUESTIONS_STORAGE_KEY = "confidence-trivia:recent-question-ids";
 const RECENT_QUESTION_LIMIT = 40;
 const UI_PRELOAD_IMAGES = [
+  ...RANK_IMAGE_SOURCES,
   require("./assets/avatar-thumbnails/smart-owl.png"),
   require("./assets/avatar-thumbnails/fox.png"),
   require("./assets/avatar-thumbnails/quiz-bot.png"),

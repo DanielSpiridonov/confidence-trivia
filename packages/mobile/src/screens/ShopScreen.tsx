@@ -184,6 +184,17 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
     }
   }
 
+  function renderFrameCard(item: CosmeticItem) {
+    const equipped = item.id === equippedFrameId;
+    return (
+      <Pressable key={item.id || "no-frame"} onPress={() => void equipPlayerFrame(item.id)} style={[styles.cosmeticCard, styles.frameCard, equipped && styles.cosmeticCardEquipped, item.id ? { borderColor: FRAME_COSMETIC_COLORS[item.id as keyof typeof FRAME_COSMETIC_COLORS], borderWidth: equipped ? 3 : 2 } : null]}>
+        <Text style={[styles.cosmeticIcon, { color: item.id ? FRAME_COSMETIC_COLORS[item.id as keyof typeof FRAME_COSMETIC_COLORS] : theme.textDim, textShadowColor: "rgba(0,0,0,0.8)", textShadowRadius: 2 }]}>{item.icon}</Text>
+        <Text numberOfLines={1} style={styles.cosmeticName}>{item.name}</Text>
+        <CosmeticStatus equipped={equipped} equipping={equippingIds.has(item.id)} owned={ownedCosmeticIds.has(item.id)} price={getCosmeticStarPrice("frame", item.id)} locked={false} />
+      </Pressable>
+    );
+  }
+
   return (
     <Screen style={styles.screen} androidScale={ANDROID_MENU_UI_SCALE}>
       <View pointerEvents="none" style={styles.avatarPreloader}>
@@ -233,6 +244,13 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
                 <Pressable disabled style={styles.buyButton}><Text style={styles.buyText}>{item.price}</Text></Pressable>
               </View>
             )} />
+          ) : tab === "frames" ? (
+            <ScrollView style={styles.frameScroll} contentContainerStyle={styles.frameSections} showsVerticalScrollIndicator={false}>
+              <Text style={styles.frameSectionTitle}>{t("shop.frameCategories.solid")}</Text>
+              <View style={styles.frameGrid}>{COSMETICS.frames.slice(0, 6).map(renderFrameCard)}</View>
+              <Text style={styles.frameSectionTitle}>{t("shop.frameCategories.animated")}</Text>
+              <View style={styles.frameGrid}>{COSMETICS.frames.slice(6).map(renderFrameCard)}</View>
+            </ScrollView>
           ) : tab === "inventory" ? (
             <ScrollView style={styles.inventoryScroll} contentContainerStyle={styles.inventoryContent} showsVerticalScrollIndicator={false}>
               <InventoryCategory title={t("shop.inventoryCategories.nameColors")}>
@@ -251,13 +269,11 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
             </ScrollView>
           ) : (
             <FlatList key={`cosmetics-${tab}`} data={COSMETICS[tab]} numColumns={3} keyExtractor={(item) => item.id} columnWrapperStyle={styles.cosmeticRow} contentContainerStyle={styles.cosmeticList} showsVerticalScrollIndicator={false} renderItem={({ item }) => (
-              <Pressable onPress={() => item.color ? void equipColor(item.id) : item.image ? void equipPlayerAvatar(item.id) : tab === "frames" ? void equipPlayerFrame(item.id) : undefined} style={[styles.cosmeticCard, (item.id === equippedNameColorId || item.id === equippedAvatarId || item.id === equippedFrameId) && styles.cosmeticCardEquipped, tab === "frames" && item.id ? { borderColor: FRAME_COSMETIC_COLORS[item.id as keyof typeof FRAME_COSMETIC_COLORS], borderWidth: item.id === equippedFrameId ? 3 : 2 } : null]}>
+              <Pressable onPress={() => void equipColor(item.id)} style={[styles.cosmeticCard, item.id === equippedNameColorId && styles.cosmeticCardEquipped]}>
                 {item.tag ? <Text style={styles.itemTag}>{item.tag}</Text> : null}
-                {item.color ? (
-                  <Text style={[styles.cosmeticIcon, { color: item.color, textShadowColor: "rgba(0,0,0,0.8)", textShadowRadius: 2 }]}>{item.icon}</Text>
-                ) : item.image ? <Image source={item.image} fadeDuration={0} resizeMode="contain" style={styles.avatarImage} /> : <Text style={[styles.cosmeticIcon, tab === "frames" ? { color: item.id ? FRAME_COSMETIC_COLORS[item.id as keyof typeof FRAME_COSMETIC_COLORS] : theme.textDim, textShadowColor: "rgba(0,0,0,0.8)", textShadowRadius: 2 } : null]}>{item.icon}</Text>}
-                <Text numberOfLines={1} adjustsFontSizeToFit={Boolean(item.color)} minimumFontScale={0.7} style={[styles.cosmeticName, item.color ? { color: item.color } : null]}>{item.color ? (displayName || t("ranked.player")) : item.image ? t(`shop.avatarNames.${item.id}`) : item.name}</Text>
-                <CosmeticStatus equipped={item.id === equippedNameColorId || item.id === equippedFrameId} equipping={equippingIds.has(item.id)} owned={ownedCosmeticIds.has(item.id)} price={getCosmeticStarPrice(item.color ? "name_color" : "frame", item.id)} locked={false} />
+                <Text style={[styles.cosmeticIcon, { color: item.color, textShadowColor: "rgba(0,0,0,0.8)", textShadowRadius: 2 }]}>{item.icon}</Text>
+                <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={[styles.cosmeticName, { color: item.color }]}>{displayName || t("ranked.player")}</Text>
+                <CosmeticStatus equipped={item.id === equippedNameColorId} equipping={equippingIds.has(item.id)} owned={ownedCosmeticIds.has(item.id)} price={getCosmeticStarPrice("name_color", item.id)} locked={false} />
               </Pressable>
             )} />
           )}
@@ -305,6 +321,11 @@ const styles = StyleSheet.create({
   cosmeticList: { paddingBottom: 4 },
   cosmeticRow: { gap: 8, marginBottom: 8 },
   cosmeticCard: { flex: 1, minWidth: 0, height: 86, alignItems: "center", justifyContent: "center", borderRadius: 10, backgroundColor: "rgba(15,12,27,0.75)", borderWidth: 1, borderColor: "rgba(185,176,214,0.18)", paddingHorizontal: 7 },
+  frameScroll: { flex: 1, minHeight: 0 },
+  frameSections: { paddingBottom: 5 },
+  frameSectionTitle: { color: theme.text, fontSize: 12, fontWeight: "900", marginBottom: 6, paddingLeft: 2 },
+  frameGrid: { width: "100%", flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 10 },
+  frameCard: { flex: 0, width: "32.2%" },
   cosmeticCardEquipped: { borderColor: "#7CFFA0", backgroundColor: "rgba(56,104,68,0.22)" },
   cosmeticCardLocked: { opacity: 0.58, borderColor: "rgba(255,114,210,0.55)" },
   cosmeticIcon: { fontSize: 27 },

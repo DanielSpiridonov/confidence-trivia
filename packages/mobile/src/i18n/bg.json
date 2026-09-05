@@ -80,6 +80,8 @@
     "waitingForPlayers": "Изчакване на {{count}} играчи...",
     "rankedSearching": "Търсене на Ranked играчи",
     "rankedAutoStart": "Мачът започва автоматично при четирима играчи.",
+    "damageSearching": "Търсене на противник",
+    "damageAutoStart": "Мачът започва автоматично при намерен играч със същия залог.",
     "start": "Започни играта",
     "startingTitle": "Играта започва",
     "startingMessage": "Пригответе се...",
@@ -171,6 +173,7 @@
     "placementHint": "Остават {{count}} класиращи игри",
     "novice": "Новак",
     "placements": "Класиращи игри: {{current}} / {{total}}",
+    "placementMatchesLabel": "Класиращи игри",
     "findMatch": "Намери рангова игра",
     "finding": "Търсене на играчи...",
     "loading": "Зареждане на класирането...",
@@ -238,6 +241,10 @@
     "noOwnedAvatars": "Все още няма притежавани аватари.",
     "noOwnedFrames": "Все още няма притежавани рамки за играч.",
     "playerBordersPreview": "Рамки за картите с аватар и име",
+    "frameCategories": {
+      "solid": "Едноцветни",
+      "animated": "Анимирани"
+    },
     "inventoryCategories": {
       "nameColors": "Цветове за име",
       "avatars": "Аватари",

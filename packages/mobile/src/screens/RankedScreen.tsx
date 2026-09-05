@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { getRankedDivision, RANKED_PLACEMENT_MATCHES } from "@confidence-trivia/shared";
 import { ANDROID_MENU_UI_SCALE, BackIconButton, Screen, Title, theme } from "../components/ui";
 import { getRankedLeaderboard, RankedLeaderboardEntry, RankedLeaderboardResponse } from "../network/client";
+import { RankIcon } from "../components/RankIcon";
 
 export function RankedScreen({
   deviceId,
@@ -76,7 +77,10 @@ function LeaderboardRow({ entry, isCurrent, t }: { entry: RankedLeaderboardEntry
       <Text numberOfLines={1} style={[styles.cell, styles.position]}>{entry.position ? `#${entry.position}` : "—"}</Text>
       <Text numberOfLines={1} ellipsizeMode="tail" style={[styles.cell, styles.player]}>{entry.displayName}{isCurrent ? ` (${t("common.you")})` : ""}</Text>
       <Text numberOfLines={1} style={[styles.cell, styles.lp]}>{entry.placementMatches < RANKED_PLACEMENT_MATCHES ? "—" : entry.lp}</Text>
-      <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={[styles.cell, styles.rank, { color: rank?.color ?? theme.textDim }]}>{rankLabel}</Text>
+      <View style={[styles.rank, styles.rankCell]}>
+        <RankIcon rankKey={entry.rankKey} size={20} />
+        <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65} style={[styles.cell, styles.rankLabel, { color: rank?.color ?? theme.textDim }]}>{rankLabel}</Text>
+      </View>
       <Text numberOfLines={1} style={[styles.cell, styles.wins]}>{entry.wins}</Text>
     </View>
   );
@@ -90,6 +94,7 @@ function PlayerRankCard({ entry, t }: { entry: RankedLeaderboardEntry; t: (key: 
   return (
     <View style={[styles.rankCard, division && { borderColor: division.color }]}> 
       <Text style={styles.rankCardEyebrow}>{t("ranked.yourRank")}</Text>
+      {isPlaced ? <RankIcon rankKey={entry.rankKey} size={76} style={styles.rankCardIcon} /> : null}
       <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={[styles.rankCardName, { color: division?.color ?? theme.textDim }]}>
         {isPlaced ? t(`ranked.ranks.${entry.rankKey}`) : t("ranked.ranks.novice")}
       </Text>
@@ -100,7 +105,8 @@ function PlayerRankCard({ entry, t }: { entry: RankedLeaderboardEntry; t: (key: 
         </>
       ) : (
         <>
-          <Text style={styles.rankCardProgress}>{t("ranked.placements", { current: matchesPlayed, total: RANKED_PLACEMENT_MATCHES })}</Text>
+          <Text style={styles.rankCardProgressLabel}>{t("ranked.placementMatchesLabel")}</Text>
+          <Text style={styles.rankCardProgress}>{matchesPlayed}/{RANKED_PLACEMENT_MATCHES}</Text>
           <Text style={styles.rankCardHint}>{t("ranked.placementHint", { count: RANKED_PLACEMENT_MATCHES - matchesPlayed })}</Text>
         </>
       )}
@@ -113,10 +119,12 @@ const styles = StyleSheet.create({
   content: { flex: 1, minHeight: 0, width: "100%", flexDirection: "row", gap: 12, marginTop: 6 },
   rankCard: { width: 150, alignSelf: "stretch", alignItems: "center", justifyContent: "center", backgroundColor: "rgba(31, 26, 51, 0.96)", borderRadius: 14, borderWidth: 2, borderColor: "rgba(184, 140, 255, 0.45)", paddingHorizontal: 10 },
   rankCardEyebrow: { color: theme.textDim, fontSize: 10, fontWeight: "900", textTransform: "uppercase", letterSpacing: 0.8 },
-  rankCardName: { marginTop: 5, color: theme.text, fontSize: 23, fontWeight: "900", textAlign: "center" },
+  rankCardIcon: { marginTop: 3, marginBottom: -3 },
+  rankCardName: { marginTop: 3, color: theme.text, fontSize: 20, fontWeight: "900", textAlign: "center" },
   rankCardLp: { marginTop: 5, color: theme.text, fontSize: 14, fontWeight: "900" },
   rankCardPosition: { marginTop: 2, color: theme.textDim, fontSize: 10, fontWeight: "700" },
-  rankCardProgress: { marginTop: 7, color: theme.text, fontSize: 10, fontWeight: "800", textAlign: "center" },
+  rankCardProgressLabel: { marginTop: 7, color: theme.textDim, fontSize: 9, fontWeight: "800", textAlign: "center" },
+  rankCardProgress: { marginTop: 1, color: theme.text, fontSize: 15, fontWeight: "900", textAlign: "center" },
   rankCardHint: { marginTop: 3, color: theme.textDim, fontSize: 9, fontWeight: "600", textAlign: "center" },
   leaderboardPanel: { flex: 1, minWidth: 0, backgroundColor: "#17211D", borderRadius: 9, borderWidth: 7, borderColor: "#6F4226", padding: 8, shadowColor: "#000000", shadowOpacity: 0.5, shadowRadius: 7, shadowOffset: { width: 0, height: 4 }, elevation: 7 },
   framePin: { position: "absolute", width: 5, height: 5, borderRadius: 3, backgroundColor: "#C29A62", borderWidth: 1, borderColor: "#3E2517", zIndex: 3 },
@@ -135,6 +143,8 @@ const styles = StyleSheet.create({
   player: { width: "35%", paddingRight: 6 },
   lp: { width: "14%", textAlign: "right", paddingRight: 8 },
   rank: { width: "27%", textAlign: "center", fontWeight: "900" },
+  rankCell: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 3, minWidth: 0 },
+  rankLabel: { flex: 1, minWidth: 0, textAlign: "center", fontWeight: "900" },
   wins: { width: "14%", textAlign: "right" },
   message: { color: "#CFC7B4", textAlign: "center", marginTop: 32 },
 });

@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { ANDROID_COMPACT_MENU_UI_SCALE, BackIconButton, Screen, Title, BigButton, theme } from "../components/ui";
 import { DAMAGE_WAGER_OPTIONS, DEFAULT_DAMAGE_WAGER, DEFAULT_ROUND_COUNT, getRankedDivision, RANKED_PLACEMENT_MATCHES } from "@confidence-trivia/shared";
 import { getRankedLeaderboard, RankedLeaderboardEntry } from "../network/client";
+import { RankIcon } from "../components/RankIcon";
 
 const ROUND_OPTIONS = [3, 5, 7, 9, 11, 13, 15];
 const DEFAULT_ROUNDS = ROUND_OPTIONS.reduce((closest, value) => {
@@ -157,7 +158,7 @@ export function CreateGameScreen({
                 })}
               </ScrollView>
             </View> : null}
-            {gameMode !== "ranked" ? <View style={styles.visibilitySection}>
+            {gameMode === "classic" ? <View style={styles.visibilitySection}>
               <Text style={styles.roundsLabel}>{t("create.visibility")}</Text>
               <View style={styles.modeRow}>
                 {(["private", "public"] as const).map((value) => (
@@ -178,9 +179,12 @@ export function CreateGameScreen({
                 <>
                   <View style={styles.rankedSummaryBlock}>
                     <Text style={styles.rankedSummaryLabel}>{t("ranked.yourRank")}</Text>
-                    <Text style={[styles.rankedSummaryRank, { color: rankedProfile.placementMatches >= RANKED_PLACEMENT_MATCHES ? getRankedDivision(rankedProfile.lp).color : theme.textDim }]}>
-                      {t(`ranked.ranks.${rankedProfile.rankKey}`)}
-                    </Text>
+                    <View style={styles.rankedSummaryIdentity}>
+                      {rankedProfile.placementMatches >= RANKED_PLACEMENT_MATCHES ? <RankIcon rankKey={rankedProfile.rankKey} size={31} /> : null}
+                      <Text style={[styles.rankedSummaryRank, { color: rankedProfile.placementMatches >= RANKED_PLACEMENT_MATCHES ? getRankedDivision(rankedProfile.lp).color : theme.textDim }]}>
+                        {t(`ranked.ranks.${rankedProfile.rankKey}`)}
+                      </Text>
+                    </View>
                   </View>
                   <View style={styles.rankedDivider} />
                   <View style={styles.rankedSummaryBlock}>
@@ -196,7 +200,7 @@ export function CreateGameScreen({
         <View style={styles.actionsColumn}>
           {error && <Text style={styles.error}>{t("network.createFailed", { message: error })}</Text>}
           <BigButton
-            label={gameMode === "ranked" ? (submitting ? t("create.queueing") : t("create.queue")) : (submitting ? t("create.creating") : t("create.create"))}
+            label={gameMode === "ranked" || gameMode === "damage" ? (submitting ? t("create.queueing") : t("create.queue")) : (submitting ? t("create.creating") : t("create.create"))}
             onPress={handleSubmit}
             disabled={!trimmedName || submitting}
             style={styles.actionButton}
@@ -224,6 +228,7 @@ const styles = StyleSheet.create({
   rankedSummary: { width: "100%", minHeight: 50, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 14, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 7, backgroundColor: "rgba(31, 26, 51, 0.88)", borderWidth: 1, borderColor: "rgba(184, 140, 255, 0.42)" },
   rankedSummaryBlock: { minWidth: 75, alignItems: "center" },
   rankedSummaryLabel: { color: theme.textDim, fontSize: 9, fontWeight: "900", textTransform: "uppercase" },
+  rankedSummaryIdentity: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 },
   rankedSummaryRank: { color: theme.text, fontSize: 15, fontWeight: "900", marginTop: 1 },
   rankedSummaryLp: { color: "#F7D85B", fontSize: 16, fontWeight: "900", marginTop: 1 },
   rankedDivider: { width: 1, height: 30, backgroundColor: "rgba(255,255,255,0.14)" },

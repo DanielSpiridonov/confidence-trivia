@@ -80,6 +80,8 @@
     "waitingForPlayers": "Waiting for {{count}} players...",
     "rankedSearching": "Searching for ranked players",
     "rankedAutoStart": "The match starts automatically when four players are found.",
+    "damageSearching": "Searching for an opponent",
+    "damageAutoStart": "The match starts automatically when another player with the same wager is found.",
     "start": "Start Game",
     "startingTitle": "Game starting",
     "startingMessage": "Get ready...",
@@ -171,6 +173,7 @@
     "placementHint": "{{count}} placement game(s) remaining",
     "novice": "Novice",
     "placements": "Placement matches: {{current}} / {{total}}",
+    "placementMatchesLabel": "Placement matches",
     "findMatch": "Find Ranked Match",
     "finding": "Finding players...",
     "loading": "Loading leaderboard...",
@@ -238,6 +241,10 @@
     "noOwnedAvatars": "No owned avatars yet.",
     "noOwnedFrames": "No owned player borders yet.",
     "playerBordersPreview": "Borders for avatar + name cards",
+    "frameCategories": {
+      "solid": "Solid",
+      "animated": "Animated"
+    },
     "inventoryCategories": {
       "nameColors": "Name Colors",
       "avatars": "Avatars",

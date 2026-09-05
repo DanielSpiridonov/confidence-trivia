@@ -91,9 +91,10 @@ class GameRoom extends colyseus_1.Room {
         this.isPublic = options.visibility === "public";
         this.state.isPublic = this.isPublic;
         this.questionSet = (0, questions_1.getQuestionSet)(this.state.gameMode === "damage" ? 100 : this.state.totalRounds, options.excludeQuestionIds ?? []);
-        // Ranked rooms are discoverable only to joinOrCreate matchmaking. They
-        // are filtered out of the user-facing public lobby endpoint.
-        await this.setPrivate(this.state.gameMode === "ranked" ? false : !this.isPublic);
+        // Matchmade rooms stay available to joinOrCreate, but are filtered out
+        // of the user-facing public lobby browser.
+        const isMatchmade = this.state.gameMode === "ranked" || this.state.gameMode === "damage";
+        await this.setPrivate(isMatchmade ? false : !this.isPublic);
         await this.updateLobbyMetadata();
         this.onMessage("toggleReady", (client) => this.handleToggleReady(client));
         this.onMessage("toggleRoomVisibility", (client) => void this.handleToggleRoomVisibility(client));
@@ -146,6 +147,11 @@ class GameRoom extends colyseus_1.Room {
         if (this.state.gameMode === "ranked" && this.state.players.size === shared_1.RANKED_PLAYER_COUNT && !this.state.gameStarted) {
             await this.lock();
             this.beginGame();
+        }
+        if (this.state.gameMode === "damage" && this.state.players.size === 2 && !this.state.gameStarted) {
+            const host = this.clients.find((roomClient) => roomClient.sessionId === this.state.hostId);
+            if (host)
+                await this.handleStartGame(host);
         }
     }
     async onLeave(client, consented) {

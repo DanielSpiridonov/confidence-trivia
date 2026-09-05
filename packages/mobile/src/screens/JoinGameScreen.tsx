@@ -110,7 +110,7 @@ export function JoinGameScreen({
             onChangeText={setSearch}
           />
           <View style={styles.filterRow}>
-            {(["all", "classic", "ranked", "damage"] as const).map((mode) => {
+            {(["all", "classic"] as const).map((mode) => {
               const selected = modeFilter === mode;
               return (
                 <Pressable key={mode} onPress={() => setModeFilter(mode)} style={[styles.filterChip, selected && styles.filterChipSelected]}>
