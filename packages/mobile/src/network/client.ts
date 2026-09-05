@@ -214,8 +214,7 @@ export async function createRoom(
   damageWager = 5,
 ) {
   const accessToken = await getAccessToken();
-  const room = await withRoomRequestTimeout(
-    getClient().create("confidence_trivia", {
+  const options = {
       roundCount,
       locale,
       gameMode,
@@ -225,8 +224,10 @@ export async function createRoom(
       visibility,
       damageWager,
       accessToken,
-    })
-  );
+    };
+  const room = await withRoomRequestTimeout(gameMode === "ranked"
+    ? getClient().joinOrCreate("confidence_trivia", options)
+    : getClient().create("confidence_trivia", options));
   return room;
 }
 
@@ -264,6 +265,7 @@ export async function listPublicRooms(): Promise<PublicRoomListing[]> {
       && room.clients < room.maxClients
       && (room.metadata?.playerCount ?? 0) > 0
       && Boolean(room.metadata?.leaderName)
+      && room.metadata?.gameMode !== "ranked"
     ))
     .map((room) => ({
       roomId: room.roomId,

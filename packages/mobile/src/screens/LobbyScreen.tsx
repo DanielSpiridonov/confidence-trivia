@@ -80,6 +80,7 @@ export function LobbyScreen({ room, mySessionId }: { room: Room; mySessionId: st
   const me = players.find((p) => p.id === mySessionId);
   const isHost = me?.isHost ?? false;
   const requiredPlayers = state.gameMode === "damage" ? 2 : state.gameMode === "ranked" ? RANKED_PLAYER_COUNT : MIN_PLAYERS_TO_START;
+  const isRanked = state.gameMode === "ranked";
   const canStart = isHost && (state.gameMode === "damage" || state.gameMode === "ranked" ? players.length === requiredPlayers : players.length >= requiredPlayers);
 
   async function handleCopyCode() {
@@ -98,28 +99,24 @@ export function LobbyScreen({ room, mySessionId }: { room: Room; mySessionId: st
               <View style={[styles.playerRow, item.frameId ? { borderWidth: 2, borderColor: FRAME_COSMETIC_COLORS[item.frameId as keyof typeof FRAME_COSMETIC_COLORS] } : null]}>
                 <PlayerFrameEffect frameId={item.frameId} />
                 <Text numberOfLines={1} style={[styles.playerName, { color: item.nameColor || theme.text }]}>{item.isHost ? "👑 " : ""}{item.name}{!item.connected ? " (reconnecting…)" : ""}</Text>
-                <Text style={item.ready ? styles.readyBadge : styles.notReadyBadge}>{item.ready ? t("lobby.ready") : t("lobby.notReady")}</Text>
+                {!isRanked ? <Text style={item.ready ? styles.readyBadge : styles.notReadyBadge}>{item.ready ? t("lobby.ready") : t("lobby.notReady")}</Text> : null}
               </View>
             )} />
           </View>
 
           <View style={styles.infoColumn}>
-            <Subtitle>{t("lobby.roomCode")}</Subtitle>
-            <Pressable onPress={() => void handleCopyCode()} style={styles.codeWrap}>
-              <Title>{state.code}</Title>
-              <Text style={styles.copyHint}>{copied ? t("lobby.copied") : t("lobby.tapToCopy")}</Text>
-            </Pressable>
+            {isRanked ? <View style={styles.rankedQueue}><Subtitle>{t("lobby.rankedSearching")}</Subtitle><Text style={styles.rankedCount}>{players.length}/{RANKED_PLAYER_COUNT}</Text><Text style={styles.copyHint}>{t("lobby.rankedAutoStart")}</Text></View> : <><Subtitle>{t("lobby.roomCode")}</Subtitle><Pressable onPress={() => void handleCopyCode()} style={styles.codeWrap}><Title>{state.code}</Title><Text style={styles.copyHint}>{copied ? t("lobby.copied") : t("lobby.tapToCopy")}</Text></Pressable></>}
             {state.gameMode === "damage" ? <View style={styles.wagerBanner}>
               <Text style={styles.wagerStake}>{t("lobby.wagerStake", { count: state.damageWager })}</Text>
               <Text style={styles.wagerPot}>{t("lobby.wagerPot", { count: state.damagePot })}</Text>
             </View> : null}
-            {isHost && !isStarting ? <Pressable accessibilityRole="switch" accessibilityState={{ checked: Boolean(state.isPublic) }} onPress={() => room.send("toggleRoomVisibility")} style={styles.visibilityControl}>
+            {!isRanked && isHost && !isStarting ? <Pressable accessibilityRole="switch" accessibilityState={{ checked: Boolean(state.isPublic) }} onPress={() => room.send("toggleRoomVisibility")} style={styles.visibilityControl}>
               <Text style={styles.visibilityLabel}>{state.isPublic ? t("lobby.partyPublic") : t("lobby.partyPrivate")}</Text>
               <View style={[styles.visibilityTrack, state.isPublic && styles.visibilityTrackEnabled]}><View style={[styles.visibilityThumb, state.isPublic && styles.visibilityThumbEnabled]} /></View>
             </Pressable> : null}
             <View style={styles.actionArea}>
-              {!isStarting && (isHost ? <BigButton label={t("lobby.start")} onPress={() => { setStartError(null); room.send("startGame"); }} disabled={!canStart} /> : <BigButton label={me?.ready ? t("lobby.notReady") : t("lobby.ready")} onPress={() => room.send("toggleReady")} variant="secondary" />)}
-              {!isStarting && !canStart && isHost && <Subtitle>{t("lobby.waitingForPlayers", { count: requiredPlayers })}</Subtitle>}
+              {!isRanked && !isStarting && (isHost ? <BigButton label={t("lobby.start")} onPress={() => { setStartError(null); room.send("startGame"); }} disabled={!canStart} /> : <BigButton label={me?.ready ? t("lobby.notReady") : t("lobby.ready")} onPress={() => room.send("toggleReady")} variant="secondary" />)}
+              {!isRanked && !isStarting && !canStart && isHost && <Subtitle>{t("lobby.waitingForPlayers", { count: requiredPlayers })}</Subtitle>}
               {!isStarting && startError ? <Text style={styles.startError}>{startError}</Text> : null}
             </View>
           </View>
@@ -160,6 +157,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     fontSize: 13,
   },
+  rankedQueue: { width: "100%", alignItems: "center" },
+  rankedCount: { color: theme.text, fontSize: 42, fontWeight: "900", marginVertical: 8 },
   visibilityControl: {
     alignSelf: "center",
     flexDirection: "row",

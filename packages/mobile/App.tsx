@@ -21,13 +21,14 @@ import { SettingsScreen, VolumeControl } from "./src/screens/SettingsScreen";
 import { RankedScreen } from "./src/screens/RankedScreen";
 import { ShopScreen } from "./src/screens/ShopScreen";
 import { ProfileScreen } from "./src/screens/ProfileScreen";
+import { RulesScreen } from "./src/screens/RulesScreen";
 import { AccountProfile, claimDailyReward, createRoom, DailyRewardStatus, getAccountProfile, getDailyRewardStatus, getPlayerStars, joinPublicRoom, joinRoom, linkPlayerAccount, reconnectRoom, updateAccountName, useRoomState } from "./src/network/client";
 import { prepareSoundEffects, setSoundEffectsVolume, stopAllSoundEffects } from "./src/audio/sounds";
 import { pauseMusicForBackground, prepareMusic, setMusicVolume as applyMusicVolume, startMenuMusic, stopMenuMusic } from "./src/audio/music";
 import { createFreshGuestIdentity, getOrCreateDeviceId, getOrCreateGuestName } from "./src/utils/deviceId";
 import { authConfigured, getStoredSession, signInWithSocialProvider, signOutAccount, subscribeToAuthChanges } from "./src/auth/supabase";
 
-type Nav = "home" | "create" | "join" | "ranked" | "shop" | "settings" | "profile" | "in-room";
+type Nav = "home" | "create" | "join" | "ranked" | "shop" | "settings" | "profile" | "rules" | "in-room";
 type RoomRecoveryState = "reconnecting" | "failed";
 const LANGUAGE_STORAGE_KEY = "confidence-trivia:locale";
 const SFX_VOLUME_STORAGE_KEY = "confidence-trivia:sfx-volume";
@@ -419,11 +420,6 @@ export default function App() {
     void AsyncStorage.setItem(MUSIC_VOLUME_STORAGE_KEY, String(volume));
   }
 
-  function handleDefaultPlayerName(name: string) {
-    setDefaultPlayerName(name);
-    void AsyncStorage.setItem(PLAYER_NAME_STORAGE_KEY, name);
-  }
-
   function handleHapticsEnabled(enabled: boolean) {
     setHapticsEnabled(enabled);
     void AsyncStorage.setItem(HAPTICS_STORAGE_KEY, String(enabled));
@@ -440,7 +436,10 @@ export default function App() {
     setDailyRewardClaiming(true);
     try {
       const status = await claimDailyReward(currentDeviceId, defaultPlayerName);
-      if (!status) return;
+      if (!status) {
+        Alert.alert(i18n.t("feedback.actionFailed"), i18n.t("feedback.tryAgain"));
+        return;
+      }
       const earned = Math.max(0, status.stars - stars);
       setDailyReward(status);
       setStars(status.stars);
@@ -640,18 +639,17 @@ export default function App() {
               locale={locale}
               soundEffectsVolume={soundEffectsVolume}
               musicVolume={musicVolume}
-              defaultPlayerName={defaultPlayerName}
               hapticsEnabled={hapticsEnabled}
               highContrastEnabled={highContrastEnabled}
               onChangeLocale={handleChangeLocale}
               onChangeSoundEffectsVolume={handleSoundEffectsVolume}
               onChangeMusicVolume={handleMusicVolume}
-              onChangeDefaultPlayerName={handleDefaultPlayerName}
               onChangeHapticsEnabled={handleHapticsEnabled}
               onChangeHighContrastEnabled={handleHighContrastEnabled}
               onBack={() => setNav("home")}
             />
           )}
+          {nav === "rules" && <RulesScreen onBack={() => setNav("home")} />}
           {nav === "profile" && (
             <ProfileScreen
               displayName={defaultPlayerName}
@@ -669,16 +667,16 @@ export default function App() {
         </>
       )}
       {nav === "home" ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={i18n.t("home.settings")}
-          onPress={() => setNav("settings")}
-          style={({ pressed }) => [styles.homeSettingsButton, pressed && styles.homeSettingsButtonPressed]}
-        >
-          <Text style={styles.homeSettingsIcon}>{"\u2699"}</Text>
-        </Pressable>
+        <>
+          <Pressable accessibilityRole="button" accessibilityLabel={i18n.t("home.ruleBook")} onPress={() => setNav("rules")} style={({ pressed }) => [styles.homeSettingsButton, styles.homeRulesButton, pressed && styles.homeSettingsButtonPressed]}>
+            <Text style={styles.homeRulesIcon}>?</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel={i18n.t("home.settings")} onPress={() => setNav("settings")} style={({ pressed }) => [styles.homeSettingsButton, pressed && styles.homeSettingsButtonPressed]}>
+            <Text style={styles.homeSettingsIcon}>{"\u2699"}</Text>
+          </Pressable>
+        </>
       ) : null}
-      {nav !== "in-room" ? <StarsBadge stars={stars} gain={starGain} onPress={() => openShop("stars")} /> : null}
+      {nav !== "in-room" ? <StarsBadge stars={stars} gain={starGain} onPress={() => openRegisteredFeature("shop", () => openShop("stars"))} /> : null}
     </AppFrame>
   );
 }
@@ -918,6 +916,8 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255, 255, 255, 0.10)",
   },
   homeSettingsButtonPressed: { opacity: 0.7, transform: [{ scale: 0.96 }] },
+  homeRulesButton: { right: 170 },
+  homeRulesIcon: { color: theme.text, fontSize: 23, lineHeight: 26, fontWeight: "900" },
   homeSettingsIcon: { color: theme.text, fontSize: 24, lineHeight: 27, fontWeight: "800" },
   pointsBadge: {
     minWidth: 76,

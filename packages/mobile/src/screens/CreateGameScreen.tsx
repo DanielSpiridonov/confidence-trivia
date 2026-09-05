@@ -1,9 +1,8 @@
 import React, { useState } from "react";
-import { Alert, TextInput, StyleSheet, Text, ScrollView, Pressable, View, Platform } from "react-native";
+import { Alert, StyleSheet, Text, ScrollView, Pressable, View, Platform } from "react-native";
 import { useTranslation } from "react-i18next";
 import { ANDROID_COMPACT_MENU_UI_SCALE, BackIconButton, Screen, Title, BigButton, theme } from "../components/ui";
 import { DAMAGE_WAGER_OPTIONS, DEFAULT_DAMAGE_WAGER, DEFAULT_ROUND_COUNT, getRankedDivision, RANKED_PLACEMENT_MATCHES } from "@confidence-trivia/shared";
-import { isValidPlayerName } from "../utils/playerName";
 import { getRankedLeaderboard, RankedLeaderboardEntry } from "../network/client";
 
 const ROUND_OPTIONS = [3, 5, 7, 9, 11, 13, 15];
@@ -33,7 +32,6 @@ export function CreateGameScreen({
   onBack: () => void;
 }) {
   const { t } = useTranslation();
-  const [name, setName] = useState(initialName);
   const [gameMode, setGameMode] = useState<"classic" | "ranked" | "damage">("classic");
   const [visibility, setVisibility] = useState<"private" | "public">("private");
   const [rounds, setRounds] = useState(DEFAULT_ROUNDS);
@@ -42,8 +40,7 @@ export function CreateGameScreen({
   const [error, setError] = useState<string | null>(null);
   const [rankedProfile, setRankedProfile] = useState<RankedLeaderboardEntry | null>(null);
   const [rankedLoading, setRankedLoading] = useState(false);
-  const trimmedName = name.trim();
-  const hasInvalidNameCharacters = trimmedName.length > 0 && !isValidPlayerName(trimmedName);
+  const trimmedName = initialName.trim();
 
   React.useEffect(() => {
     if (gameMode !== "ranked") return;
@@ -59,7 +56,7 @@ export function CreateGameScreen({
   }, [deviceId, gameMode]);
 
   async function handleSubmit() {
-    if (submitting || !isValidPlayerName(name)) return;
+    if (submitting || !trimmedName) return;
     if (gameMode === "damage" && damageWager > stars) {
       Alert.alert(t("shop.notEnoughStars"));
       return;
@@ -84,17 +81,7 @@ export function CreateGameScreen({
       <View style={styles.titleGap} />
       <View style={styles.body}>
         <View style={styles.formColumn}>
-          <TextInput
-            style={styles.input}
-            placeholder={t("create.yourName") as string}
-            placeholderTextColor={theme.textDim}
-            value={name}
-            onChangeText={(value) => {
-              setName(value);
-              if (error) setError(null);
-            }}
-            maxLength={20}
-          />
+          <View style={styles.input}><Text numberOfLines={1} style={styles.playerNameText}>{initialName}</Text></View>
           <View style={styles.modeSection}>
             <Text style={styles.roundsLabel}>{t("create.mode")}</Text>
             <View style={styles.modeRow}>
@@ -209,12 +196,11 @@ export function CreateGameScreen({
         <View style={styles.actionsColumn}>
           {error && <Text style={styles.error}>{t("network.createFailed", { message: error })}</Text>}
           <BigButton
-            label={submitting ? t("create.creating") : t("create.create")}
+            label={gameMode === "ranked" ? (submitting ? t("create.queueing") : t("create.queue")) : (submitting ? t("create.creating") : t("create.create"))}
             onPress={handleSubmit}
-            disabled={!isValidPlayerName(name) || submitting}
+            disabled={!trimmedName || submitting}
             style={styles.actionButton}
           />
-          {hasInvalidNameCharacters ? <Text style={styles.validationError}>{t("validation.nameSpecialCharacters")}</Text> : null}
         </View>
       </View>
     </Screen>
@@ -254,7 +240,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 12,
     width: "100%",
+    minHeight: 50,
+    justifyContent: "center",
   },
+  playerNameText: { color: theme.text, fontSize: 16, fontWeight: "800" },
   roundsSection: {
     flex: 1,
     minWidth: 0,
@@ -323,5 +312,4 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     textAlign: "center",
   },
-  validationError: { color: theme.danger, marginTop: 8, textAlign: "center", fontSize: 13 },
 });

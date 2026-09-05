@@ -1,10 +1,9 @@
 import React from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { ANDROID_COMPACT_MENU_UI_SCALE, BackIconButton, Screen, Title, BigButton, theme } from "../components/ui";
-import { isValidPlayerName } from "../utils/playerName";
 
-type SettingsSection = "profile" | "sounds" | "haptics" | "language" | "accessibility";
+type SettingsSection = "sounds" | "haptics" | "language" | "accessibility";
 
 function SettingsToggle({ label, value, onChange }: { label: string; value: boolean; onChange: (value: boolean) => void }) {
   return (
@@ -96,13 +95,11 @@ export function SettingsScreen({
   locale,
   soundEffectsVolume,
   musicVolume,
-  defaultPlayerName,
   hapticsEnabled,
   highContrastEnabled,
   onChangeLocale,
   onChangeSoundEffectsVolume,
   onChangeMusicVolume,
-  onChangeDefaultPlayerName,
   onChangeHapticsEnabled,
   onChangeHighContrastEnabled,
   onBack,
@@ -110,38 +107,20 @@ export function SettingsScreen({
   locale: "en" | "bg";
   soundEffectsVolume: number;
   musicVolume: number;
-  defaultPlayerName: string;
   hapticsEnabled: boolean;
   highContrastEnabled: boolean;
   onChangeLocale: (locale: "en" | "bg") => void;
   onChangeSoundEffectsVolume: (volume: number) => void;
   onChangeMusicVolume: (volume: number) => void;
-  onChangeDefaultPlayerName: (name: string) => void;
   onChangeHapticsEnabled: (enabled: boolean) => void;
   onChangeHighContrastEnabled: (enabled: boolean) => void;
   onBack: () => void;
 }) {
   const { t } = useTranslation();
-  const [section, setSection] = React.useState<SettingsSection>("profile");
-  const invalidName = defaultPlayerName.trim().length > 0 && !isValidPlayerName(defaultPlayerName);
+  const [section, setSection] = React.useState<SettingsSection>("sounds");
 
   function renderPanel() {
     switch (section) {
-      case "profile":
-        return (
-          <View style={styles.panelContent}>
-            <Text style={styles.fieldLabel}>{t("settings.defaultName")}</Text>
-            <TextInput
-              value={defaultPlayerName}
-              onChangeText={onChangeDefaultPlayerName}
-              maxLength={20}
-              placeholder={t("settings.defaultName")}
-              placeholderTextColor={theme.textDim}
-              style={[styles.nameInput, invalidName && styles.nameInputInvalid]}
-            />
-            {invalidName ? <Text style={styles.validationText}>{t("validation.nameSpecialCharacters")}</Text> : null}
-          </View>
-        );
       case "sounds":
         return (
           <View style={styles.panelContent}>
@@ -169,7 +148,7 @@ export function SettingsScreen({
       <Title>{t("settings.title")}</Title>
       <View style={styles.settingsLayout}>
         <View style={styles.sidebar}>
-          {(["profile", "sounds", "haptics", "language", "accessibility"] as const).map((value) => (
+          {(["sounds", "haptics", "language", "accessibility"] as const).map((value) => (
             <Pressable
               key={value}
               onPress={() => setSection(value)}
@@ -202,10 +181,6 @@ const styles = StyleSheet.create({
   panelTitle: { color: theme.text, fontSize: 18, fontWeight: "800", marginBottom: 8 },
   panelContent: { width: "100%", maxWidth: 520 },
   languageButton: { width: "100%", minWidth: 0 },
-  fieldLabel: { color: theme.text, fontSize: 14, fontWeight: "800", marginBottom: 7 },
-  nameInput: { width: "100%", minHeight: 48, borderRadius: 8, backgroundColor: theme.surface, color: theme.text, paddingHorizontal: 14, fontSize: 16, borderWidth: 1, borderColor: "transparent" },
-  nameInputInvalid: { borderColor: "#ff6b7a" },
-  validationText: { color: "#ff8b97", fontSize: 12, marginTop: 6 },
   toggleRow: { width: "100%", minHeight: 54, backgroundColor: theme.surface, borderRadius: 8, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   toggleLabel: { color: theme.text, fontSize: 15, fontWeight: "800", flexShrink: 1, marginRight: 12 },
   toggleTrack: { width: 46, height: 26, borderRadius: 13, padding: 3, backgroundColor: "rgba(185, 176, 214, 0.3)" },

@@ -16,6 +16,20 @@
     "dailyRewardClaimed": "Daily Reward Claimed",
     "dailyRewardTomorrow": "Available again tomorrow"
   },
+  "rules": {
+    "title": "How to Play",
+    "intro": "Answer well, judge your confidence, and outscore the room.",
+    "loop": { "title": "Each round", "body": "Answer before time runs out. When everyone finishes, the countdown shortens and the game moves on." },
+    "confidence": { "title": "Confidence", "body": "After answering, choose your risk. No Confidence is +0 / -0; higher confidence offers a larger reward but a larger penalty." },
+    "classic": { "title": "Classic", "body": "Earn 1 point for Easy, 2 for Medium, and 3 for Hard questions, adjusted by confidence. The highest final score wins." },
+    "damage": { "title": "1v1 Damage", "body": "Correct answers damage your opponent. If both answer correctly, damage is stored in a pot for the next decisive hit. Reduce the opponent to 0 HP." },
+    "ranked": { "title": "Ranked", "body": "Four-player matchmaking. LP is awarded by final placement, not round points. Your first 3 matches determine your starting rank." },
+    "stars": { "title": "Stars", "body": "Stars are currency, separate from match points. Eligible games, daily rewards, and future gifts grant stars for cosmetics and wagers." }
+  },
+  "feedback": {
+    "actionFailed": "Something went wrong",
+    "tryAgain": "Your change was not saved. Please check your connection and try again."
+  },
   "join": {
     "roomCode": "Room Code",
     "yourName": "Your Name",
@@ -51,6 +65,8 @@
     "private": "Private",
     "public": "Public",
     "create": "Create Room",
+    "queue": "Join Queue",
+    "queueing": "Joining Queue...",
     "creating": "Creating room..."
   },
   "lobby": {
@@ -62,6 +78,8 @@
     "players": "Players",
     "waitingForHost": "Waiting for the host to start...",
     "waitingForPlayers": "Waiting for {{count}} players...",
+    "rankedSearching": "Searching for ranked players",
+    "rankedAutoStart": "The match starts automatically when four players are found.",
     "start": "Start Game",
     "startingTitle": "Game starting",
     "startingMessage": "Get ready...",
@@ -146,7 +164,7 @@
     "player": "Player",
     "lp": "LP",
     "rank": "Rank",
-    "wins": "Wins",
+    "wins": "Ranked wins",
     "yourRank": "Your rank",
     "lpValue": "{{value}} LP",
     "globalPosition": "Global position #{{position}}",
@@ -192,6 +210,7 @@
     "configurationRequired": "Google and Apple sign-in need the Supabase project URL, publishable key, and provider settings before they can be used.",
     "google": "Continue with Google",
     "apple": "Continue with Apple",
+    "appleComingSoon": "Continue with Apple · Coming later",
     "signIn": "Sign in",
     "signInRequired": "Account required",
     "shopRequiresAccount": "Sign in with Google or Apple to access the Shop and Inventory.",
@@ -199,7 +218,7 @@
     "signInFailed": "Could not sign in",
     "linkFailed": "Your account signed in, but the guest progress could not be linked.",
     "progressProtected": "Your stars, cosmetics, and game progress are linked to this account.",
-    "protected": "PROTECTED", "localOnly": "LOCAL GUEST", "email": "Email", "namePlaceholder": "Permanent player name", "saveName": "Save", "nameRules": "Use 3-20 letters, numbers, spaces, _ or -.", "nameUpdated": "Player name updated", "nameUpdateFailed": "Could not update name", "stars": "Stars", "games": "Games", "wins": "Wins", "rank": "Rank", "signOut": "Sign out", "signOutConfirm": "Your linked progress will stay safe. This device will return to a new guest profile.", "sessionExpired": "Session expired", "sessionExpiredMessage": "Please sign in again. Your linked progress remains safe."
+    "protected": "PROTECTED", "localOnly": "LOCAL GUEST", "unlockProfile": "Make your progress yours", "benefitProgress": "Protect progress", "benefitRanked": "Play Ranked", "benefitSocial": "Friends & gifts", "transferHint": "Your current guest progress transfers automatically.", "email": "Email", "namePlaceholder": "Permanent player name", "saveName": "Save", "nameRules": "Use 3-20 letters, numbers, spaces, _ or -.", "nameUpdated": "Player name updated", "nameUpdateFailed": "Could not update name", "stars": "Stars", "games": "Games", "wins": "Wins", "rank": "Rank", "signOut": "Sign out", "signOutConfirm": "Your linked progress will stay safe. This device will return to a new guest profile.", "sessionExpired": "Session expired", "sessionExpiredMessage": "Please sign in again. Your linked progress remains safe."
   },
   "shop": {
     "title": "Customization Shop",

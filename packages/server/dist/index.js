@@ -208,7 +208,7 @@ const gameServer = new colyseus_1.Server({
 // "confidence_trivia" is the room type name the client requests by;
 // each call to joinOrCreate/create spins up a new authoritative GameRoom
 // instance with its own room code.
-gameServer.define("confidence_trivia", GameRoom_1.GameRoom);
+gameServer.define("confidence_trivia", GameRoom_1.GameRoom).filterBy(["gameMode"]);
 httpServer.listen(port, () => {
     console.log(`Confidence Trivia server listening on ws://0.0.0.0:${port}`);
 });

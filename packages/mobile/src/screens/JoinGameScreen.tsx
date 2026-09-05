@@ -3,7 +3,6 @@ import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-na
 import { useTranslation } from "react-i18next";
 import { ANDROID_MENU_UI_SCALE, BackIconButton, Screen, Title, BigButton, theme } from "../components/ui";
 import { listPublicRooms, PublicRoomListing } from "../network/client";
-import { isValidPlayerName } from "../utils/playerName";
 
 export function JoinGameScreen({
   onJoin,
@@ -18,15 +17,13 @@ export function JoinGameScreen({
 }) {
   const { t } = useTranslation();
   const [code, setCode] = useState("");
-  const [name, setName] = useState(initialName);
   const [search, setSearch] = useState("");
   const [modeFilter, setModeFilter] = useState<"all" | "classic" | "ranked" | "damage">("all");
   const [rooms, setRooms] = useState<PublicRoomListing[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [joiningRoomId, setJoiningRoomId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const trimmedName = name.trim();
-  const hasInvalidNameCharacters = trimmedName.length > 0 && !isValidPlayerName(trimmedName);
+  const trimmedName = initialName.trim();
 
   const refreshRooms = useCallback(async (showSpinner = false) => {
     if (showSpinner) setRefreshing(true);
@@ -55,7 +52,7 @@ export function JoinGameScreen({
   }, [modeFilter, rooms, search]);
 
   async function joinWithCode() {
-    if (joiningRoomId || code.length !== 6 || !isValidPlayerName(name)) return;
+    if (joiningRoomId || code.length !== 6 || !trimmedName) return;
     try {
       setJoiningRoomId("code");
       setError(null);
@@ -67,7 +64,7 @@ export function JoinGameScreen({
   }
 
   async function joinListedRoom(roomId: string) {
-    if (joiningRoomId || !isValidPlayerName(name)) return;
+    if (joiningRoomId || !trimmedName) return;
     try {
       setJoiningRoomId(roomId);
       setError(null);
@@ -85,14 +82,7 @@ export function JoinGameScreen({
       <Title>{t("home.joinGame")}</Title>
       <View style={styles.columns}>
         <View style={styles.leftColumn}>
-          <TextInput
-            style={styles.input}
-            placeholder={t("join.yourName") as string}
-            placeholderTextColor={theme.textDim}
-            value={name}
-            onChangeText={(value) => { setName(value); setError(null); }}
-            maxLength={20}
-          />
+          <View style={styles.input}><Text numberOfLines={1} style={styles.playerNameText}>{initialName}</Text></View>
           <TextInput
             style={[styles.input, styles.codeInput]}
             placeholder={t("join.roomCode") as string}
@@ -102,12 +92,11 @@ export function JoinGameScreen({
             keyboardType="number-pad"
             maxLength={6}
           />
-          {hasInvalidNameCharacters ? <Text style={styles.validationError}>{t("validation.nameSpecialCharacters")}</Text> : null}
           {error ? <Text numberOfLines={2} style={styles.error}>{t("network.joinFailed", { message: error })}</Text> : null}
           <BigButton
             label={joiningRoomId === "code" ? t("join.joining") : t("join.join")}
             onPress={joinWithCode}
-            disabled={code.length !== 6 || !isValidPlayerName(name) || Boolean(joiningRoomId)}
+            disabled={code.length !== 6 || !trimmedName || Boolean(joiningRoomId)}
             style={styles.actionButton}
           />
         </View>
@@ -149,8 +138,8 @@ export function JoinGameScreen({
                 </View>
                 <Pressable
                   onPress={() => void joinListedRoom(item.roomId)}
-                  disabled={!isValidPlayerName(name) || Boolean(joiningRoomId)}
-                  style={[styles.joinRoomButton, (!isValidPlayerName(name) || Boolean(joiningRoomId)) && styles.disabled]}
+                  disabled={!trimmedName || Boolean(joiningRoomId)}
+                  style={[styles.joinRoomButton, (!trimmedName || Boolean(joiningRoomId)) && styles.disabled]}
                 >
                   <Text style={styles.joinRoomText}>{joiningRoomId === item.roomId ? t("join.joining") : t("join.join")}</Text>
                 </Pressable>
@@ -168,7 +157,8 @@ const styles = StyleSheet.create({
   columns: { flex: 1, minHeight: 0, width: "100%", flexDirection: "row", gap: 24, alignItems: "stretch" },
   leftColumn: { width: "38%", minWidth: 0, justifyContent: "center" },
   rightColumn: { flex: 1, minWidth: 0 },
-  input: { width: "100%", minHeight: 54, backgroundColor: theme.surface, color: theme.text, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, marginBottom: 10 },
+  input: { width: "100%", minHeight: 54, backgroundColor: theme.surface, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 13, marginBottom: 10, justifyContent: "center" },
+  playerNameText: { color: theme.text, fontSize: 15, fontWeight: "800" },
   codeInput: { letterSpacing: 2, textAlign: "center" },
   searchInput: { width: "100%", color: theme.text, backgroundColor: "transparent", paddingHorizontal: 4, paddingVertical: 8, fontSize: 14, marginBottom: 4 },
   filterRow: { width: "100%", flexDirection: "row", gap: 6, marginBottom: 7 },
@@ -189,5 +179,4 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.4 },
   actionButton: { width: "100%", minWidth: 0 },
   error: { color: theme.danger, marginBottom: 2, textAlign: "center", fontSize: 12 },
-  validationError: { color: theme.danger, marginBottom: 4, textAlign: "center", fontSize: 12 },
 });

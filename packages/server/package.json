@@ -6,7 +6,10 @@
     "dev": "tsx watch src/index.ts",
     "prebuild": "npm run build --workspace=@confidence-trivia/shared",
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "test:unit": "npm run build && node --test scripts/*.test.mjs",
+    "test:load": "node scripts/load-test.mjs",
+    "test:ranked-load": "node scripts/ranked-load-test.mjs"
   },
   "dependencies": {
     "@colyseus/schema": "^2.0.0",

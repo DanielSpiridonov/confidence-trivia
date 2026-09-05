@@ -136,6 +136,7 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
     } else {
       setEquippedNameColorId(previous);
       cacheCustomization(previous, equippedAvatarId, equippedFrameId);
+      Alert.alert(t("feedback.actionFailed"), t("feedback.tryAgain"));
     }
   }
 
@@ -157,6 +158,7 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
     } else {
       setEquippedAvatarId(previous);
       cacheCustomization(equippedNameColorId, previous, equippedFrameId);
+      Alert.alert(t("feedback.actionFailed"), t("feedback.tryAgain"));
     }
   }
 
@@ -178,6 +180,7 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
     } else {
       setEquippedFrameId(previous);
       cacheCustomization(equippedNameColorId, equippedAvatarId, previous);
+      Alert.alert(t("feedback.actionFailed"), t("feedback.tryAgain"));
     }
   }
 

@@ -288,10 +288,10 @@ async function getRankedLeaderboard(deviceId) {
         return null;
     try {
         const rows = await sql `
-      select id, display_name, ranked_lp, wins, ranked_placement_matches, position::int
+      select id, display_name, ranked_lp, ranked_wins, ranked_placement_matches, position::int
       from (
-        select id, display_name, ranked_lp, wins, ranked_placement_matches,
-          row_number() over (order by ranked_lp desc, wins desc, created_at asc) as position
+        select id, display_name, ranked_lp, ranked_wins, ranked_placement_matches,
+          row_number() over (order by ranked_lp desc, ranked_wins desc, created_at asc) as position
         from public.players
         where ranked_placement_matches >= ${shared_1.RANKED_PLACEMENT_MATCHES}
       ) ranked
@@ -303,20 +303,20 @@ async function getRankedLeaderboard(deviceId) {
             displayName: player.display_name,
             lp: player.ranked_lp,
             rankKey: (0, shared_1.getRankedDivision)(player.ranked_lp).key,
-            wins: player.wins,
+            wins: player.ranked_wins,
             position: player.position,
             placementMatches: player.ranked_placement_matches,
         }));
         const [current] = await sql `
-      select p.id, p.display_name, p.ranked_lp, p.wins, p.ranked_placement_matches,
+      select p.id, p.display_name, p.ranked_lp, p.ranked_wins, p.ranked_placement_matches,
         case when p.ranked_placement_matches >= ${shared_1.RANKED_PLACEMENT_MATCHES} then (
           select count(*)::int + 1
           from public.players ahead
           where ahead.ranked_placement_matches >= ${shared_1.RANKED_PLACEMENT_MATCHES}
             and (
               ahead.ranked_lp > p.ranked_lp
-              or (ahead.ranked_lp = p.ranked_lp and ahead.wins > p.wins)
-              or (ahead.ranked_lp = p.ranked_lp and ahead.wins = p.wins and ahead.created_at < p.created_at)
+              or (ahead.ranked_lp = p.ranked_lp and ahead.ranked_wins > p.ranked_wins)
+              or (ahead.ranked_lp = p.ranked_lp and ahead.ranked_wins = p.ranked_wins and ahead.created_at < p.created_at)
             )
         )
         end as position
@@ -330,7 +330,7 @@ async function getRankedLeaderboard(deviceId) {
             rankKey: current.ranked_placement_matches < shared_1.RANKED_PLACEMENT_MATCHES
                 ? "novice"
                 : (0, shared_1.getRankedDivision)(current.ranked_lp).key,
-            wins: current.wins,
+            wins: current.ranked_wins,
             position: current.position,
             placementMatches: current.ranked_placement_matches,
         } : null;
@@ -572,7 +572,8 @@ async function saveCompletedMatch(match) {
               update public.players
               set ranked_lp = ${lpAfter},
                   ranked_placement_matches = ${placementMatchesAfter},
-                  ranked_placement_points = ${placementPointsAfter}
+                  ranked_placement_points = ${placementPointsAfter},
+                  ranked_wins = ranked_wins + ${placement === 1 ? 1 : 0}
               where id = ${player.deviceId}
             `;
                     }

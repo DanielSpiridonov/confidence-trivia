@@ -134,7 +134,9 @@ export class GameRoom extends Room<RoomStateSchema> {
     this.isPublic = options.visibility === "public";
     this.state.isPublic = this.isPublic;
     this.questionSet = getQuestionSet(this.state.gameMode === "damage" ? 100 : this.state.totalRounds, options.excludeQuestionIds ?? []);
-    await this.setPrivate(!this.isPublic);
+    // Ranked rooms are discoverable only to joinOrCreate matchmaking. They
+    // are filtered out of the user-facing public lobby endpoint.
+    await this.setPrivate(this.state.gameMode === "ranked" ? false : !this.isPublic);
     await this.updateLobbyMetadata();
 
     this.onMessage("toggleReady", (client) => this.handleToggleReady(client));
@@ -156,6 +158,7 @@ export class GameRoom extends Room<RoomStateSchema> {
       && ![...this.deviceIds.values()].includes(options.deviceId);
     if (!basicAdmissionAllowed) return false;
     if (this.state.gameMode !== "ranked") return true;
+    if (process.env.NODE_ENV === "test" && process.env.RANKED_TEST_AUTH_BYPASS === "true") return true;
     const identity = await verifySupabaseIdentity(options.accessToken ? `Bearer ${options.accessToken}` : undefined);
     return Boolean(identity && await isAuthenticatedPlayer(options.deviceId!, identity.userId));
   }
@@ -181,6 +184,10 @@ export class GameRoom extends Room<RoomStateSchema> {
       player.frameId = customization.frameId;
     }
     void this.updateLobbyMetadata();
+    if (this.state.gameMode === "ranked" && this.state.players.size === RANKED_PLAYER_COUNT && !this.state.gameStarted) {
+      await this.lock();
+      this.beginGame();
+    }
   }
 
   async onLeave(client: Client, consented: boolean) {
@@ -202,12 +209,16 @@ export class GameRoom extends Room<RoomStateSchema> {
         void this.updateLobbyMetadata();
         return;
       }
-      const closesLobby = player.isHost && !this.state.gameStarted;
+      const closesLobby = this.state.gameMode !== "ranked" && player.isHost && !this.state.gameStarted;
       this.deviceIds.delete(client.sessionId);
       this.state.players.delete(client.sessionId);
       if (closesLobby) {
         this.isPublic = false;
         await this.setPrivate(true);
+        await this.disconnect();
+        return;
+      }
+      if (this.state.gameMode === "ranked" && this.state.players.size === 0) {
         await this.disconnect();
         return;
       }

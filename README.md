@@ -11,6 +11,9 @@ half the game — knowing how confident to be is the other half.
   round timing, validation, and scoring.
 - `packages/mobile` — Expo (React Native) client for iOS/Android.
 
+iPhone features requiring an Apple-signed development or TestFlight build are
+tracked in [IPHONE_TESTING_CHECKLIST.md](./IPHONE_TESTING_CHECKLIST.md).
+
 ## Phase 1 scope (this build)
 
 Room create/join, lobby, multiple-choice questions, confidence, side bets,
