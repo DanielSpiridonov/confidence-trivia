@@ -3,7 +3,7 @@ import express from "express";
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { GameRoom } from "./rooms/GameRoom";
-import { claimDailyReward, claimFriendGift, equipFreeAvatar, equipFreeFrame, equipFreeNameColor, getAccountProfile, getDailyRewardStatus, getDatabaseStatus, getPlayerCustomization, getPlayerStars, getRankedLeaderboard, isAuthenticatedPlayer, linkPlayerAccount, listFriends, respondToFriendRequest, searchFriendPlayers, sendFriendGift, sendFriendRequest, suggestFriendPlayers, updateAccountDisplayName, updateFriendRelationship } from "./database";
+import { claimDailyReward, claimFriendGift, createPlayerChallenge, equipFreeAvatar, equipFreeFrame, equipFreeNameColor, getAccountProfile, getDailyRewardStatus, getDatabaseStatus, getPlayerChallenges, getPlayerCustomization, getPlayerStars, getRankedLeaderboard, isAuthenticatedPlayer, linkPlayerAccount, listFriends, respondToFriendRequest, respondToPlayerChallenge, searchFriendPlayers, sendFriendGift, sendFriendRequest, suggestFriendPlayers, updateAccountDisplayName, updateFriendRelationship, updatePlayerPresence } from "./database";
 import { verifySupabaseIdentity } from "./auth";
 
 const port = Number(process.env.PORT ?? 2567);
@@ -246,6 +246,36 @@ app.post("/friends/gifts/:giftId/claim", async (req, res) => {
   sendFriendActionResponse(res, await claimFriendGift(playerId, req.params.giftId));
 });
 
+app.post("/presence", async (req, res) => {
+  const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
+  const available = req.body?.available === true;
+  if (!isDeviceId(playerId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) { res.status(403).json({ error: "Invalid presence update" }); return; }
+  if (!await updatePlayerPresence(playerId, available)) { res.status(503).json({ error: "Presence is temporarily unavailable" }); return; }
+  res.json({ ok: true });
+});
+
+app.get("/challenges", async (req, res) => {
+  const playerId = typeof req.query.playerId === "string" ? req.query.playerId : "";
+  if (!isDeviceId(playerId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) { res.status(403).json({ error: "Invalid challenge request" }); return; }
+  const challenges = await getPlayerChallenges(playerId);
+  if (!challenges) { res.status(503).json({ error: "Challenges are temporarily unavailable" }); return; }
+  res.json(challenges);
+});
+
+app.post("/challenges", async (req, res) => {
+  const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
+  const challengedId = typeof req.body?.challengedId === "string" ? req.body.challengedId : "";
+  if (!isDeviceId(playerId) || !isDeviceId(challengedId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) { res.status(403).json({ error: "Invalid challenge" }); return; }
+  sendFriendActionResponse(res, await createPlayerChallenge(playerId, challengedId));
+});
+
+app.patch("/challenges/:challengeId", async (req, res) => {
+  const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
+  const action = req.body?.action;
+  if (!isDeviceId(playerId) || !isDeviceId(req.params.challengeId) || !["accept", "decline"].includes(action) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) { res.status(403).json({ error: "Invalid challenge response" }); return; }
+  sendFriendActionResponse(res, await respondToPlayerChallenge(playerId, req.params.challengeId, action === "accept"));
+});
+
 function sendFriendActionResponse(res: express.Response, result: { ok: boolean; error?: string; stars?: number }) {
   if (!result.ok) { res.status(409).json({ error: result.error ?? "Action unavailable" }); return; }
   res.json(result);
@@ -264,7 +294,7 @@ const gameServer = new Server({
 // "confidence_trivia" is the room type name the client requests by;
 // each call to joinOrCreate/create spins up a new authoritative GameRoom
 // instance with its own room code.
-gameServer.define("confidence_trivia", GameRoom).filterBy(["gameMode", "damageWager", "locale"]);
+gameServer.define("confidence_trivia", GameRoom).filterBy(["gameMode", "damageWager", "locale", "challengeId"]);
 
 httpServer.listen(port, () => {
   console.log(`Confidence Trivia server listening on ws://0.0.0.0:${port}`);

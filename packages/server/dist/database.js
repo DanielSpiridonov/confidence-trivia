@@ -8,6 +8,11 @@ exports.updateAccountDisplayName = updateAccountDisplayName;
 exports.getDatabaseStatus = getDatabaseStatus;
 exports.isRegisteredPlayer = isRegisteredPlayer;
 exports.isAuthenticatedPlayer = isAuthenticatedPlayer;
+exports.updatePlayerPresence = updatePlayerPresence;
+exports.createPlayerChallenge = createPlayerChallenge;
+exports.getPlayerChallenges = getPlayerChallenges;
+exports.respondToPlayerChallenge = respondToPlayerChallenge;
+exports.isAcceptedChallengeParticipant = isAcceptedChallengeParticipant;
 exports.listFriends = listFriends;
 exports.searchFriendPlayers = searchFriendPlayers;
 exports.suggestFriendPlayers = suggestFriendPlayers;
@@ -92,6 +97,92 @@ async function isAuthenticatedPlayer(playerId, authUserId) {
     select id from public.players where id = ${playerId} and account_type = 'registered' and auth_user_id = ${authUserId}
   `;
     return Boolean(player);
+}
+async function updatePlayerPresence(playerId, available) {
+    if (!sql)
+        return false;
+    try {
+        await sql `insert into public.player_presence (player_id, available, last_seen_at) values (${playerId}, ${available}, now()) on conflict (player_id) do update set available = excluded.available, last_seen_at = now()`;
+        return true;
+    }
+    catch (error) {
+        console.error("Could not update player presence", error);
+        return false;
+    }
+}
+async function createPlayerChallenge(challengerId, challengedId) {
+    if (!sql || challengerId === challengedId)
+        return { ok: false, error: "Invalid challenge" };
+    try {
+        const [eligible] = await sql `
+      select presence.available
+      from public.player_presence presence
+      where presence.player_id = ${challengedId} and presence.available = true and presence.last_seen_at > now() - interval '20 seconds'
+        and exists (
+          select 1 from public.friendships friendship
+          where friendship.player_low_id = least(${challengerId}::uuid, ${challengedId}::uuid)
+            and friendship.player_high_id = greatest(${challengerId}::uuid, ${challengedId}::uuid) and friendship.status = 'accepted'
+        )
+    `;
+        if (!eligible)
+            return { ok: false, error: "Player is not online" };
+        await sql `update public.player_challenges set status = 'expired' where status = 'pending' and expires_at <= now()`;
+        const [challenge] = await sql `
+      insert into public.player_challenges (challenger_id, challenged_id)
+      values (${challengerId}, ${challengedId}) returning id
+    `;
+        return { ok: true, challengeId: challenge.id };
+    }
+    catch (error) {
+        console.error("Could not create challenge", error);
+        return { ok: false, error: "Could not send challenge" };
+    }
+}
+async function getPlayerChallenges(playerId) {
+    if (!sql)
+        return null;
+    try {
+        await sql `update public.player_challenges set status = 'expired' where status = 'pending' and expires_at <= now()`;
+        const rows = await sql `
+      select challenge.id, challenge.challenger_id, challenger.display_name as challenger_name,
+        challenge.challenged_id, challenge.status, challenge.expires_at
+      from public.player_challenges challenge
+      join public.players challenger on challenger.id = challenge.challenger_id
+      where ${playerId} in (challenge.challenger_id, challenge.challenged_id)
+        and (challenge.status = 'pending' or (challenge.status = 'accepted' and challenge.responded_at > now() - interval '20 seconds'))
+      order by challenge.created_at desc limit 5
+    `;
+        return rows.map((row) => ({ id: row.id, challengerId: row.challenger_id, challengerName: row.challenger_name, challengedId: row.challenged_id, gameMode: "damage", status: row.status, expiresAt: row.expires_at.toISOString() }));
+    }
+    catch (error) {
+        console.error("Could not load challenges", error);
+        return null;
+    }
+}
+async function respondToPlayerChallenge(playerId, challengeId, accept) {
+    if (!sql)
+        return { ok: false, error: "Challenges are temporarily unavailable" };
+    try {
+        const [updated] = await sql `
+      update public.player_challenges set status = ${accept ? "accepted" : "declined"}, responded_at = now()
+      where id = ${challengeId} and challenged_id = ${playerId} and status = 'pending' and expires_at > now()
+      returning id
+    `;
+        return updated ? { ok: true } : { ok: false, error: "Challenge has expired" };
+    }
+    catch (error) {
+        console.error("Could not respond to challenge", error);
+        return { ok: false, error: "Could not respond to challenge" };
+    }
+}
+async function isAcceptedChallengeParticipant(challengeId, playerId) {
+    if (!sql)
+        return false;
+    const [challenge] = await sql `
+    select id from public.player_challenges
+    where id = ${challengeId} and status = 'accepted' and ${playerId} in (challenger_id, challenged_id)
+  `;
+    return Boolean(challenge);
 }
 async function listFriends(playerId) {
     if (!sql)

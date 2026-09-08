@@ -25,7 +25,7 @@ import { ShopScreen } from "./src/screens/ShopScreen";
 import { ProfileScreen } from "./src/screens/ProfileScreen";
 import { RulesScreen } from "./src/screens/RulesScreen";
 import { FriendsScreen } from "./src/screens/FriendsScreen";
-import { AccountProfile, claimDailyReward, createRoom, DailyRewardStatus, getAccountProfile, getDailyRewardStatus, getPlayerStars, joinPublicRoom, joinRoom, linkPlayerAccount, reconnectRoom, updateAccountName, useRoomState } from "./src/network/client";
+import { AccountProfile, claimDailyReward, createRoom, DailyRewardStatus, getAccountProfile, getChallenges, getDailyRewardStatus, getPlayerStars, joinPublicRoom, joinRoom, linkPlayerAccount, PlayerChallenge, reconnectRoom, respondChallenge, updateAccountName, updatePresence, useRoomState } from "./src/network/client";
 import { prepareSoundEffects, setSoundEffectsVolume, stopAllSoundEffects } from "./src/audio/sounds";
 import { pauseMusicForBackground, prepareMusic, setMusicVolume as applyMusicVolume, startMenuMusic, stopMenuMusic } from "./src/audio/music";
 import { createFreshGuestIdentity, getOrCreateDeviceId, getOrCreateGuestName } from "./src/utils/deviceId";
@@ -231,6 +231,10 @@ export default function App() {
   const [authBusy, setAuthBusy] = useState(false);
   const [stars, setStars] = useState(0);
   const [starGain, setStarGain] = useState<{ id: number; amount: number } | null>(null);
+  const [incomingChallenge, setIncomingChallenge] = useState<PlayerChallenge | null>(null);
+  const challengeOpacity = useRef(new Animated.Value(0)).current;
+  const handledChallengeIds = useRef(new Set<string>());
+  const joiningChallengeId = useRef<string | null>(null);
   const [dailyRewardCelebration, setDailyRewardCelebration] = useState<{ id: number; amount: number; streakDay: number } | null>(null);
   const [dailyReward, setDailyReward] = useState<DailyRewardStatus | null>(null);
   const [dailyRewardClaiming, setDailyRewardClaiming] = useState(false);
@@ -664,6 +668,71 @@ export default function App() {
     };
   }, [room]);
 
+  useEffect(() => {
+    if (!registeredAccount || !deviceId) {
+      setIncomingChallenge(null);
+      return;
+    }
+    let cancelled = false;
+    let polling = false;
+    const poll = async () => {
+      if (polling) return;
+      polling = true;
+      try {
+        await updatePresence(deviceId, nav !== "in-room");
+        const challenges = await getChallenges(deviceId);
+        if (cancelled) return;
+        const incoming = challenges.find((challenge) => challenge.status === "pending" && challenge.challengedId === deviceId) ?? null;
+        setIncomingChallenge(incoming);
+        const accepted = challenges.find((challenge) => challenge.status === "accepted" && !handledChallengeIds.current.has(challenge.id));
+        if (accepted && nav !== "in-room" && joiningChallengeId.current !== accepted.id) {
+          joiningChallengeId.current = accepted.id;
+          try {
+            const challengeRoom = await createRoom(deviceId, defaultPlayerName, 10, "en", "damage", [], "private", 5, accepted.id);
+            handledChallengeIds.current.add(accepted.id);
+            reconnectionTokenRef.current = challengeRoom.reconnectionToken;
+            setRoom(challengeRoom);
+            setRoomRecovery(null);
+            setRoomRecoveryMessage(null);
+            setIncomingChallenge(null);
+            setNav("in-room");
+          } catch (error) {
+            Alert.alert(i18n.t("friends.challengeFailed"), error instanceof Error ? error.message : i18n.t("feedback.tryAgain"));
+          } finally {
+            joiningChallengeId.current = null;
+          }
+        }
+      } catch {
+        // Presence polling recovers automatically on the next interval.
+      } finally {
+        polling = false;
+      }
+    };
+    void poll();
+    const interval = setInterval(() => void poll(), 2_000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [defaultPlayerName, deviceId, nav, registeredAccount]);
+
+  useEffect(() => {
+    if (!incomingChallenge || !deviceId) {
+      challengeOpacity.setValue(0);
+      return;
+    }
+    challengeOpacity.setValue(1);
+    const remaining = Math.max(0, new Date(incomingChallenge.expiresAt).getTime() - Date.now());
+    const animation = Animated.sequence([
+      Animated.delay(Math.max(0, remaining - 800)),
+      Animated.timing(challengeOpacity, { toValue: 0, duration: Math.min(800, remaining), useNativeDriver: true }),
+    ]);
+    animation.start(({ finished }) => {
+      if (finished) {
+        void respondChallenge(deviceId, incomingChallenge.id, "decline").catch(() => undefined);
+        setIncomingChallenge((current) => current?.id === incomingChallenge.id ? null : current);
+      }
+    });
+    return () => animation.stop();
+  }, [challengeOpacity, deviceId, incomingChallenge?.id]);
+
   if (!localeReady || !uiImagesReady) {
     return (
       <AppFrame highContrast={highContrastEnabled}>
@@ -784,6 +853,16 @@ export default function App() {
             <Text style={styles.homeSettingsIcon}>{"\u2699"}</Text>
           </Pressable>
         </>
+      ) : null}
+      {incomingChallenge && deviceId ? (
+        <Animated.View style={[styles.challengePopup, { opacity: challengeOpacity }]}>
+          <Text style={styles.challengePopupTitle}>{i18n.t("friends.challengeIncoming", { player: incomingChallenge.challengerName })}</Text>
+          <Text style={styles.challengePopupMode}>{i18n.t("friends.challengeMode")}</Text>
+          <View style={styles.challengePopupActions}>
+            <Pressable onPress={() => { const challenge = incomingChallenge; setIncomingChallenge(null); void respondChallenge(deviceId, challenge.id, "decline").catch(() => undefined); }} style={[styles.challengePopupButton, styles.challengeDecline]}><Text style={styles.challengePopupButtonText}>{i18n.t("friends.decline")}</Text></Pressable>
+            <Pressable onPress={() => { const challenge = incomingChallenge; setIncomingChallenge(null); void respondChallenge(deviceId, challenge.id, "accept").catch((error) => Alert.alert(i18n.t("friends.challengeFailed"), error instanceof Error ? error.message : i18n.t("feedback.tryAgain"))); }} style={styles.challengePopupButton}><Text style={styles.challengePopupButtonText}>{i18n.t("friends.accept")}</Text></Pressable>
+          </View>
+        </Animated.View>
       ) : null}
       <View
         pointerEvents={nav !== "in-room" ? "box-none" : "none"}
@@ -1040,6 +1119,13 @@ const styles = StyleSheet.create({
   homeRulesButton: { right: 190 },
   homeRulesIcon: { color: theme.text, fontSize: 23, lineHeight: 26, fontWeight: "900" },
   homeSettingsIcon: { color: theme.text, fontSize: 24, lineHeight: 27, fontWeight: "800" },
+  challengePopup: { position: "absolute", top: 68, right: 18, zIndex: 60, width: 270, borderRadius: 13, padding: 12, backgroundColor: "rgba(31,26,51,0.98)", borderWidth: 1, borderColor: "rgba(185,176,214,0.5)", shadowColor: "#000", shadowOpacity: 0.35, shadowRadius: 8, elevation: 8 },
+  challengePopupTitle: { color: theme.text, fontSize: 13, fontWeight: "900" },
+  challengePopupMode: { color: "#B9AAFF", fontSize: 10, fontWeight: "800", marginTop: 3 },
+  challengePopupActions: { flexDirection: "row", justifyContent: "flex-end", gap: 7, marginTop: 10 },
+  challengePopupButton: { minWidth: 78, paddingHorizontal: 12, paddingVertical: 7, alignItems: "center", borderRadius: 8, backgroundColor: theme.primary },
+  challengeDecline: { backgroundColor: "rgba(112,103,135,0.8)" },
+  challengePopupButtonText: { color: "#FFF", fontSize: 11, fontWeight: "900" },
   pointsBadge: {
     height: 40,
     paddingHorizontal: 12,

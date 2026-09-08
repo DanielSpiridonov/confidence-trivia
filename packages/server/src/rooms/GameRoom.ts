@@ -31,7 +31,7 @@ import {
   RevealEntrySchema,
 } from "../state/schema";
 import { getLocalizedCorrectAnswer, getQuestionSet, localize, localizeAnswer, localizeAnswerItems } from "../content/questions";
-import { getPlayerCustomization, isAuthenticatedPlayer, reserveDamageWager, saveCompletedMatch, settleDamageWager, upsertPlayer } from "../database";
+import { getPlayerCustomization, isAcceptedChallengeParticipant, isAuthenticatedPlayer, reserveDamageWager, saveCompletedMatch, settleDamageWager, upsertPlayer } from "../database";
 import { verifySupabaseIdentity } from "../auth";
 
 interface JoinOptions {
@@ -47,6 +47,7 @@ interface CreateOptions extends JoinOptions {
   excludeQuestionIds?: string[];
   visibility?: "private" | "public";
   damageWager?: number;
+  challengeId?: string;
 }
 
 const PLAYER_NAME_PATTERN = /^[\p{L}\p{N} ]+$/u;
@@ -73,6 +74,7 @@ export class GameRoom extends Room<RoomStateSchema> {
 
   private locale: Locale = "en";
   private isPublic = false;
+  private challengeId = "";
   private questionSet: QuestionRecord[] = [];
 
   // Server-only, per-round scratch data. Not synced — the client only
@@ -113,6 +115,7 @@ export class GameRoom extends Room<RoomStateSchema> {
     }
 
     this.setState(new RoomStateSchema());
+    this.challengeId = typeof options.challengeId === "string" && DEVICE_ID_PATTERN.test(options.challengeId) ? options.challengeId : "";
     this.state.code = this.roomId;
     this.state.gameMode = options.gameMode === "damage"
       ? "damage"
@@ -158,6 +161,10 @@ export class GameRoom extends Room<RoomStateSchema> {
       && isValidDeviceId(options.deviceId)
       && ![...this.deviceIds.values()].includes(options.deviceId);
     if (!basicAdmissionAllowed) return false;
+    if (this.challengeId) {
+      const identity = await verifySupabaseIdentity(options.accessToken ? `Bearer ${options.accessToken}` : undefined);
+      return Boolean(identity && await isAuthenticatedPlayer(options.deviceId!, identity.userId) && await isAcceptedChallengeParticipant(this.challengeId, options.deviceId!));
+    }
     if (this.state.gameMode !== "ranked") return true;
     if (process.env.NODE_ENV === "test" && process.env.RANKED_TEST_AUTH_BYPASS === "true") return true;
     const identity = await verifySupabaseIdentity(options.accessToken ? `Bearer ${options.accessToken}` : undefined);
@@ -276,6 +283,8 @@ export class GameRoom extends Room<RoomStateSchema> {
       roundCount: this.state.totalRounds,
       locale: this.locale,
       gameMode: this.state.gameMode,
+      damageWager: this.state.damageWager,
+      challengeId: this.challengeId,
     });
   }
 

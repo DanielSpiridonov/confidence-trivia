@@ -231,6 +231,21 @@ export const updateFriendship = (playerId: string, friendshipId: string, action:
 export const sendFriendGift = (playerId: string, friendshipId: string) => friendRequest<{ ok: true }>(`/friends/${encodeURIComponent(friendshipId)}/gifts`, { method: "POST", body: JSON.stringify({ playerId }) });
 export const claimFriendGift = (playerId: string, giftId: string) => friendRequest<{ ok: true; stars: number }>(`/friends/gifts/${encodeURIComponent(giftId)}/claim`, { method: "POST", body: JSON.stringify({ playerId }) });
 
+export interface PlayerChallenge {
+  id: string;
+  challengerId: string;
+  challengerName: string;
+  challengedId: string;
+  gameMode: "damage";
+  status: "pending" | "accepted";
+  expiresAt: string;
+}
+
+export const updatePresence = (playerId: string, available: boolean) => friendRequest<{ ok: true }>("/presence", { method: "POST", body: JSON.stringify({ playerId, available }) });
+export const getChallenges = (playerId: string) => friendRequest<PlayerChallenge[]>(`/challenges?playerId=${encodeURIComponent(playerId)}`);
+export const challengeFriend = (playerId: string, challengedId: string) => friendRequest<{ ok: true; challengeId: string }>("/challenges", { method: "POST", body: JSON.stringify({ playerId, challengedId }) });
+export const respondChallenge = (playerId: string, challengeId: string, action: "accept" | "decline") => friendRequest<{ ok: true }>(`/challenges/${encodeURIComponent(challengeId)}`, { method: "PATCH", body: JSON.stringify({ playerId, action }) });
+
 async function withRoomRequestTimeout<T>(promise: Promise<T>): Promise<T> {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
@@ -256,6 +271,7 @@ export async function createRoom(
   excludeQuestionIds: string[] = [],
   visibility: "private" | "public" = "private",
   damageWager = 5,
+  challengeId?: string,
 ) {
   const accessToken = await getAccessToken();
   const options = {
@@ -267,6 +283,7 @@ export async function createRoom(
       name: playerName,
       visibility,
       damageWager,
+      challengeId: challengeId ?? "",
       accessToken,
     };
   const room = await withRoomRequestTimeout(gameMode === "ranked" || gameMode === "damage"

@@ -2,7 +2,7 @@ import React from "react";
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { ANDROID_MENU_UI_SCALE, BackIconButton, Screen, Title, theme } from "../components/ui";
-import { FriendSearchResult, FriendSummary, claimFriendGift, getFriendSuggestions, getFriends, requestFriend, respondFriendRequest, searchFriends, sendFriendGift, updateFriendship } from "../network/client";
+import { FriendSearchResult, FriendSummary, challengeFriend, claimFriendGift, getFriendSuggestions, getFriends, requestFriend, respondFriendRequest, searchFriends, sendFriendGift, updateFriendship } from "../network/client";
 import { PointsIcon } from "../components/PointsIcon";
 
 type FriendsTab = "friends" | "requests" | "blocked";
@@ -54,7 +54,7 @@ export function FriendsScreen({ playerId, onStarsChange, onBack }: { playerId: s
 
   const discoveryItems = results ?? suggestions;
   return (
-    <Screen style={styles.screen} androidScale={ANDROID_MENU_UI_SCALE}>
+    <Screen style={styles.screen} androidScale={ANDROID_MENU_UI_SCALE * 0.9}>
       <BackIconButton label={t("common.back")} onPress={onBack} />
       <Title>{t("friends.title")}</Title>
       <View style={styles.toolbar}>
@@ -79,7 +79,7 @@ export function FriendsScreen({ playerId, onStarsChange, onBack }: { playerId: s
         <View style={styles.listPanel}>
           {loading ? <ActivityIndicator color={theme.primary} style={styles.loader} /> : null}
           {!loading && tab === "friends" ? <ScrollView contentContainerStyle={styles.listContent}>
-            {data?.friends.map((friend) => <FriendRow key={friend.friendshipId} item={friend} expanded={expandedId === friend.friendshipId} busy={busyId === friend.friendshipId} onToggle={() => setExpandedId((current) => current === friend.friendshipId ? null : friend.friendshipId)} onBless={() => void runAction(friend.friendshipId, () => sendFriendGift(playerId, friend.friendshipId))} onClaim={() => void runAction(friend.friendshipId, async () => { const claimed = await claimFriendGift(playerId, friend.giftId!); onStarsChange(claimed.stars); })} onRemove={() => confirmAction(t("friends.removeConfirm", { name: friend.displayName }), () => void runAction(friend.friendshipId, () => updateFriendship(playerId, friend.friendshipId, "remove")))} onBlock={() => confirmAction(t("friends.blockConfirm", { name: friend.displayName }), () => void runAction(friend.friendshipId, () => updateFriendship(playerId, friend.friendshipId, "block")))} />)}
+            {data?.friends.map((friend) => <FriendRow key={friend.friendshipId} item={friend} expanded={expandedId === friend.friendshipId} busy={busyId === friend.friendshipId} onToggle={() => setExpandedId((current) => current === friend.friendshipId ? null : friend.friendshipId)} onBless={() => void runAction(friend.friendshipId, () => sendFriendGift(playerId, friend.friendshipId))} onClaim={() => void runAction(friend.friendshipId, async () => { const claimed = await claimFriendGift(playerId, friend.giftId!); onStarsChange(claimed.stars); })} onChallenge={() => void runAction(friend.friendshipId, async () => { await challengeFriend(playerId, friend.playerId); Alert.alert(t("friends.challengeSent")); })} onRemove={() => confirmAction(t("friends.removeConfirm", { name: friend.displayName }), () => void runAction(friend.friendshipId, () => updateFriendship(playerId, friend.friendshipId, "remove")))} onBlock={() => confirmAction(t("friends.blockConfirm", { name: friend.displayName }), () => void runAction(friend.friendshipId, () => updateFriendship(playerId, friend.friendshipId, "block")))} />)}
             {data?.friends.length === 0 ? <Empty text={t("friends.noFriends")} /> : null}
           </ScrollView> : null}
           {!loading && tab === "requests" ? <ScrollView contentContainerStyle={styles.listContent}>
@@ -102,9 +102,9 @@ function DiscoveryRow({ item, busy, onAdd }: { item: FriendSearchResult; busy: b
   return <View style={styles.personRow}><Text numberOfLines={1} style={styles.personName}>{item.displayName}</Text>{item.relationship === "none" ? <SmallButton label={busy ? "..." : t("friends.add")} onPress={onAdd} disabled={busy} /> : <Text style={styles.statusText}>{t(`friends.relationship.${item.relationship}`)}</Text>}</View>;
 }
 
-function FriendRow({ item, expanded, busy, onToggle, onBless, onClaim, onRemove, onBlock }: { item: FriendSummary; expanded: boolean; busy: boolean; onToggle: () => void; onBless: () => void; onClaim: () => void; onRemove: () => void; onBlock: () => void }) {
+function FriendRow({ item, expanded, busy, onToggle, onBless, onClaim, onChallenge, onRemove, onBlock }: { item: FriendSummary; expanded: boolean; busy: boolean; onToggle: () => void; onBless: () => void; onClaim: () => void; onChallenge: () => void; onRemove: () => void; onBlock: () => void }) {
   const { t } = useTranslation();
-  return <View style={[styles.friendCard, expanded && styles.friendCardExpanded]}><Pressable onPress={onToggle} style={styles.friendMainRow}><View style={styles.friendAvatar}><Text style={styles.friendAvatarText}>{item.displayName.slice(0, 1).toUpperCase()}</Text></View><Text numberOfLines={1} style={styles.personName}>{item.displayName}</Text>{item.giftId ? <SmallButton label={t("friends.claimBlessing")} onPress={onClaim} disabled={busy} icon /> : <SmallButton label={item.giftSentToday ? t("friends.blessedToday") : t("friends.bless")} onPress={onBless} disabled={busy || item.giftSentToday} icon />}<Text style={styles.expandIcon}>{expanded ? "⌃" : "⌄"}</Text></Pressable>{expanded ? <View style={styles.manageRow}><Text style={styles.manageHint}>{t("friends.manageHint")}</Text><SmallButton label={t("friends.remove")} onPress={onRemove} disabled={busy} muted /><SmallButton label={t("friends.block")} onPress={onBlock} disabled={busy} danger /></View> : null}</View>;
+  return <View style={[styles.friendCard, expanded && styles.friendCardExpanded]}><Pressable onPress={onToggle} style={styles.friendMainRow}><View style={styles.friendAvatar}><Text style={styles.friendAvatarText}>{item.displayName.slice(0, 1).toUpperCase()}</Text></View><Text numberOfLines={1} style={styles.personName}>{item.displayName}</Text>{item.giftId ? <SmallButton label={t("friends.claimBlessing")} onPress={onClaim} disabled={busy} icon /> : <SmallButton label={item.giftSentToday ? t("friends.blessedToday") : t("friends.bless")} onPress={onBless} disabled={busy || item.giftSentToday} icon />}<Text style={styles.expandIcon}>{expanded ? "⌃" : "⌄"}</Text></Pressable>{expanded ? <View style={styles.manageRow}><SmallButton label={t("friends.challenge")} onPress={onChallenge} disabled={busy} /><Text style={styles.manageHint}>{t("friends.manageHint")}</Text><SmallButton label={t("friends.remove")} onPress={onRemove} disabled={busy} muted /><SmallButton label={t("friends.block")} onPress={onBlock} disabled={busy} danger /></View> : null}</View>;
 }
 
 function SmallButton({ label, onPress, disabled, muted, danger, icon }: { label: string; onPress: () => void; disabled?: boolean; muted?: boolean; danger?: boolean; icon?: boolean }) { return <Pressable disabled={disabled} onPress={onPress} style={[styles.smallButton, muted && styles.smallButtonMuted, danger && styles.smallButtonDanger, disabled && styles.buttonDisabled]}>{icon ? <PointsIcon size={15} /> : null}<Text numberOfLines={1} style={styles.smallButtonText}>{label}</Text></Pressable>; }

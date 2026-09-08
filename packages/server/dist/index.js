@@ -284,6 +284,50 @@ app.post("/friends/gifts/:giftId/claim", async (req, res) => {
     }
     sendFriendActionResponse(res, await (0, database_1.claimFriendGift)(playerId, req.params.giftId));
 });
+app.post("/presence", async (req, res) => {
+    const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
+    const available = req.body?.available === true;
+    if (!isDeviceId(playerId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
+        res.status(403).json({ error: "Invalid presence update" });
+        return;
+    }
+    if (!await (0, database_1.updatePlayerPresence)(playerId, available)) {
+        res.status(503).json({ error: "Presence is temporarily unavailable" });
+        return;
+    }
+    res.json({ ok: true });
+});
+app.get("/challenges", async (req, res) => {
+    const playerId = typeof req.query.playerId === "string" ? req.query.playerId : "";
+    if (!isDeviceId(playerId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
+        res.status(403).json({ error: "Invalid challenge request" });
+        return;
+    }
+    const challenges = await (0, database_1.getPlayerChallenges)(playerId);
+    if (!challenges) {
+        res.status(503).json({ error: "Challenges are temporarily unavailable" });
+        return;
+    }
+    res.json(challenges);
+});
+app.post("/challenges", async (req, res) => {
+    const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
+    const challengedId = typeof req.body?.challengedId === "string" ? req.body.challengedId : "";
+    if (!isDeviceId(playerId) || !isDeviceId(challengedId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
+        res.status(403).json({ error: "Invalid challenge" });
+        return;
+    }
+    sendFriendActionResponse(res, await (0, database_1.createPlayerChallenge)(playerId, challengedId));
+});
+app.patch("/challenges/:challengeId", async (req, res) => {
+    const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
+    const action = req.body?.action;
+    if (!isDeviceId(playerId) || !isDeviceId(req.params.challengeId) || !["accept", "decline"].includes(action) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
+        res.status(403).json({ error: "Invalid challenge response" });
+        return;
+    }
+    sendFriendActionResponse(res, await (0, database_1.respondToPlayerChallenge)(playerId, req.params.challengeId, action === "accept"));
+});
 function sendFriendActionResponse(res, result) {
     if (!result.ok) {
         res.status(409).json({ error: result.error ?? "Action unavailable" });
@@ -302,7 +346,7 @@ const gameServer = new colyseus_1.Server({
 // "confidence_trivia" is the room type name the client requests by;
 // each call to joinOrCreate/create spins up a new authoritative GameRoom
 // instance with its own room code.
-gameServer.define("confidence_trivia", GameRoom_1.GameRoom).filterBy(["gameMode", "damageWager", "locale"]);
+gameServer.define("confidence_trivia", GameRoom_1.GameRoom).filterBy(["gameMode", "damageWager", "locale", "challengeId"]);
 httpServer.listen(port, () => {
     console.log(`Confidence Trivia server listening on ws://0.0.0.0:${port}`);
 });

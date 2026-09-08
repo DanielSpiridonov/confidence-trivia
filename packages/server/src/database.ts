@@ -118,7 +118,86 @@ export interface FriendSearchResult {
   relationship: "none" | "friend" | "incoming" | "outgoing" | "blocked";
 }
 
-type FriendActionResult = { ok: true; stars?: number } | { ok: false; error: string };
+type FriendActionResult = { ok: true; stars?: number; claimedCount?: number } | { ok: false; error: string };
+
+export interface PlayerChallenge {
+  id: string;
+  challengerId: string;
+  challengerName: string;
+  challengedId: string;
+  gameMode: "damage";
+  status: "pending" | "accepted";
+  expiresAt: string;
+}
+
+export async function updatePlayerPresence(playerId: string, available: boolean): Promise<boolean> {
+  if (!sql) return false;
+  try {
+    await sql`insert into public.player_presence (player_id, available, last_seen_at) values (${playerId}, ${available}, now()) on conflict (player_id) do update set available = excluded.available, last_seen_at = now()`;
+    return true;
+  } catch (error) { console.error("Could not update player presence", error); return false; }
+}
+
+export async function createPlayerChallenge(challengerId: string, challengedId: string): Promise<FriendActionResult & { challengeId?: string }> {
+  if (!sql || challengerId === challengedId) return { ok: false, error: "Invalid challenge" };
+  try {
+    const [eligible] = await sql<{ available: boolean }[]>`
+      select presence.available
+      from public.player_presence presence
+      where presence.player_id = ${challengedId} and presence.available = true and presence.last_seen_at > now() - interval '20 seconds'
+        and exists (
+          select 1 from public.friendships friendship
+          where friendship.player_low_id = least(${challengerId}::uuid, ${challengedId}::uuid)
+            and friendship.player_high_id = greatest(${challengerId}::uuid, ${challengedId}::uuid) and friendship.status = 'accepted'
+        )
+    `;
+    if (!eligible) return { ok: false, error: "Player is not online" };
+    await sql`update public.player_challenges set status = 'expired' where status = 'pending' and expires_at <= now()`;
+    const [challenge] = await sql<{ id: string }[]>`
+      insert into public.player_challenges (challenger_id, challenged_id)
+      values (${challengerId}, ${challengedId}) returning id
+    `;
+    return { ok: true, challengeId: challenge.id };
+  } catch (error) { console.error("Could not create challenge", error); return { ok: false, error: "Could not send challenge" }; }
+}
+
+export async function getPlayerChallenges(playerId: string): Promise<PlayerChallenge[] | null> {
+  if (!sql) return null;
+  try {
+    await sql`update public.player_challenges set status = 'expired' where status = 'pending' and expires_at <= now()`;
+    const rows = await sql<{ id: string; challenger_id: string; challenger_name: string; challenged_id: string; status: "pending" | "accepted"; expires_at: Date }[]>`
+      select challenge.id, challenge.challenger_id, challenger.display_name as challenger_name,
+        challenge.challenged_id, challenge.status, challenge.expires_at
+      from public.player_challenges challenge
+      join public.players challenger on challenger.id = challenge.challenger_id
+      where ${playerId} in (challenge.challenger_id, challenge.challenged_id)
+        and (challenge.status = 'pending' or (challenge.status = 'accepted' and challenge.responded_at > now() - interval '20 seconds'))
+      order by challenge.created_at desc limit 5
+    `;
+    return rows.map((row) => ({ id: row.id, challengerId: row.challenger_id, challengerName: row.challenger_name, challengedId: row.challenged_id, gameMode: "damage", status: row.status, expiresAt: row.expires_at.toISOString() }));
+  } catch (error) { console.error("Could not load challenges", error); return null; }
+}
+
+export async function respondToPlayerChallenge(playerId: string, challengeId: string, accept: boolean): Promise<FriendActionResult> {
+  if (!sql) return { ok: false, error: "Challenges are temporarily unavailable" };
+  try {
+    const [updated] = await sql<{ id: string }[]>`
+      update public.player_challenges set status = ${accept ? "accepted" : "declined"}, responded_at = now()
+      where id = ${challengeId} and challenged_id = ${playerId} and status = 'pending' and expires_at > now()
+      returning id
+    `;
+    return updated ? { ok: true } : { ok: false, error: "Challenge has expired" };
+  } catch (error) { console.error("Could not respond to challenge", error); return { ok: false, error: "Could not respond to challenge" }; }
+}
+
+export async function isAcceptedChallengeParticipant(challengeId: string, playerId: string): Promise<boolean> {
+  if (!sql) return false;
+  const [challenge] = await sql<{ id: string }[]>`
+    select id from public.player_challenges
+    where id = ${challengeId} and status = 'accepted' and ${playerId} in (challenger_id, challenged_id)
+  `;
+  return Boolean(challenge);
+}
 
 export async function listFriends(playerId: string): Promise<FriendsResponse | null> {
   if (!sql) return null;
@@ -342,6 +421,33 @@ export async function claimFriendGift(playerId: string, giftId: string): Promise
   } catch (error) {
     console.error("Could not claim friend gift", error);
     return { ok: false, error: "Could not claim gift" };
+  }
+}
+
+export async function claimAllFriendGifts(playerId: string): Promise<FriendActionResult> {
+  if (!sql) return { ok: false, error: "Gifts are temporarily unavailable" };
+  try {
+    return await sql.begin(async (transaction) => {
+      const gifts = await transaction<{ id: string; stars: number }[]>`
+        select id, stars from public.friend_gifts
+        where receiver_idlish = ${playerId} and gift_date = (now() at time zone 'utc')::date and claimed_at is null
+        order by sent_at for update
+      `;
+      if (gifts.length === 0) return { ok: false, error: "No blessings are waiting to be claimed" } as FriendActionResult;
+      const total = gifts.reduce((sum, gift) => sum + gift.stars, 0);
+      await transaction`update public.friend_gifts set claimed_at = now() where id in ${transaction(gifts.map((gift) => gift.id))}`;
+      const [updated] = await transaction<{ stars: number }[]>`update public.players set stars = stars + ${total} where id = ${playerId} returning stars`;
+      for (const gift of gifts) {
+        await transaction`
+          insert into public.star_transactions (id, player_id, amount, reason)
+          values (${randomUUID()}, ${playerId}, ${gift.stars}, ${`friend_gift:${gift.id}`})
+        `;
+      }
+      return { ok: true, stars: updated.stars, claimedCount: gifts.length } as FriendActionResult;
+    });
+  } catch (error) {
+    console.error("Could not claim all friend gifts", error);
+    return { ok: false, error: "Could not claim blessings" };
   }
 }
 
