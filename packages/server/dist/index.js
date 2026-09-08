@@ -228,6 +228,19 @@ app.get("/friends/search", async (req, res) => {
     }
     res.json(results);
 });
+app.get("/friends/suggestions", async (req, res) => {
+    const playerId = typeof req.query.playerId === "string" ? req.query.playerId : "";
+    if (!isDeviceId(playerId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
+        res.status(403).json({ error: "Sign in to access Friends" });
+        return;
+    }
+    const results = await (0, database_1.suggestFriendPlayers)(playerId);
+    if (!results) {
+        res.status(503).json({ error: "Friend suggestions are temporarily unavailable" });
+        return;
+    }
+    res.json(results);
+});
 app.post("/friends/requests", async (req, res) => {
     const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
     const targetPlayerId = typeof req.body?.targetPlayerId === "string" ? req.body.targetPlayerId : "";
@@ -249,11 +262,11 @@ app.patch("/friends/requests/:friendshipId", async (req, res) => {
 app.patch("/friends/:friendshipId", async (req, res) => {
     const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
     const action = req.body?.action;
-    if (!isDeviceId(playerId) || !isDeviceId(req.params.friendshipId) || !["remove", "block"].includes(action) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
+    if (!isDeviceId(playerId) || !isDeviceId(req.params.friendshipId) || !["remove", "block", "unblock"].includes(action) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
         res.status(403).json({ error: "Invalid friendship action" });
         return;
     }
-    sendFriendActionResponse(res, await (0, database_1.removeOrBlockFriend)(playerId, req.params.friendshipId, action === "block"));
+    sendFriendActionResponse(res, await (0, database_1.updateFriendRelationship)(playerId, req.params.friendshipId, action));
 });
 app.post("/friends/:friendshipId/gifts", async (req, res) => {
     const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";

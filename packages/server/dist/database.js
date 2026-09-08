@@ -10,9 +10,10 @@ exports.isRegisteredPlayer = isRegisteredPlayer;
 exports.isAuthenticatedPlayer = isAuthenticatedPlayer;
 exports.listFriends = listFriends;
 exports.searchFriendPlayers = searchFriendPlayers;
+exports.suggestFriendPlayers = suggestFriendPlayers;
 exports.sendFriendRequest = sendFriendRequest;
 exports.respondToFriendRequest = respondToFriendRequest;
-exports.removeOrBlockFriend = removeOrBlockFriend;
+exports.updateFriendRelationship = updateFriendRelationship;
 exports.sendFriendGift = sendFriendGift;
 exports.claimFriendGift = claimFriendGift;
 exports.linkPlayerAccount = linkPlayerAccount;
@@ -113,14 +114,17 @@ async function listFriends(playerId) {
       from public.friendships f
       join public.players other_player on other_player.id = case
         when f.player_low_id = ${playerId} then f.player_high_id else f.player_low_id end
-      where ${playerId} in (f.player_low_id, f.player_high_id) and f.status <> 'blocked'
+      where ${playerId} in (f.player_low_id, f.player_high_id)
+        and (f.status <> 'blocked' or f.blocked_by = ${playerId})
       order by lower(other_player.display_name), other_player.id
     `;
-        const response = { friends: [], incoming: [], outgoing: [], unclaimedGiftCount: 0 };
+        const response = { friends: [], incoming: [], outgoing: [], blocked: [], unclaimedGiftCount: 0 };
         for (const row of rows) {
-            const direction = row.status === "accepted"
-                ? "friend"
-                : row.requested_by === playerId ? "outgoing" : "incoming";
+            const direction = row.status === "blocked"
+                ? "blocked"
+                : row.status === "accepted"
+                    ? "friend"
+                    : row.requested_by === playerId ? "outgoing" : "incoming";
             const item = {
                 friendshipId: row.friendship_id,
                 playerId: row.other_id,
@@ -129,7 +133,9 @@ async function listFriends(playerId) {
                 giftSentToday: row.gift_sent_today,
                 giftId: row.gift_id,
             };
-            if (direction === "friend")
+            if (direction === "blocked")
+                response.blocked.push(item);
+            else if (direction === "friend")
                 response.friends.push(item);
             else if (direction === "incoming")
                 response.incoming.push(item);
@@ -172,6 +178,29 @@ async function searchFriendPlayers(playerId, query) {
     }
     catch (error) {
         console.error("Could not search friend players", error);
+        return null;
+    }
+}
+async function suggestFriendPlayers(playerId) {
+    if (!sql)
+        return null;
+    try {
+        const rows = await sql `
+      select candidate.id, candidate.display_name
+      from public.players candidate
+      where candidate.account_type = 'registered' and candidate.id <> ${playerId}
+        and not exists (
+          select 1 from public.friendships friendship
+          where friendship.player_low_id = least(candidate.id, ${playerId}::uuid)
+            and friendship.player_high_id = greatest(candidate.id, ${playerId}::uuid)
+        )
+      order by random()
+      limit 8
+    `;
+        return rows.map((row) => ({ playerId: row.id, displayName: row.display_name, relationship: "none" }));
+    }
+    catch (error) {
+        console.error("Could not suggest friend players", error);
         return null;
     }
 }
@@ -237,13 +266,15 @@ async function respondToFriendRequest(playerId, friendshipId, accept) {
         return { ok: false, error: "Could not update friend request" };
     }
 }
-async function removeOrBlockFriend(playerId, friendshipId, block) {
+async function updateFriendRelationship(playerId, friendshipId, action) {
     if (!sql)
         return { ok: false, error: "Friends are temporarily unavailable" };
     try {
-        const rows = block
+        const rows = action === "block"
             ? await sql `update public.friendships set status = 'blocked', blocked_by = ${playerId}, responded_at = now() where id = ${friendshipId} and ${playerId} in (player_low_id, player_high_id) returning id`
-            : await sql `delete from public.friendships where id = ${friendshipId} and ${playerId} in (player_low_id, player_high_id) and status <> 'blocked' returning id`;
+            : action === "unblock"
+                ? await sql `delete from public.friendships where id = ${friendshipId} and blocked_by = ${playerId} returning id`
+                : await sql `delete from public.friendships where id = ${friendshipId} and ${playerId} in (player_low_id, player_high_id) and status <> 'blocked' returning id`;
         return rows.length ? { ok: true } : { ok: false, error: "Friendship is no longer available" };
     }
     catch (error) {

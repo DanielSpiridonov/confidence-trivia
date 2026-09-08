@@ -191,7 +191,7 @@ export interface FriendSummary {
   friendshipId: string;
   playerId: string;
   displayName: string;
-  direction: "friend" | "incoming" | "outgoing";
+  direction: "friend" | "incoming" | "outgoing" | "blocked";
   giftSentToday: boolean;
   giftId: string | null;
 }
@@ -200,6 +200,7 @@ export interface FriendsResponse {
   friends: FriendSummary[];
   incoming: FriendSummary[];
   outgoing: FriendSummary[];
+  blocked: FriendSummary[];
   unclaimedGiftCount: number;
 }
 
@@ -223,9 +224,10 @@ async function friendRequest<T>(path: string, options?: RequestInit): Promise<T>
 
 export const getFriends = (playerId: string) => friendRequest<FriendsResponse>(`/friends?playerId=${encodeURIComponent(playerId)}`);
 export const searchFriends = (playerId: string, query: string) => friendRequest<FriendSearchResult[]>(`/friends/search?playerId=${encodeURIComponent(playerId)}&query=${encodeURIComponent(query)}`);
+export const getFriendSuggestions = (playerId: string) => friendRequest<FriendSearchResult[]>(`/friends/suggestions?playerId=${encodeURIComponent(playerId)}`);
 export const requestFriend = (playerId: string, targetPlayerId: string) => friendRequest<{ ok: true }>("/friends/requests", { method: "POST", body: JSON.stringify({ playerId, targetPlayerId }) });
 export const respondFriendRequest = (playerId: string, friendshipId: string, action: "accept" | "reject") => friendRequest<{ ok: true }>(`/friends/requests/${encodeURIComponent(friendshipId)}`, { method: "PATCH", body: JSON.stringify({ playerId, action }) });
-export const updateFriendship = (playerId: string, friendshipId: string, action: "remove" | "block") => friendRequest<{ ok: true }>(`/friends/${encodeURIComponent(friendshipId)}`, { method: "PATCH", body: JSON.stringify({ playerId, action }) });
+export const updateFriendship = (playerId: string, friendshipId: string, action: "remove" | "block" | "unblock") => friendRequest<{ ok: true }>(`/friends/${encodeURIComponent(friendshipId)}`, { method: "PATCH", body: JSON.stringify({ playerId, action }) });
 export const sendFriendGift = (playerId: string, friendshipId: string) => friendRequest<{ ok: true }>(`/friends/${encodeURIComponent(friendshipId)}/gifts`, { method: "POST", body: JSON.stringify({ playerId }) });
 export const claimFriendGift = (playerId: string, giftId: string) => friendRequest<{ ok: true; stars: number }>(`/friends/gifts/${encodeURIComponent(giftId)}/claim`, { method: "POST", body: JSON.stringify({ playerId }) });
 
