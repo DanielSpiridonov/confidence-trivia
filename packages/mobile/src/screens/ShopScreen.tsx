@@ -1,5 +1,5 @@
 import React from "react";
-import { Alert, FlatList, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, FlatList, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { ANDROID_MENU_UI_SCALE, BackIconButton, Screen, Title, theme } from "../components/ui";
 import { PointsIcon } from "../components/PointsIcon";
@@ -130,9 +130,48 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
     return true;
   }
 
+  function confirmPurchase(cosmeticType: "name_color" | "avatar" | "frame", cosmeticId: string, itemName: string) {
+    if (ownedCosmeticIds.has(cosmeticId)) return Promise.resolve(true);
+    const price = getCosmeticStarPrice(cosmeticType, cosmeticId);
+    if (!price) return Promise.resolve(true);
+    return new Promise<boolean>((resolve) => {
+      Alert.alert(
+        t("shop.confirmPurchaseTitle"),
+        t("shop.confirmPurchaseMessage", { item: itemName, price }),
+        [
+          { text: t("validation.cancel"), style: "cancel", onPress: () => resolve(false) },
+          { text: t("shop.buy"), onPress: () => resolve(true) },
+        ],
+        { cancelable: true, onDismiss: () => resolve(false) },
+      );
+    });
+  }
+
+  function applyOptimisticPurchase(cosmeticType: "name_color" | "avatar" | "frame", cosmeticId: string) {
+    const alreadyOwned = ownedCosmeticIds.has(cosmeticId);
+    const price = getCosmeticStarPrice(cosmeticType, cosmeticId) ?? 0;
+    if (!alreadyOwned) {
+      setOwnedCosmeticIds((current) => new Set(current).add(cosmeticId));
+      if (price > 0) onStarsChange(Math.max(0, stars - price));
+    }
+    return { alreadyOwned, price };
+  }
+
+  function rollbackOptimisticPurchase(cosmeticId: string, alreadyOwned: boolean, price: number) {
+    if (alreadyOwned) return;
+    setOwnedCosmeticIds((current) => {
+      const next = new Set(current);
+      next.delete(cosmeticId);
+      return next;
+    });
+    if (price > 0) onStarsChange(stars);
+  }
+
   async function equipColor(cosmeticId: string) {
     if (cosmeticId === equippedNameColorId) return;
     if (!canAcquire("name_color", cosmeticId)) return;
+    if (!await confirmPurchase("name_color", cosmeticId, t(`shop.nameColors.${cosmeticId}`))) return;
+    const purchase = applyOptimisticPurchase("name_color", cosmeticId);
     const previous = equippedNameColorId;
     const request = ++colorRequest.current;
     setEquippedNameColorId(cosmeticId);
@@ -146,6 +185,7 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
       setEquippedNameColorId(customization.nameColorId);
       acceptCustomization(customization);
     } else {
+      rollbackOptimisticPurchase(cosmeticId, purchase.alreadyOwned, purchase.price);
       setEquippedNameColorId(previous);
       cacheCustomization(previous, equippedAvatarId, equippedFrameId);
       Alert.alert(t("feedback.actionFailed"), t("feedback.tryAgain"));
@@ -155,6 +195,8 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
   async function equipPlayerAvatar(cosmeticId: string) {
     if (cosmeticId === equippedAvatarId) return;
     if (!canAcquire("avatar", cosmeticId)) return;
+    if (!await confirmPurchase("avatar", cosmeticId, t(`shop.avatarNames.${cosmeticId}`))) return;
+    const purchase = applyOptimisticPurchase("avatar", cosmeticId);
     const previous = equippedAvatarId;
     const request = ++avatarRequest.current;
     setEquippedAvatarId(cosmeticId);
@@ -168,15 +210,18 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
       setEquippedAvatarId(customization.avatarId);
       acceptCustomization(customization);
     } else {
+      rollbackOptimisticPurchase(cosmeticId, purchase.alreadyOwned, purchase.price);
       setEquippedAvatarId(previous);
       cacheCustomization(equippedNameColorId, previous, equippedFrameId);
       Alert.alert(t("feedback.actionFailed"), t("feedback.tryAgain"));
     }
   }
 
-  async function equipPlayerFrame(cosmeticId: string) {
+  async function equipPlayerFrame(cosmeticId: string, itemName?: string) {
     if (cosmeticId === equippedFrameId) return;
     if (!canAcquire("frame", cosmeticId)) return;
+    if (!await confirmPurchase("frame", cosmeticId, itemName ?? cosmeticId)) return;
+    const purchase = applyOptimisticPurchase("frame", cosmeticId);
     const previous = equippedFrameId;
     const request = ++frameRequest.current;
     setEquippedFrameId(cosmeticId);
@@ -190,6 +235,7 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
       setEquippedFrameId(customization.frameId);
       acceptCustomization(customization);
     } else {
+      rollbackOptimisticPurchase(cosmeticId, purchase.alreadyOwned, purchase.price);
       setEquippedFrameId(previous);
       cacheCustomization(equippedNameColorId, equippedAvatarId, previous);
       Alert.alert(t("feedback.actionFailed"), t("feedback.tryAgain"));
@@ -199,7 +245,7 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
   function renderFrameCard(item: CosmeticItem) {
     const equipped = item.id === equippedFrameId;
     return (
-      <Pressable key={item.id || "no-frame"} onPress={() => void equipPlayerFrame(item.id)} style={[styles.cosmeticCard, styles.frameCard, equipped && styles.cosmeticCardEquipped, item.id ? { borderColor: FRAME_COSMETIC_COLORS[item.id as keyof typeof FRAME_COSMETIC_COLORS], borderWidth: equipped ? 3 : 2 } : null]}>
+      <Pressable key={item.id || "no-frame"} onPress={() => void equipPlayerFrame(item.id, item.name)} style={[styles.cosmeticCard, styles.frameCard, equipped && styles.cosmeticCardEquipped, item.id ? { borderColor: FRAME_COSMETIC_COLORS[item.id as keyof typeof FRAME_COSMETIC_COLORS], borderWidth: equipped ? 3 : 2 } : null]}>
         <Text style={[styles.cosmeticIcon, { color: item.id ? FRAME_COSMETIC_COLORS[item.id as keyof typeof FRAME_COSMETIC_COLORS] : theme.textDim, textShadowColor: "rgba(0,0,0,0.8)", textShadowRadius: 2 }]}>{item.icon}</Text>
         <Text numberOfLines={1} style={styles.cosmeticName}>{item.name}</Text>
         <CosmeticStatus equipped={equipped} equipping={equippingIds.has(item.id)} owned={ownedCosmeticIds.has(item.id)} price={getCosmeticStarPrice("frame", item.id)} locked={false} />
@@ -208,7 +254,7 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
   }
 
   return (
-    <Screen style={styles.screen} androidScale={ANDROID_MENU_UI_SCALE}>
+    <Screen style={styles.screen} androidScale={ANDROID_MENU_UI_SCALE * 0.89}>
       <View pointerEvents="none" style={styles.avatarPreloader}>
         {SHOP_PERSISTENT_IMAGES.map((source, index) => <Image key={index} source={source} defaultSource={source} fadeDuration={0} resizeMode="contain" style={styles.preloadedAvatar} />)}
       </View>
@@ -217,7 +263,7 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
         <Title>{tab === "inventory" ? t("shop.tabs.inventory") : t("shop.title")}</Title>
       </View>
       <View style={styles.shopBody}>
-        <View pointerEvents={tab === "inventory" ? "none" : "auto"} style={[styles.tabRail, tab === "inventory" && styles.tabRailHidden]}>
+        <View pointerEvents={tab === "inventory" ? "none" : "auto"} style={[styles.tabRail, Platform.OS === "ios" && styles.tabRailIos, tab === "inventory" && styles.tabRailHidden]}>
           {tabs.map((item) => (
             <Pressable key={item} onPress={() => setTab(item)} style={[styles.tab, tab === item && styles.tabSelected]}>
               <View style={styles.tabIconSlot}>
@@ -228,7 +274,7 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
           ))}
         </View>
 
-        <View style={[styles.catalogue, tab !== "inventory" && styles.catalogueWithTabRail]}>
+        <View style={[styles.catalogue, tab !== "inventory" && styles.catalogueWithTabRail, tab !== "inventory" && Platform.OS === "ios" && styles.catalogueWithTabRailIos]}>
           <View style={styles.catalogueHeader}>
             <Text style={styles.sectionTitle}>{t(`shop.tabs.${tab}`)}</Text>
             <Text style={styles.previewBadge}>{tab === "inventory" ? t("shop.ownedItems") : tab === "stars" ? t("shop.previewOnly") : tab === "frames" ? t("shop.playerBordersPreview") : t("shop.starPricedCosmetics")}</Text>
@@ -250,7 +296,7 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
             <FlatList key="star-packs" horizontal data={STAR_PACKS} keyExtractor={(item) => String(item.stars)} contentContainerStyle={styles.packList} showsHorizontalScrollIndicator={false} renderItem={({ item, index }) => (
               <View style={[styles.starPack, item.stars === 6000 && styles.starPackBest]}>
                 {item.bonus ? <Text style={styles.packBonus}>{item.bonus}</Text> : null}
-                <Image source={STAR_PACK_IMAGES[item.name]} defaultSource={STAR_PACK_IMAGES[item.name]} fadeDuration={0} resizeMode="contain" style={[styles.packImage, { width: 66 + index * 4, height: 66 + index * 4 }]} />
+                <Image source={STAR_PACK_IMAGES[item.name]} defaultSource={STAR_PACK_IMAGES[item.name]} fadeDuration={0} resizeMode="contain" style={[styles.packImage, { width: 79 + index * 4, height: 79 + index * 4 }]} />
                 <Text style={styles.packAmount}>{item.stars}</Text>
                 <Pressable disabled style={styles.buyButton}><Text style={styles.buyText}>{item.price}</Text></Pressable>
               </View>
@@ -303,7 +349,7 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
             <FlatList key={`cosmetics-${tab}`} data={COSMETICS[tab]} numColumns={3} keyExtractor={(item) => item.id} columnWrapperStyle={styles.cosmeticRow} contentContainerStyle={styles.cosmeticList} showsVerticalScrollIndicator={false} renderItem={({ item }) => (
               <Pressable onPress={() => void equipColor(item.id)} style={[styles.cosmeticCard, item.id === equippedNameColorId && styles.cosmeticCardEquipped]}>
                 {item.tag ? <Text style={styles.itemTag}>{item.tag}</Text> : null}
-                <Text style={[styles.cosmeticIcon, { color: item.color, textShadowColor: "rgba(0,0,0,0.8)", textShadowRadius: 2 }]}>{item.icon}</Text>
+                <View style={[styles.shopColorDot, { backgroundColor: item.color }]} />
                 <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={[styles.cosmeticName, { color: item.color }]}>{displayName || t("ranked.player")}</Text>
                 <CosmeticStatus equipped={item.id === equippedNameColorId} equipping={equippingIds.has(item.id)} owned={ownedCosmeticIds.has(item.id)} price={getCosmeticStarPrice("name_color", item.id)} locked={false} />
               </Pressable>
@@ -319,7 +365,7 @@ function CosmeticStatus({ equipped, equipping, owned, price, locked }: { equippe
   const { t } = useTranslation();
   if (equipped) return <Text style={[styles.equipState, styles.equippedState]}>{t("shop.equipped")}</Text>;
   if (equipping) return <Text style={styles.equipState}>{t("shop.equipping")}</Text>;
-  if (owned) return <Text style={styles.equipState}>{t("shop.ownedEquip")}</Text>;
+  if (owned) return <Text style={styles.ownedState}>{t("shop.owned")}</Text>;
   if (locked) return <Text style={styles.rankLocked}>{t("shop.omniscientUnlock")}</Text>;
   if (price === 0) return <Text style={styles.freeItem}>{t("shop.freeItem")}</Text>;
   return <View style={styles.priceRow}><PointsIcon size={14} /><Text style={styles.price}>{price ?? "—"}</Text></View>;
@@ -335,16 +381,18 @@ const styles = StyleSheet.create({
   screen: { justifyContent: "flex-start", paddingTop: 10 },
   headerRow: { width: "100%", minHeight: 44, alignItems: "center", justifyContent: "center" },
   shopBody: { flex: 1, minHeight: 0, width: "100%", position: "relative", marginTop: 4 },
-  tabRail: { position: "absolute", left: 0, top: 0, bottom: 0, width: 112, gap: 7, justifyContent: "center", opacity: 1 },
+  tabRail: { position: "absolute", left: 0, top: 0, bottom: 0, width: 124, gap: 8, justifyContent: "center", opacity: 1 },
+  tabRailIos: { width: 138 },
   tabRailHidden: { opacity: 0 },
-  tab: { minHeight: 48, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 10, borderRadius: 10, backgroundColor: "rgba(31,26,51,0.84)", borderWidth: 1, borderColor: "rgba(185,176,214,0.16)" },
+  tab: { minHeight: 53, flexDirection: "row", alignItems: "center", gap: 9, paddingHorizontal: 11, borderRadius: 10, backgroundColor: "rgba(31,26,51,0.84)", borderWidth: 1, borderColor: "rgba(185,176,214,0.16)" },
   tabSelected: { backgroundColor: "rgba(124,92,255,0.25)", borderColor: theme.primary },
-  tabIconSlot: { width: 39, height: 39, alignItems: "center", justifyContent: "center" },
-  tabIconImage: { width: 31, height: 31 },
-  tabText: { flex: 1, color: theme.textDim, fontSize: 10, fontWeight: "800" },
+  tabIconSlot: { width: 43, height: 43, alignItems: "center", justifyContent: "center" },
+  tabIconImage: { width: 35, height: 35 },
+  tabText: { flex: 1, color: theme.textDim, fontSize: 11, fontWeight: "800" },
   tabTextSelected: { color: theme.text },
   catalogue: { flex: 1, minWidth: 0, borderRadius: 14, backgroundColor: "rgba(31,26,51,0.88)", padding: 11 },
-  catalogueWithTabRail: { marginLeft: 124 },
+  catalogueWithTabRail: { marginLeft: 136 },
+  catalogueWithTabRailIos: { marginLeft: 150 },
   persistentAvatarCatalogue: { ...StyleSheet.absoluteFillObject, top: 43, paddingHorizontal: 11, paddingBottom: 11, opacity: 1 },
   persistentStarCatalogue: { ...StyleSheet.absoluteFillObject, top: 43, paddingHorizontal: 11, paddingBottom: 11, opacity: 1 },
   persistentCatalogueHidden: { opacity: 0 },
@@ -352,8 +400,8 @@ const styles = StyleSheet.create({
   sectionTitle: { color: theme.text, fontSize: 17, fontWeight: "900" },
   previewBadge: { color: theme.textDim, fontSize: 9, fontWeight: "800", textTransform: "uppercase" },
   cosmeticList: { paddingBottom: 4 },
-  cosmeticRow: { gap: 8, marginBottom: 8 },
-  cosmeticCard: { flex: 1, minWidth: 0, height: 86, alignItems: "center", justifyContent: "center", borderRadius: 10, backgroundColor: "rgba(15,12,27,0.75)", borderWidth: 1, borderColor: "rgba(185,176,214,0.18)", paddingHorizontal: 7 },
+  cosmeticRow: { gap: 9, marginBottom: 9 },
+  cosmeticCard: { flex: 1, minWidth: 0, height: 105, alignItems: "center", justifyContent: "center", borderRadius: 10, backgroundColor: "rgba(15,12,27,0.75)", borderWidth: 1, borderColor: "rgba(185,176,214,0.18)", paddingHorizontal: 9 },
   frameScroll: { flex: 1, minHeight: 0 },
   frameSections: { paddingBottom: 5 },
   frameSectionTitle: { color: theme.text, fontSize: 12, fontWeight: "900", marginBottom: 6, paddingLeft: 2 },
@@ -361,32 +409,34 @@ const styles = StyleSheet.create({
   frameCard: { flex: 0, width: "32.2%" },
   cosmeticCardEquipped: { borderColor: "#7CFFA0", backgroundColor: "rgba(56,104,68,0.22)" },
   cosmeticCardLocked: { opacity: 0.58, borderColor: "rgba(255,114,210,0.55)" },
-  cosmeticIcon: { fontSize: 27 },
-  avatarImage: { width: 52, height: 52, marginTop: -2 },
-  cosmeticName: { width: "100%", color: theme.text, fontSize: 10, fontWeight: "800", textAlign: "center", marginTop: 2 },
+  cosmeticIcon: { fontSize: 33 },
+  shopColorDot: { width: 42, height: 42, borderRadius: 21, borderWidth: 2, borderColor: "rgba(255,255,255,0.5)" },
+  avatarImage: { width: 64, height: 64, marginTop: -2 },
+  cosmeticName: { width: "100%", color: theme.text, fontSize: 11, fontWeight: "800", textAlign: "center", marginTop: 2 },
   itemTag: { position: "absolute", top: 4, right: 5, color: "#F7D85B", fontSize: 7, fontWeight: "900", textTransform: "uppercase" },
   priceRow: { flexDirection: "row", alignItems: "center", gap: 3, marginTop: 3 },
-  price: { color: "#F7D85B", fontSize: 10, fontWeight: "900" },
-  equipState: { color: theme.textDim, fontSize: 9, fontWeight: "900", marginTop: 3, textTransform: "uppercase" },
+  price: { color: "#F7D85B", fontSize: 11, fontWeight: "900" },
+  equipState: { color: theme.textDim, fontSize: 10, fontWeight: "900", marginTop: 3, textTransform: "uppercase" },
+  ownedState: { color: "#B9AAFF", fontSize: 10, fontWeight: "900", marginTop: 3, textTransform: "uppercase" },
   equippedState: { color: "#7CFFA0" },
   rankLocked: { color: "#FF72D2", fontSize: 7, fontWeight: "900", marginTop: 3, textTransform: "uppercase", textAlign: "center" },
-  freeItem: { color: "#7CFFA0", fontSize: 9, fontWeight: "900", marginTop: 2, textTransform: "uppercase" },
+  freeItem: { color: "#7CFFA0", fontSize: 10, fontWeight: "900", marginTop: 2, textTransform: "uppercase" },
   inventoryScroll: { flex: 1, minHeight: 0 },
   inventoryContent: { paddingBottom: 6, gap: 9 },
   inventoryCategory: { borderRadius: 10, backgroundColor: "rgba(15,12,27,0.62)", borderWidth: 1, borderColor: "rgba(185,176,214,0.16)", padding: 9 },
   inventoryCategoryTitle: { color: theme.text, fontSize: 12, fontWeight: "900", marginBottom: 7 },
   inventoryItems: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
-  inventoryColorItem: { width: "31.5%", minHeight: 48, flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 5, backgroundColor: "rgba(31,26,51,0.84)", borderWidth: 1, borderColor: "transparent" },
-  inventoryCosmeticItem: { width: "31.5%", minHeight: 48, flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 4, backgroundColor: "rgba(31,26,51,0.84)", borderWidth: 1, borderColor: "transparent" },
-  inventoryAvatarImage: { width: 35, height: 35 },
+  inventoryColorItem: { width: "31.5%", minHeight: 58, flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 5, backgroundColor: "rgba(31,26,51,0.84)", borderWidth: 1, borderColor: "transparent" },
+  inventoryCosmeticItem: { width: "31.5%", minHeight: 58, flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 4, backgroundColor: "rgba(31,26,51,0.84)", borderWidth: 1, borderColor: "transparent" },
+  inventoryAvatarImage: { width: 43, height: 43 },
   inventoryFrameIcon: { width: 30, fontSize: 25, fontWeight: "900", textAlign: "center" },
   inventoryItemEquipped: { borderColor: "#7CFFA0", backgroundColor: "rgba(56,104,68,0.22)" },
-  colorSwatch: { width: 17, height: 17, borderRadius: 9, borderWidth: 1, borderColor: "rgba(255,255,255,0.55)" },
-  inventoryItemName: { flex: 1, minWidth: 0, color: theme.text, fontSize: 9, fontWeight: "900" },
+  colorSwatch: { width: 21, height: 21, borderRadius: 11, borderWidth: 1, borderColor: "rgba(255,255,255,0.55)" },
+  inventoryItemName: { flex: 1, minWidth: 0, color: theme.text, fontSize: 10, fontWeight: "900" },
   inventoryItemState: { color: theme.textDim, fontSize: 7, fontWeight: "900", textTransform: "uppercase" },
   emptyInventory: { color: theme.textDim, fontSize: 10, fontWeight: "700", paddingVertical: 5 },
   packList: { flexGrow: 1, alignItems: "center", gap: 9, paddingVertical: 5 },
-  starPack: { width: 105, height: 172, alignItems: "center", justifyContent: "center", borderRadius: 12, backgroundColor: "rgba(15,12,27,0.8)", borderWidth: 1, borderColor: "rgba(247,216,91,0.25)", padding: 8 },
+  starPack: { width: 124, height: 196, alignItems: "center", justifyContent: "center", borderRadius: 12, backgroundColor: "rgba(15,12,27,0.8)", borderWidth: 1, borderColor: "rgba(247,216,91,0.25)", padding: 10 },
   starPackBest: { borderColor: "#F7D85B", backgroundColor: "rgba(72,58,20,0.45)" },
   packBonus: { position: "absolute", top: 5, color: "#7CFFA0", fontSize: 8, fontWeight: "900", textTransform: "uppercase" },
   packImage: { marginTop: 3, marginBottom: 2 },

@@ -95,6 +95,227 @@ export async function isAuthenticatedPlayer(playerId: string, authUserId: string
   return Boolean(player);
 }
 
+export interface FriendSummary {
+  friendshipId: string;
+  playerId: string;
+  displayName: string;
+  direction: "friend" | "incoming" | "outgoing";
+  giftSentToday: boolean;
+  giftId: string | null;
+}
+
+export interface FriendsResponse {
+  friends: FriendSummary[];
+  incoming: FriendSummary[];
+  outgoing: FriendSummary[];
+  unclaimedGiftCount: number;
+}
+
+export interface FriendSearchResult {
+  playerId: string;
+  displayName: string;
+  relationship: "none" | "friend" | "incoming" | "outgoing" | "blocked";
+}
+
+type FriendActionResult = { ok: true; stars?: number } | { ok: false; error: string };
+
+export async function listFriends(playerId: string): Promise<FriendsResponse | null> {
+  if (!sql) return null;
+  try {
+    const rows = await sql<{
+      friendship_id: string; status: string; requested_by: string; other_id: string; display_name: string;
+      gift_sent_today: boolean; gift_id: string | null;
+    }[]>`
+      select f.id as friendship_id, f.status, f.requested_by,
+        other_player.id as other_id, other_player.display_name,
+        exists(
+          select 1 from public.friend_gifts sent
+          where sent.friendship_id = f.id and sent.sender_id = ${playerId}
+            and sent.gift_date = (now() at time zone 'utc')::date
+        ) as gift_sent_today,
+        (
+          select received.id from public.friend_gifts received
+          where received.friendship_id = f.id and received.receiver_id = ${playerId}
+            and received.gift_date = (now() at time zone 'utc')::date and received.claimed_at is null
+          limit 1
+        ) as gift_id
+      from public.friendships f
+      join public.players other_player on other_player.id = case
+        when f.player_low_id = ${playerId} then f.player_high_id else f.player_low_id end
+      where ${playerId} in (f.player_low_id, f.player_high_id) and f.status <> 'blocked'
+      order by lower(other_player.display_name), other_player.id
+    `;
+    const response: FriendsResponse = { friends: [], incoming: [], outgoing: [], unclaimedGiftCount: 0 };
+    for (const row of rows) {
+      const direction: FriendSummary["direction"] = row.status === "accepted"
+        ? "friend"
+        : row.requested_by === playerId ? "outgoing" : "incoming";
+      const item: FriendSummary = {
+        friendshipId: row.friendship_id,
+        playerId: row.other_id,
+        displayName: row.display_name,
+        direction,
+        giftSentToday: row.gift_sent_today,
+        giftId: row.gift_id,
+      };
+      if (direction === "friend") response.friends.push(item);
+      else if (direction === "incoming") response.incoming.push(item);
+      else response.outgoing.push(item);
+      if (row.gift_id) response.unclaimedGiftCount += 1;
+    }
+    return response;
+  } catch (error) {
+    console.error("Could not load friends", error);
+    return null;
+  }
+}
+
+export async function searchFriendPlayers(playerId: string, query: string): Promise<FriendSearchResult[] | null> {
+  if (!sql) return null;
+  try {
+    const normalizedQuery = query.toLocaleLowerCase("en-US");
+    const rows = await sql<{ id: string; display_name: string; status: string | null; requested_by: string | null }[]>`
+      select candidate.id, candidate.display_name, friendship.status, friendship.requested_by
+      from public.players candidate
+      left join public.friendships friendship on
+        friendship.player_low_id = least(candidate.id, ${playerId}::uuid)
+        and friendship.player_high_id = greatest(candidate.id, ${playerId}::uuid)
+      where candidate.account_type = 'registered' and candidate.id <> ${playerId}
+        and candidate.normalized_display_name like ${`${normalizedQuery}%`}
+      order by lower(candidate.display_name), candidate.id
+      limit 12
+    `;
+    return rows.map((row) => ({
+      playerId: row.id,
+      displayName: row.display_name,
+      relationship: row.status === "accepted" ? "friend"
+        : row.status === "blocked" ? "blocked"
+        : row.status === "pending" ? row.requested_by === playerId ? "outgoing" : "incoming"
+        : "none",
+    }));
+  } catch (error) {
+    console.error("Could not search friend players", error);
+    return null;
+  }
+}
+
+export async function sendFriendRequest(playerId: string, targetPlayerId: string): Promise<FriendActionResult> {
+  if (!sql || playerId === targetPlayerId) return { ok: false, error: "Invalid player" };
+  const [low, high] = [playerId, targetPlayerId].sort();
+  try {
+    return await sql.begin(async (transaction) => {
+      const [target] = await transaction<{ id: string }[]>`select id from public.players where id = ${targetPlayerId} and account_type = 'registered'`;
+      if (!target) return { ok: false, error: "Player not found" } as FriendActionResult;
+      const [existing] = await transaction<{ status: string; requested_by: string }[]>`
+        select status, requested_by from public.friendships where player_low_id = ${low} and player_high_id = ${high} for update
+      `;
+      if (existing?.status === "blocked") return { ok: false, error: "Friend request unavailable" };
+      if (existing?.status === "accepted") return { ok: false, error: "You are already friends" };
+      if (existing?.status === "pending") return { ok: false, error: existing.requested_by === playerId ? "Request already sent" : "This player already sent you a request" };
+      await transaction`
+        insert into public.friendships (player_low_id, player_high_id, requested_by)
+        values (${low}, ${high}, ${playerId})
+      `;
+      return { ok: true } as FriendActionResult;
+    });
+  } catch (error) {
+    console.error("Could not send friend request", error);
+    return { ok: false, error: "Could not send friend request" };
+  }
+}
+
+export async function respondToFriendRequest(playerId: string, friendshipId: string, accept: boolean): Promise<FriendActionResult> {
+  if (!sql) return { ok: false, error: "Friends are temporarily unavailable" };
+  try {
+    return await sql.begin(async (transaction) => {
+      const [friendship] = await transaction<{ player_low_id: string; player_high_id: string; requested_by: string; status: string }[]>`
+        select player_low_id, player_high_id, requested_by, status from public.friendships where id = ${friendshipId} for update
+      `;
+      if (!friendship || friendship.status !== "pending" || friendship.requested_by === playerId || ![friendship.player_low_id, friendship.player_high_id].includes(playerId)) {
+        return { ok: false, error: "Friend request is no longer available" } as FriendActionResult;
+      }
+      if (!accept) {
+        await transaction`delete from public.friendships where id = ${friendshipId}`;
+        return { ok: true } as FriendActionResult;
+      }
+      const counts = await transaction<{ player_id: string; count: number }[]>`
+        select member.player_id, count(f.id)::int as count
+        from (values (${friendship.player_low_id}::uuid), (${friendship.player_high_id}::uuid)) member(player_id)
+        left join public.friendships f on member.player_id in (f.player_low_id, f.player_high_id) and f.status = 'accepted'
+        group by member.player_id
+      `;
+      if (counts.some((item) => item.count >= 25)) return { ok: false, error: "The 25 friend limit has been reached" } as FriendActionResult;
+      await transaction`update public.friendships set status = 'accepted', responded_at = now() where id = ${friendshipId}`;
+      return { ok: true } as FriendActionResult;
+    });
+  } catch (error) {
+    console.error("Could not respond to friend request", error);
+    return { ok: false, error: "Could not update friend request" };
+  }
+}
+
+export async function removeOrBlockFriend(playerId: string, friendshipId: string, block: boolean): Promise<FriendActionResult> {
+  if (!sql) return { ok: false, error: "Friends are temporarily unavailable" };
+  try {
+    const rows = block
+      ? await sql`update public.friendships set status = 'blocked', blocked_by = ${playerId}, responded_at = now() where id = ${friendshipId} and ${playerId} in (player_low_id, player_high_id) returning id`
+      : await sql`delete from public.friendships where id = ${friendshipId} and ${playerId} in (player_low_id, player_high_id) and status <> 'blocked' returning id`;
+    return rows.length ? { ok: true } : { ok: false, error: "Friendship is no longer available" };
+  } catch (error) {
+    console.error("Could not remove or block friend", error);
+    return { ok: false, error: "Could not update friendship" };
+  }
+}
+
+export async function sendFriendGift(playerId: string, friendshipId: string): Promise<FriendActionResult> {
+  if (!sql) return { ok: false, error: "Gifts are temporarily unavailable" };
+  try {
+    return await sql.begin(async (transaction) => {
+      const [friendship] = await transaction<{ player_low_id: string; player_high_id: string; status: string }[]>`
+        select player_low_id, player_high_id, status from public.friendships where id = ${friendshipId} for update
+      `;
+      if (!friendship || friendship.status !== "accepted" || ![friendship.player_low_id, friendship.player_high_id].includes(playerId)) {
+        return { ok: false, error: "You can only gift accepted friends" } as FriendActionResult;
+      }
+      const receiverId = friendship.player_low_id === playerId ? friendship.player_high_id : friendship.player_low_id;
+      const inserted = await transaction`
+        insert into public.friend_gifts (friendship_id, sender_id, receiver_id)
+        values (${friendshipId}, ${playerId}, ${receiverId})
+        on conflict (sender_id, receiver_id, gift_date) do nothing returning id
+      `;
+      return inserted.length ? { ok: true } as FriendActionResult : { ok: false, error: "Gift already sent today" } as FriendActionResult;
+    });
+  } catch (error) {
+    console.error("Could not send friend gift", error);
+    return { ok: false, error: "Could not send gift" };
+  }
+}
+
+export async function claimFriendGift(playerId: string, giftId: string): Promise<FriendActionResult> {
+  if (!sql) return { ok: false, error: "Gifts are temporarily unavailable" };
+  try {
+    return await sql.begin(async (transaction) => {
+      const [gift] = await transaction<{ id: string; stars: number }[]>`
+        select id, stars from public.friend_gifts
+        where id = ${giftId} and receiver_id = ${playerId}
+          and gift_date = (now() at time zone 'utc')::date and claimed_at is null
+        for update
+      `;
+      if (!gift) return { ok: false, error: "Gift is no longer available" } as FriendActionResult;
+      await transaction`update public.friend_gifts set claimed_at = now() where id = ${giftId}`;
+      const [updated] = await transaction<{ stars: number }[]>`update public.players set stars = stars + ${gift.stars} where id = ${playerId} returning stars`;
+      await transaction`
+        insert into public.star_transactions (id, player_id, amount, reason)
+        values (${randomUUID()}, ${playerId}, ${gift.stars}, ${`friend_gift:${gift.id}`})
+      `;
+      return { ok: true, stars: updated.stars } as FriendActionResult;
+    });
+  } catch (error) {
+    console.error("Could not claim friend gift", error);
+    return { ok: false, error: "Could not claim gift" };
+  }
+}
+
 export async function linkPlayerAccount(guestPlayerId: string, displayName: string, authUserId: string, provider: string): Promise<PlayerAccount | null> {
   if (!sql) return null;
   try {

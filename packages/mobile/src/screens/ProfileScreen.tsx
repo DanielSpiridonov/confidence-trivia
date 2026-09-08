@@ -1,17 +1,120 @@
 import React from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { AccountProfile } from "../network/client";
 import { ANDROID_MENU_UI_SCALE, BackIconButton, Screen, Title, theme } from "../components/ui";
 
-export function ProfileScreen({ displayName, registered, provider, profile, busy, authAvailable, onGoogle, onSaveName, onSignOut, onBack }: { displayName:string; registered:boolean; provider:string|null; profile:AccountProfile|null; busy:boolean; authAvailable:boolean; onGoogle:()=>void; onSaveName:(name:string)=>void; onSignOut:()=>void; onBack:()=>void }) {
- const {t}=useTranslation(); const [name,setName]=React.useState(displayName); React.useEffect(()=>setName(displayName),[displayName]); const valid=/^[\p{L}\p{N} _-]{3,20}$/u.test(name.trim());
- return <Screen style={s.screen} androidScale={ANDROID_MENU_UI_SCALE}><BackIconButton label={t("common.back")} onPress={onBack} disabled={busy}/><Title>{t("account.title")}</Title><View style={s.profileContent}><View style={s.card}>
-  <View style={s.header}><View><Text style={s.name}>{displayName}</Text><Text style={s.status}>{registered?t("account.signedInWith",{provider:provider??"Google"}):t("account.guest")}</Text></View><Text style={s.badge}>{registered?t("account.protected"):t("account.localOnly")}</Text></View>
-  {registered&&profile?<><View style={s.row}><Text style={s.label}>{t("account.email")}</Text><Text numberOfLines={1} style={s.value}>{profile.email??"—"}</Text></View><View style={s.editor}><TextInput value={name} onChangeText={setName} maxLength={20} style={s.input} placeholder={t("account.namePlaceholder")} placeholderTextColor={theme.textDim}/><Pressable disabled={busy||!valid||name.trim()===displayName} onPress={()=>onSaveName(name.trim())} style={[s.save,(!valid||name.trim()===displayName)&&s.disabled]}><Text style={s.buttonText}>{t("account.saveName")}</Text></Pressable></View>{!valid&&name.length>0?<Text style={s.error}>{t("account.nameRules")}</Text>:null}<View style={s.stats}><Stat l={t("account.stars")} v={profile.stars}/><Stat l={t("account.games")} v={profile.gamesPlayed}/><Stat l={t("account.wins")} v={profile.wins}/><Stat l={t("account.rank")} v={t(`ranked.ranks.${profile.rankKey}`)}/><Stat l="LP" v={profile.rankedLp}/></View><Text style={s.linked}>{t("account.progressProtected")}</Text><Pressable disabled={busy} onPress={onSignOut} style={s.signOut}><Text style={s.signOutText}>{t("account.signOut")}</Text></Pressable></>:<View style={compact.guest}><View style={compact.intro}><Text style={compact.title}>{t("account.unlockProfile")}</Text><Text style={compact.explain}>{t("account.guestLimits")}</Text><Text style={compact.hint}>{t("account.transferHint")}</Text></View><View style={compact.action}><View style={compact.benefits}><Benefit icon="✓" text={t("account.benefitProgress")}/><Benefit icon="✓" text={t("account.benefitRanked")}/><Benefit icon="✓" text={t("account.benefitSocial")}/></View>{!authAvailable?<Text style={s.warning}>{t("account.configurationRequired")}</Text>:null}<Pressable disabled={busy||!authAvailable} onPress={onGoogle} style={[compact.google,(!authAvailable||busy)&&s.disabled]}><View style={s.googleIcon}><Text style={s.googleLetter}>G</Text></View><Text style={s.buttonText}>{t("account.google")}</Text></Pressable><Pressable disabled style={compact.apple}><Text style={compact.appleIcon}>?</Text><Text style={compact.appleText}>{t("account.appleComingSoon")}</Text></Pressable></View></View>}{busy?<ActivityIndicator style={s.loader} color={theme.primary}/>:null}
- </View></View></Screen>;
+interface Props {
+  displayName: string; registered: boolean; provider: string | null; profile: AccountProfile | null;
+  busy: boolean; authAvailable: boolean; onGoogle: () => void; onSaveName: (name: string) => void;
+  onSignOut: () => void; onBack: () => void;
 }
-function Stat({l,v}:{l:string;v:string|number}){return <View style={s.stat}><Text style={s.statValue}>{v}</Text><Text style={s.statLabel}>{l}</Text></View>}
-function Benefit({icon,text}:{icon:string;text:string}){return <View style={compact.benefit}><Text style={compact.benefitIcon}>{icon}</Text><Text style={compact.benefitText}>{text}</Text></View>}
-const compact=StyleSheet.create({guest:{width:"100%",flexDirection:"row",alignItems:"stretch",gap:18,paddingTop:12},intro:{flex:1,justifyContent:"center",paddingRight:6},action:{flex:1,justifyContent:"center"},title:{color:theme.text,fontSize:18,fontWeight:"900"},explain:{color:theme.textDim,fontSize:11,lineHeight:17,marginTop:6},hint:{color:theme.textDim,fontSize:10,marginTop:8},benefits:{width:"100%",gap:5},benefit:{minHeight:25,borderRadius:8,flexDirection:"row",alignItems:"center",paddingHorizontal:9,backgroundColor:"rgba(124,92,255,.1)"},benefitIcon:{color:"#7CFFA0",fontSize:11,fontWeight:"900",marginRight:7},benefitText:{color:theme.text,fontSize:10,fontWeight:"800"},google:{width:"100%",minHeight:42,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:9,borderRadius:10,backgroundColor:"#4285F4",marginTop:8},apple:{width:"100%",minHeight:38,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:8,borderRadius:10,borderWidth:1,borderColor:"rgba(255,255,255,.3)",backgroundColor:"rgba(255,255,255,.06)",marginTop:6,opacity:.55},appleIcon:{color:"#FFFFFF",fontSize:12},appleText:{color:"#FFFFFF",fontSize:11,fontWeight:"800"}});
-const s=StyleSheet.create({screen:{justifyContent:"flex-start",paddingTop:12},profileContent:{flex:1,width:"100%",justifyContent:"flex-start"},card:{width:"78%",maxWidth:700,alignSelf:"center",marginTop:14,padding:18,borderRadius:20,backgroundColor:"rgba(31,26,51,.94)",borderWidth:1,borderColor:"rgba(185,176,214,.28)"},header:{flexDirection:"row",justifyContent:"space-between",alignItems:"center"},name:{color:theme.text,fontSize:24,fontWeight:"900"},status:{color:"#7CFFA0",fontSize:12,fontWeight:"800"},badge:{color:"#CBBEFF",fontSize:11,fontWeight:"900",borderWidth:1,borderColor:"#7C5CFF",borderRadius:10,padding:6},row:{marginTop:14,flexDirection:"row",justifyContent:"space-between",gap:12},label:{color:theme.textDim,fontSize:12},value:{color:theme.text,fontSize:12,fontWeight:"800",flexShrink:1},editor:{flexDirection:"row",gap:8,marginTop:12},input:{flex:1,minHeight:42,borderRadius:10,borderWidth:1,borderColor:"#62558E",backgroundColor:"#171329",color:theme.text,paddingHorizontal:12,fontWeight:"800"},save:{paddingHorizontal:18,justifyContent:"center",borderRadius:10,backgroundColor:theme.primary},buttonText:{color:"#fff",fontWeight:"900",fontSize:14},disabled:{opacity:.4},error:{color:"#FF8B8B",fontSize:10,marginTop:5},stats:{flexDirection:"row",gap:8,marginTop:16},stat:{flex:1,minWidth:65,alignItems:"center",paddingVertical:9,borderRadius:10,backgroundColor:"rgba(124,92,255,.13)"},statValue:{color:theme.text,fontSize:15,fontWeight:"900"},statLabel:{color:theme.textDim,fontSize:9,fontWeight:"800"},linked:{color:theme.textDim,textAlign:"center",fontSize:11,marginTop:12},guestBody:{alignItems:"center",paddingHorizontal:12,paddingTop:7},guestMark:{width:56,height:56,borderRadius:28,alignItems:"center",justifyContent:"center",backgroundColor:"rgba(124,92,255,.2)",borderWidth:2,borderColor:"#9B83FF"},guestMarkIcon:{color:"#F7D85B",fontSize:27,fontWeight:"900"},guestTitle:{color:theme.text,fontSize:20,fontWeight:"900",marginTop:8},explain:{color:theme.textDim,textAlign:"center",fontSize:12,lineHeight:18,marginTop:6,maxWidth:520},benefits:{width:"100%",flexDirection:"row",gap:8,marginTop:13},benefit:{flex:1,minHeight:52,borderRadius:12,alignItems:"center",justifyContent:"center",padding:7,backgroundColor:"rgba(124,92,255,.11)",borderWidth:1,borderColor:"rgba(155,131,255,.2)"},benefitIcon:{color:"#F7D85B",fontSize:14,fontWeight:"900"},benefitText:{color:theme.text,fontSize:10,fontWeight:"800",textAlign:"center",marginTop:3},warning:{color:"#F7D85B",textAlign:"center",fontSize:11,marginTop:10},google:{width:"100%",maxWidth:420,minHeight:48,flexDirection:"row",alignItems:"center",justifyContent:"center",gap:10,borderRadius:12,backgroundColor:"#4285F4",marginTop:13,borderWidth:1,borderColor:"rgba(255,255,255,.25)"},googleIcon:{width:25,height:25,borderRadius:13,alignItems:"center",justifyContent:"center",backgroundColor:"#fff"},googleLetter:{color:"#4285F4",fontSize:14,fontWeight:"900"},transferHint:{color:theme.textDim,fontSize:10,textAlign:"center",marginTop:7},signOut:{alignSelf:"center",marginTop:12,paddingHorizontal:24,paddingVertical:9,borderRadius:10,borderWidth:1,borderColor:"#FF7777"},signOutText:{color:"#FF9B9B",fontWeight:"900"},loader:{marginTop:10}});
+
+export function ProfileScreen(props: Props) {
+  const { displayName, registered, provider, profile, busy, authAvailable, onGoogle, onSaveName, onSignOut, onBack } = props;
+  const { t } = useTranslation();
+  const [name, setName] = React.useState(displayName);
+  const trimmedName = name.trim();
+  const valid = /^[\p{L}\p{N} _-]{3,20}$/u.test(trimmedName);
+  const initials = displayName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "?";
+  React.useEffect(() => setName(displayName), [displayName]);
+
+  return <Screen style={s.screen} androidScale={ANDROID_MENU_UI_SCALE}>
+    <BackIconButton label={t("common.back")} onPress={onBack} disabled={busy} />
+    <Title>{t("account.title")}</Title>
+    <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <View style={s.surface}>
+        <View style={s.identityColumn}>
+          <View style={s.identityHeader}>
+            <View style={s.avatar}><Text style={s.avatarText}>{initials}</Text></View>
+            <View style={s.identityText}>
+              <Text numberOfLines={1} adjustsFontSizeToFit style={s.name}>{displayName}</Text>
+              <Text numberOfLines={1} style={s.status}>{registered ? t("account.signedInWith", { provider: provider ?? "Google" }) : t("account.guest")}</Text>
+            </View>
+          </View>
+          <Text style={[s.badge, registered && s.protectedBadge]}>{registered ? t("account.protected") : t("account.localOnly")}</Text>
+          {registered && profile ? <View style={s.emailBlock}>
+            <Text style={s.eyebrow}>{t("account.email")}</Text>
+            <Text numberOfLines={1} style={s.email}>{profile.email ?? "-"}</Text>
+          </View> : <View style={s.guestIntro}>
+            <Text style={s.sectionTitle}>{t("account.unlockProfile")}</Text>
+            <Text style={s.bodyText}>{t("account.guestLimits")}</Text>
+          </View>}
+          {registered ? <Pressable accessibilityRole="button" disabled={busy} onPress={onSignOut} style={({ pressed }) => [s.signOut, pressed && s.pressed]}>
+            <Text style={s.signOutText}>{t("account.signOut")}</Text>
+          </Pressable> : null}
+        </View>
+
+        <View style={s.divider} />
+        <View style={s.detailsColumn}>
+          {registered && profile ? <>
+            <Text style={s.eyebrow}>{t("account.namePlaceholder")}</Text>
+            <View style={s.editor}>
+              <TextInput value={name} onChangeText={setName} maxLength={20} style={s.input} placeholder={t("account.namePlaceholder")} placeholderTextColor={theme.textDim} returnKeyType="done" onSubmitEditing={() => valid && trimmedName !== displayName && onSaveName(trimmedName)} />
+              <Pressable accessibilityRole="button" disabled={busy || !valid || trimmedName === displayName} onPress={() => onSaveName(trimmedName)} style={({ pressed }) => [s.save, (!valid || trimmedName === displayName) && s.disabled, pressed && s.pressed]}>
+                <Text style={s.buttonText}>{t("account.saveName")}</Text>
+              </Pressable>
+            </View>
+            {!valid && name.length > 0 ? <Text style={s.error}>{t("account.nameRules")}</Text> : null}
+            <View style={s.stats}>
+              <Stat label={t("account.stars")} value={profile.stars} />
+              <Stat label={t("account.games")} value={profile.gamesPlayed} />
+              <Stat label={t("account.wins")} value={profile.wins} />
+              <Stat label={t("account.rank")} value={t(`ranked.ranks.${profile.rankKey}`)} />
+              <Stat label="LP" value={profile.rankedLp} last />
+            </View>
+            <Text style={s.protectedText}>{t("account.progressProtected")}</Text>
+          </> : <>
+            <View style={s.benefits}>
+              <Benefit text={t("account.benefitProgress")} />
+              <Benefit text={t("account.benefitRanked")} />
+              <Benefit text={t("account.benefitSocial")} />
+            </View>
+            <Text style={s.transferHint}>{t("account.transferHint")}</Text>
+            {!authAvailable ? <Text style={s.warning}>{t("account.configurationRequired")}</Text> : null}
+            <Pressable accessibilityRole="button" disabled={busy || !authAvailable} onPress={onGoogle} style={({ pressed }) => [s.google, (!authAvailable || busy) && s.disabled, pressed && s.pressed]}>
+              <View style={s.googleIcon}><Text style={s.googleLetter}>G</Text></View><Text style={s.buttonText}>{t("account.google")}</Text>
+            </Pressable>
+            <View style={s.apple}><Text style={s.appleMark}>A</Text><Text style={s.appleText}>{t("account.appleComingSoon")}</Text></View>
+          </>}
+        </View>
+        {busy ? <View style={s.loader} pointerEvents="none"><ActivityIndicator color={theme.primary} /></View> : null}
+      </View>
+    </ScrollView>
+  </Screen>;
+}
+
+function Stat({ label, value, last = false }: { label: string; value: string | number; last?: boolean }) {
+  return <View style={[s.stat, last && s.lastStat]}><Text numberOfLines={1} adjustsFontSizeToFit style={s.statValue}>{value}</Text><Text numberOfLines={1} style={s.statLabel}>{label}</Text></View>;
+}
+
+function Benefit({ text }: { text: string }) {
+  return <View style={s.benefit}><Text style={s.check}>+</Text><Text numberOfLines={1} adjustsFontSizeToFit style={s.benefitText}>{text}</Text></View>;
+}
+
+const s = StyleSheet.create({
+  screen: { justifyContent: "flex-start", paddingTop: 10 }, scroll: { flex: 1, width: "100%" },
+  scrollContent: { flexGrow: 1, justifyContent: "center", paddingHorizontal: 16, paddingVertical: 8 },
+  surface: { width: "92%", maxWidth: 820, minHeight: 224, alignSelf: "center", flexDirection: "row", borderRadius: 8, borderWidth: 1, borderColor: "rgba(185,176,214,.28)", backgroundColor: "rgba(31,26,51,.94)", overflow: "hidden" },
+  identityColumn: { width: "38%", padding: 16 }, detailsColumn: { flex: 1, justifyContent: "center", padding: 16 },
+  divider: { width: 1, marginVertical: 14, backgroundColor: "rgba(185,176,214,.2)" }, identityHeader: { flexDirection: "row", alignItems: "center" },
+  avatar: { width: 46, height: 46, borderRadius: 23, alignItems: "center", justifyContent: "center", backgroundColor: "#7C5CFF", borderWidth: 2, borderColor: "#B9AAFF" },
+  avatarText: { color: "#FFF", fontSize: 17, fontWeight: "900" }, identityText: { flex: 1, minWidth: 0, marginLeft: 10 },
+  name: { color: theme.text, fontSize: 20, fontWeight: "900" }, status: { color: "#9FE5B1", fontSize: 10, fontWeight: "800", marginTop: 2 },
+  badge: { alignSelf: "flex-start", color: "#CABFFF", fontSize: 9, fontWeight: "900", marginTop: 10, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, borderWidth: 1, borderColor: "rgba(155,131,255,.55)" },
+  protectedBadge: { color: "#9FE5B1", borderColor: "rgba(124,255,160,.45)" }, emailBlock: { marginTop: 13 },
+  eyebrow: { color: theme.textDim, fontSize: 9, fontWeight: "900", textTransform: "uppercase" }, email: { color: theme.text, fontSize: 11, fontWeight: "700", marginTop: 3 },
+  guestIntro: { marginTop: 12 }, sectionTitle: { color: theme.text, fontSize: 15, fontWeight: "900" }, bodyText: { color: theme.textDim, fontSize: 10, lineHeight: 15, marginTop: 5 },
+  editor: { flexDirection: "row", gap: 8, marginTop: 5 }, input: { flex: 1, minHeight: 36, borderRadius: 6, borderWidth: 1, borderColor: "#62558E", backgroundColor: "#171329", color: theme.text, paddingHorizontal: 10, paddingVertical: 5, fontSize: 12, fontWeight: "800" },
+  save: { minWidth: 70, alignItems: "center", justifyContent: "center", borderRadius: 6, backgroundColor: theme.primary }, buttonText: { color: "#FFF", fontSize: 12, fontWeight: "900" },
+  error: { color: "#FF9B9B", fontSize: 9, marginTop: 4 }, stats: { minHeight: 58, flexDirection: "row", alignItems: "stretch", marginTop: 14, borderTopWidth: 1, borderBottomWidth: 1, borderColor: "rgba(185,176,214,.18)" },
+  stat: { flex: 1, minWidth: 0, alignItems: "center", justifyContent: "center", borderRightWidth: 1, borderRightColor: "rgba(185,176,214,.18)", paddingHorizontal: 3 }, lastStat: { borderRightWidth: 0 },
+  statValue: { width: "100%", color: theme.text, fontSize: 14, fontWeight: "900", textAlign: "center" }, statLabel: { color: theme.textDim, fontSize: 8, fontWeight: "800", marginTop: 2 }, protectedText: { color: theme.textDim, fontSize: 9, textAlign: "center", marginTop: 8 },
+  signOut: { alignSelf: "flex-start", marginTop: "auto", paddingHorizontal: 13, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: "#D96E79" }, signOutText: { color: "#FF9B9B", fontSize: 10, fontWeight: "900" },
+  benefits: { gap: 2 }, benefit: { minHeight: 27, flexDirection: "row", alignItems: "center" }, check: { width: 20, height: 20, borderRadius: 10, color: "#171329", backgroundColor: "#9FE5B1", textAlign: "center", lineHeight: 20, fontSize: 14, fontWeight: "900", marginRight: 8 }, benefitText: { flex: 1, color: theme.text, fontSize: 11, fontWeight: "800" },
+  transferHint: { color: theme.textDim, fontSize: 9, marginTop: 5 }, warning: { color: "#F7D85B", fontSize: 9, lineHeight: 12, marginTop: 5 },
+  google: { minHeight: 36, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 6, backgroundColor: "#4285F4", marginTop: 9 },
+  googleIcon: { width: 21, height: 21, borderRadius: 11, alignItems: "center", justifyContent: "center", backgroundColor: "#FFF" }, googleLetter: { color: "#4285F4", fontSize: 12, fontWeight: "900" },
+  apple: { minHeight: 32, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, borderRadius: 6, borderWidth: 1, borderColor: "rgba(255,255,255,.22)", marginTop: 5, opacity: .5 }, appleMark: { color: "#FFF", fontSize: 10, fontWeight: "900" }, appleText: { color: "#FFF", fontSize: 10, fontWeight: "800" },
+  disabled: { opacity: .4 }, pressed: { opacity: .75 }, loader: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(23,19,41,.35)" },
+});

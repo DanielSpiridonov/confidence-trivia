@@ -8,7 +8,7 @@ const SECTIONS = ["loop", "confidence", "classic", "damage", "ranked", "stars"] 
 export function RulesScreen({ onBack }: { onBack: () => void }) {
   const { t } = useTranslation();
   return (
-    <Screen style={styles.screen} androidScale={ANDROID_MENU_UI_SCALE}>
+    <Screen style={styles.screen} androidScale={ANDROID_MENU_UI_SCALE * 0.9}>
       <BackIconButton label={t("common.back")} onPress={onBack} />
       <Title>{t("rules.title")}</Title>
       <Text style={styles.intro}>{t("rules.intro")}</Text>

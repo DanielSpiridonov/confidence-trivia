@@ -71,6 +71,24 @@ public `wss://` URL and use that URL instead.
 This setup is for development only. For real distribution, build the iOS app
 with EAS/TestFlight and keep only the backend Docker image hosted.
 
+Run iOS builds through the workspace script from the repository root. This
+selects the complete mobile Expo config and creates a standalone internal build
+with an embedded JavaScript bundle:
+
+```bash
+npm run build:ios:device
+```
+
+Do not run `eas build` directly from the repository root because the monorepo
+root is not the Expo app directory. A build made with the `development` EAS
+profile is a development client and requires Metro. Build and install that
+separate binary first, then start Metro:
+
+```bash
+npm run build:ios:development
+npm run dev:mobile:client
+```
+
 ## Shared test server with Expo Go
 
 Use the Render Blueprint in `render.yaml` when testers are not on the same

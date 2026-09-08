@@ -197,6 +197,87 @@ app.get("/ranked/leaderboard", async (req, res) => {
     }
     res.json(leaderboard);
 });
+app.get("/friends", async (req, res) => {
+    const playerId = typeof req.query.playerId === "string" ? req.query.playerId : "";
+    if (!isDeviceId(playerId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
+        res.status(403).json({ error: "Sign in to access Friends" });
+        return;
+    }
+    const friends = await (0, database_1.listFriends)(playerId);
+    if (!friends) {
+        res.status(503).json({ error: "Friends are temporarily unavailable" });
+        return;
+    }
+    res.json(friends);
+});
+app.get("/friends/search", async (req, res) => {
+    const playerId = typeof req.query.playerId === "string" ? req.query.playerId : "";
+    const query = typeof req.query.query === "string" ? req.query.query.trim().slice(0, 20) : "";
+    if (!isDeviceId(playerId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
+        res.status(403).json({ error: "Sign in to access Friends" });
+        return;
+    }
+    if (query.length < 2) {
+        res.json([]);
+        return;
+    }
+    const results = await (0, database_1.searchFriendPlayers)(playerId, query);
+    if (!results) {
+        res.status(503).json({ error: "Player search is temporarily unavailable" });
+        return;
+    }
+    res.json(results);
+});
+app.post("/friends/requests", async (req, res) => {
+    const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
+    const targetPlayerId = typeof req.body?.targetPlayerId === "string" ? req.body.targetPlayerId : "";
+    if (!isDeviceId(playerId) || !isDeviceId(targetPlayerId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
+        res.status(403).json({ error: "Sign in to access Friends" });
+        return;
+    }
+    sendFriendActionResponse(res, await (0, database_1.sendFriendRequest)(playerId, targetPlayerId));
+});
+app.patch("/friends/requests/:friendshipId", async (req, res) => {
+    const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
+    const action = req.body?.action;
+    if (!isDeviceId(playerId) || !isDeviceId(req.params.friendshipId) || !["accept", "reject"].includes(action) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
+        res.status(403).json({ error: "Invalid friend request" });
+        return;
+    }
+    sendFriendActionResponse(res, await (0, database_1.respondToFriendRequest)(playerId, req.params.friendshipId, action === "accept"));
+});
+app.patch("/friends/:friendshipId", async (req, res) => {
+    const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
+    const action = req.body?.action;
+    if (!isDeviceId(playerId) || !isDeviceId(req.params.friendshipId) || !["remove", "block"].includes(action) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
+        res.status(403).json({ error: "Invalid friendship action" });
+        return;
+    }
+    sendFriendActionResponse(res, await (0, database_1.removeOrBlockFriend)(playerId, req.params.friendshipId, action === "block"));
+});
+app.post("/friends/:friendshipId/gifts", async (req, res) => {
+    const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
+    if (!isDeviceId(playerId) || !isDeviceId(req.params.friendshipId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
+        res.status(403).json({ error: "Invalid gift action" });
+        return;
+    }
+    sendFriendActionResponse(res, await (0, database_1.sendFriendGift)(playerId, req.params.friendshipId));
+});
+app.post("/friends/gifts/:giftId/claim", async (req, res) => {
+    const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
+    if (!isDeviceId(playerId) || !isDeviceId(req.params.giftId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
+        res.status(403).json({ error: "Invalid gift claim" });
+        return;
+    }
+    sendFriendActionResponse(res, await (0, database_1.claimFriendGift)(playerId, req.params.giftId));
+});
+function sendFriendActionResponse(res, result) {
+    if (!result.ok) {
+        res.status(409).json({ error: result.error ?? "Action unavailable" });
+        return;
+    }
+    res.json(result);
+}
 async function requestOwnsRegisteredPlayer(playerId, authorization) {
     const identity = await (0, auth_1.verifySupabaseIdentity)(authorization);
     return Boolean(identity && await (0, database_1.isAuthenticatedPlayer)(playerId, identity.userId));

@@ -24,13 +24,14 @@ import { RankedScreen } from "./src/screens/RankedScreen";
 import { ShopScreen } from "./src/screens/ShopScreen";
 import { ProfileScreen } from "./src/screens/ProfileScreen";
 import { RulesScreen } from "./src/screens/RulesScreen";
+import { FriendsScreen } from "./src/screens/FriendsScreen";
 import { AccountProfile, claimDailyReward, createRoom, DailyRewardStatus, getAccountProfile, getDailyRewardStatus, getPlayerStars, joinPublicRoom, joinRoom, linkPlayerAccount, reconnectRoom, updateAccountName, useRoomState } from "./src/network/client";
 import { prepareSoundEffects, setSoundEffectsVolume, stopAllSoundEffects } from "./src/audio/sounds";
 import { pauseMusicForBackground, prepareMusic, setMusicVolume as applyMusicVolume, startMenuMusic, stopMenuMusic } from "./src/audio/music";
 import { createFreshGuestIdentity, getOrCreateDeviceId, getOrCreateGuestName } from "./src/utils/deviceId";
 import { authConfigured, getStoredSession, signInWithSocialProvider, signOutAccount, subscribeToAuthChanges } from "./src/auth/supabase";
 
-type Nav = "home" | "create" | "join" | "ranked" | "shop" | "settings" | "profile" | "rules" | "in-room";
+type Nav = "home" | "create" | "join" | "ranked" | "shop" | "settings" | "profile" | "friends" | "rules" | "in-room";
 type RoomRecoveryState = "reconnecting" | "failed";
 const LANGUAGE_STORAGE_KEY = "confidence-trivia:locale";
 const SFX_VOLUME_STORAGE_KEY = "confidence-trivia:sfx-volume";
@@ -41,6 +42,7 @@ const HIGH_CONTRAST_STORAGE_KEY = "confidence-trivia:high-contrast-enabled";
 const RECENT_QUESTIONS_STORAGE_KEY = "confidence-trivia:recent-question-ids";
 const RECENT_QUESTION_LIMIT = 40;
 const LOADING_EMBLEM = require("./assets/loading-emblem.png");
+const LOADING_GLOW = require("./assets/loading-glow.png");
 const UI_PRELOAD_IMAGES = [
   ...RANK_IMAGE_SOURCES,
   require("./assets/avatar-thumbnails/smart-owl.png"),
@@ -130,11 +132,17 @@ function LoadingScreen() {
   }, [pulse]);
 
   const emblemScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1.02] });
-  const glowOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.25, 0.6] });
+  const glowOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.28, 0.46] });
 
   return (
     <View style={styles.loadingRoot}>
-      <Animated.View style={[styles.loadingGlow, { opacity: glowOpacity, transform: [{ scale: emblemScale }] }]} />
+      <Animated.Image
+        source={LOADING_GLOW}
+        defaultSource={LOADING_GLOW}
+        fadeDuration={0}
+        resizeMode="contain"
+        style={[styles.loadingGlow, { opacity: glowOpacity, transform: [{ scale: emblemScale }] }]}
+      />
       <Animated.Image
         source={LOADING_EMBLEM}
         defaultSource={LOADING_EMBLEM}
@@ -180,7 +188,7 @@ function AppFrame({ children, highContrast = false }: { children: React.ReactNod
   );
 }
 
-function StarsBadge({ stars, gain, onPress }: { stars: number; gain: { id: number; amount: number } | null; onPress: () => void }) {
+function StarsBadge({ stars, gain, width, onPress }: { stars: number; gain: { id: number; amount: number } | null; width: number; onPress: () => void }) {
   const gainOpacity = useRef(new Animated.Value(0)).current;
   const gainTranslateY = useRef(new Animated.Value(8)).current;
 
@@ -196,9 +204,9 @@ function StarsBadge({ stars, gain, onPress }: { stars: number; gain: { id: numbe
 
   return (
     <View pointerEvents="box-none" style={styles.starsHud}>
-      <Pressable accessibilityRole="button" accessibilityLabel={`${stars} stars`} onPress={onPress} style={({ pressed }) => [styles.pointsBadge, pressed && styles.pointsBadgePressed]}>
+      <Pressable accessibilityRole="button" accessibilityLabel={`${stars} stars`} onPress={onPress} style={({ pressed }) => [styles.pointsBadge, { width }, pressed && styles.pointsBadgePressed]}>
         <PointsIcon size={38} />
-        <Text style={styles.pointsBadgeText}>{stars}</Text>
+        <Text numberOfLines={1} style={styles.pointsBadgeText}>{stars}</Text>
       </Pressable>
       {gain ? (
         <Animated.Text style={[styles.starGainText, { opacity: gainOpacity, transform: [{ translateY: gainTranslateY }] }]}>+{gain.amount} stars</Animated.Text>
@@ -383,13 +391,23 @@ export default function App() {
 
   async function handleAccountName(displayName: string) {
     if (!registeredAccount || authBusy) return;
+    const previousAccount = registeredAccount;
+    const previousName = defaultPlayerName;
     setAuthBusy(true);
+    setRegisteredAccount({ ...registeredAccount, displayName });
+    setDefaultPlayerName(displayName);
+    void AsyncStorage.setItem(PLAYER_NAME_STORAGE_KEY, displayName);
     try {
       const profile = await updateAccountName(registeredAccount.playerId, displayName);
       setRegisteredAccount(profile); setDefaultPlayerName(profile.displayName);
-      await AsyncStorage.setItem(PLAYER_NAME_STORAGE_KEY, profile.displayName);
+      void AsyncStorage.setItem(PLAYER_NAME_STORAGE_KEY, profile.displayName);
       Alert.alert(i18n.t("account.nameUpdated"));
-    } catch (error) { Alert.alert(i18n.t("account.nameUpdateFailed"), error instanceof Error ? error.message : i18n.t("network.unknownError")); }
+    } catch (error) {
+      setRegisteredAccount(previousAccount);
+      setDefaultPlayerName(previousName);
+      void AsyncStorage.setItem(PLAYER_NAME_STORAGE_KEY, previousName);
+      Alert.alert(i18n.t("account.nameUpdateFailed"), error instanceof Error ? error.message : i18n.t("network.unknownError"));
+    }
     finally { setAuthBusy(false); }
   }
 
@@ -408,7 +426,7 @@ export default function App() {
     ]);
   }
 
-  function openRegisteredFeature(destination: "shop" | "ranked", open: () => void) {
+  function openRegisteredFeature(destination: "shop" | "ranked" | "friends", open: () => void) {
     if (registeredAccount) {
       open();
       return;
@@ -503,22 +521,36 @@ export default function App() {
 
   async function handleClaimDailyReward() {
     if (dailyRewardClaiming || !dailyReward?.available) return;
-    const currentDeviceId = await requireDeviceId();
+    const previousReward = dailyReward;
+    const previousStars = stars;
+    const optimisticAmount = dailyReward.amount;
+    const optimisticClaim = {
+      ...dailyReward,
+      available: false,
+      stars: stars + optimisticAmount,
+      nextClaimAt: new Date(Date.now() + 24 * 60 * 60 * 1_000).toISOString(),
+    };
     setDailyRewardClaiming(true);
+    setDailyReward(optimisticClaim);
+    setStars(optimisticClaim.stars);
+    const optimisticCelebrationId = Date.now();
+    setStarGain({ id: optimisticCelebrationId, amount: optimisticAmount });
+    setDailyRewardCelebration({ id: optimisticCelebrationId, amount: optimisticAmount, streakDay: dailyReward.streakDay });
     try {
+      const currentDeviceId = await requireDeviceId();
       const status = await claimDailyReward(currentDeviceId, defaultPlayerName);
       if (!status) {
+        setDailyReward(previousReward);
+        setStars(previousStars);
         Alert.alert(i18n.t("feedback.actionFailed"), i18n.t("feedback.tryAgain"));
         return;
       }
-      const earned = Math.max(0, status.stars - stars);
       setDailyReward(status);
       setStars(status.stars);
-      if (earned > 0) {
-        const id = Date.now();
-        setStarGain({ id, amount: earned });
-        setDailyRewardCelebration({ id, amount: earned, streakDay: status.streakDay });
-      }
+    } catch (error) {
+      setDailyReward(previousReward);
+      setStars(previousStars);
+      Alert.alert(i18n.t("feedback.actionFailed"), error instanceof Error ? error.message : i18n.t("feedback.tryAgain"));
     } finally {
       setDailyRewardClaiming(false);
     }
@@ -641,6 +673,10 @@ export default function App() {
     );
   }
 
+  const starsBadgeWidth = Math.max(88, 70 + String(Math.max(0, stars)).length * 10);
+  const settingsButtonRight = 18 + starsBadgeWidth + 8;
+  const rulesButtonRight = settingsButtonRight + 48;
+
   return (
     <AppFrame highContrast={highContrastEnabled}>
       <AssetPreloader sources={UI_PRELOAD_IMAGES} />
@@ -664,6 +700,7 @@ export default function App() {
           }}
           onJoin={() => setNav("join")}
           onProfile={() => setNav("profile")}
+          onFriends={() => openRegisteredFeature("friends", () => setNav("friends"))}
           onInventory={() => openRegisteredFeature("shop", () => openShop("inventory"))}
           deviceId={deviceId}
           onRanked={() => openRegisteredFeature("ranked", () => setNav("ranked"))}
@@ -721,6 +758,7 @@ export default function App() {
             />
           )}
           {nav === "rules" && <RulesScreen onBack={() => setNav("home")} />}
+          {nav === "friends" && deviceId ? <FriendsScreen playerId={deviceId} onStarsChange={setStars} onBack={() => setNav("home")} /> : null}
           {nav === "profile" && (
             <ProfileScreen
               displayName={defaultPlayerName}
@@ -739,10 +777,10 @@ export default function App() {
       )}
       {nav === "home" ? (
         <>
-          <Pressable accessibilityRole="button" accessibilityLabel={i18n.t("home.ruleBook")} onPress={() => setNav("rules")} style={({ pressed }) => [styles.homeSettingsButton, styles.homeRulesButton, pressed && styles.homeSettingsButtonPressed]}>
+          <Pressable accessibilityRole="button" accessibilityLabel={i18n.t("home.ruleBook")} onPress={() => setNav("rules")} style={({ pressed }) => [styles.homeSettingsButton, styles.homeRulesButton, { right: rulesButtonRight }, pressed && styles.homeSettingsButtonPressed]}>
             <Text style={styles.homeRulesIcon}>?</Text>
           </Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel={i18n.t("home.settings")} onPress={() => setNav("settings")} style={({ pressed }) => [styles.homeSettingsButton, pressed && styles.homeSettingsButtonPressed]}>
+          <Pressable accessibilityRole="button" accessibilityLabel={i18n.t("home.settings")} onPress={() => setNav("settings")} style={({ pressed }) => [styles.homeSettingsButton, { right: settingsButtonRight }, pressed && styles.homeSettingsButtonPressed]}>
             <Text style={styles.homeSettingsIcon}>{"\u2699"}</Text>
           </Pressable>
         </>
@@ -751,7 +789,7 @@ export default function App() {
         pointerEvents={nav !== "in-room" ? "box-none" : "none"}
         style={[styles.starsPersistentLayer, nav === "in-room" && styles.persistentScreenHidden]}
       >
-        <StarsBadge stars={stars} gain={starGain} onPress={() => openRegisteredFeature("shop", () => openShop("stars"))} />
+        <StarsBadge stars={stars} gain={starGain} width={starsBadgeWidth} onPress={() => openRegisteredFeature("shop", () => openShop("stars"))} />
       </View>
     </AppFrame>
   );
@@ -945,7 +983,7 @@ function InRoomRouter({
 
 const styles = StyleSheet.create({
   loadingRoot: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "transparent" },
-  loadingGlow: { position: "absolute", width: 230, height: 150, borderRadius: 115, backgroundColor: "#8D3DFF", shadowColor: "#B865FF", shadowOpacity: 0.9, shadowRadius: 34 },
+  loadingGlow: { position: "absolute", width: 288, height: 192 },
   loadingEmblem: { width: 210, height: 150 },
   loadingTitle: { marginTop: 3, color: "#FFF1B8", fontSize: 17, fontWeight: "900", letterSpacing: 2.2, textShadowColor: "rgba(112,38,190,0.95)", textShadowRadius: 9 },
   loadingDots: { flexDirection: "row", gap: 6, marginTop: 10 },
@@ -987,7 +1025,7 @@ const styles = StyleSheet.create({
   homeSettingsButton: {
     position: "absolute",
     top: 18,
-    right: 122,
+    right: 142,
     zIndex: 20,
     width: 40,
     height: 40,
@@ -999,11 +1037,10 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255, 255, 255, 0.10)",
   },
   homeSettingsButtonPressed: { opacity: 0.7, transform: [{ scale: 0.96 }] },
-  homeRulesButton: { right: 170 },
+  homeRulesButton: { right: 190 },
   homeRulesIcon: { color: theme.text, fontSize: 23, lineHeight: 26, fontWeight: "900" },
   homeSettingsIcon: { color: theme.text, fontSize: 24, lineHeight: 27, fontWeight: "800" },
   pointsBadge: {
-    minWidth: 76,
     height: 40,
     paddingHorizontal: 12,
     borderRadius: 20,
@@ -1019,6 +1056,7 @@ const styles = StyleSheet.create({
     color: theme.text,
     fontSize: 17,
     fontWeight: "900",
+    textAlign: "center",
   },
   starGainText: {
     color: "#F7D85B",

@@ -2,6 +2,8 @@
 
 This social/account feature is separate from the future Friends Mode game mode.
 
+Implementation status: initial authenticated Friends screen, player search, requests, removal/blocking, daily sending, and explicit gift claiming are implemented. Cross-platform multiplayer testing and notification polish remain.
+
 - Friends require registered accounts and unique permanent player names.
 - Friend requests may be accepted, rejected, removed, or blocked.
 - An account may have at most 25 accepted friends.

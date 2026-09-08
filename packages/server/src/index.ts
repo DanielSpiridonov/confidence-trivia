@@ -3,7 +3,7 @@ import express from "express";
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { GameRoom } from "./rooms/GameRoom";
-import { claimDailyReward, equipFreeAvatar, equipFreeFrame, equipFreeNameColor, getAccountProfile, getDailyRewardStatus, getDatabaseStatus, getPlayerCustomization, getPlayerStars, getRankedLeaderboard, isAuthenticatedPlayer, linkPlayerAccount, updateAccountDisplayName } from "./database";
+import { claimDailyReward, claimFriendGift, equipFreeAvatar, equipFreeFrame, equipFreeNameColor, getAccountProfile, getDailyRewardStatus, getDatabaseStatus, getPlayerCustomization, getPlayerStars, getRankedLeaderboard, isAuthenticatedPlayer, linkPlayerAccount, listFriends, removeOrBlockFriend, respondToFriendRequest, searchFriendPlayers, sendFriendGift, sendFriendRequest, updateAccountDisplayName } from "./database";
 import { verifySupabaseIdentity } from "./auth";
 
 const port = Number(process.env.PORT ?? 2567);
@@ -186,6 +186,62 @@ app.get("/ranked/leaderboard", async (req, res) => {
   }
   res.json(leaderboard);
 });
+
+app.get("/friends", async (req, res) => {
+  const playerId = typeof req.query.playerId === "string" ? req.query.playerId : "";
+  if (!isDeviceId(playerId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) { res.status(403).json({ error: "Sign in to access Friends" }); return; }
+  const friends = await listFriends(playerId);
+  if (!friends) { res.status(503).json({ error: "Friends are temporarily unavailable" }); return; }
+  res.json(friends);
+});
+
+app.get("/friends/search", async (req, res) => {
+  const playerId = typeof req.query.playerId === "string" ? req.query.playerId : "";
+  const query = typeof req.query.query === "string" ? req.query.query.trim().slice(0, 20) : "";
+  if (!isDeviceId(playerId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) { res.status(403).json({ error: "Sign in to access Friends" }); return; }
+  if (query.length < 2) { res.json([]); return; }
+  const results = await searchFriendPlayers(playerId, query);
+  if (!results) { res.status(503).json({ error: "Player search is temporarily unavailable" }); return; }
+  res.json(results);
+});
+
+app.post("/friends/requests", async (req, res) => {
+  const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
+  const targetPlayerId = typeof req.body?.targetPlayerId === "string" ? req.body.targetPlayerId : "";
+  if (!isDeviceId(playerId) || !isDeviceId(targetPlayerId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) { res.status(403).json({ error: "Sign in to access Friends" }); return; }
+  sendFriendActionResponse(res, await sendFriendRequest(playerId, targetPlayerId));
+});
+
+app.patch("/friends/requests/:friendshipId", async (req, res) => {
+  const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
+  const action = req.body?.action;
+  if (!isDeviceId(playerId) || !isDeviceId(req.params.friendshipId) || !["accept", "reject"].includes(action) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) { res.status(403).json({ error: "Invalid friend request" }); return; }
+  sendFriendActionResponse(res, await respondToFriendRequest(playerId, req.params.friendshipId, action === "accept"));
+});
+
+app.patch("/friends/:friendshipId", async (req, res) => {
+  const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
+  const action = req.body?.action;
+  if (!isDeviceId(playerId) || !isDeviceId(req.params.friendshipId) || !["remove", "block"].includes(action) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) { res.status(403).json({ error: "Invalid friendship action" }); return; }
+  sendFriendActionResponse(res, await removeOrBlockFriend(playerId, req.params.friendshipId, action === "block"));
+});
+
+app.post("/friends/:friendshipId/gifts", async (req, res) => {
+  const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
+  if (!isDeviceId(playerId) || !isDeviceId(req.params.friendshipId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) { res.status(403).json({ error: "Invalid gift action" }); return; }
+  sendFriendActionResponse(res, await sendFriendGift(playerId, req.params.friendshipId));
+});
+
+app.post("/friends/gifts/:giftId/claim", async (req, res) => {
+  const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
+  if (!isDeviceId(playerId) || !isDeviceId(req.params.giftId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) { res.status(403).json({ error: "Invalid gift claim" }); return; }
+  sendFriendActionResponse(res, await claimFriendGift(playerId, req.params.giftId));
+});
+
+function sendFriendActionResponse(res: express.Response, result: { ok: boolean; error?: string; stars?: number }) {
+  if (!result.ok) { res.status(409).json({ error: result.error ?? "Action unavailable" }); return; }
+  res.json(result);
+}
 
 async function requestOwnsRegisteredPlayer(playerId: string, authorization: string | undefined): Promise<boolean> {
   const identity = await verifySupabaseIdentity(authorization);

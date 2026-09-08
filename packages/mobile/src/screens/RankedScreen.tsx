@@ -31,7 +31,7 @@ export function RankedScreen({
   const currentIsInTop = Boolean(current && leaderboard?.top.some((entry) => entry.playerId === current.playerId));
 
   return (
-    <Screen style={styles.screen} androidScale={ANDROID_MENU_UI_SCALE}>
+    <Screen style={styles.screen} androidScale={ANDROID_MENU_UI_SCALE * 0.9}>
       <BackIconButton label={t("common.back")} onPress={onBack} />
       <Title>{t("ranked.title")}</Title>
 

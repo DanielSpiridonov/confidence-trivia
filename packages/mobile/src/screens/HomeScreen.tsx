@@ -1,5 +1,5 @@
 import React from "react";
-import { Animated, Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, Image, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { ANDROID_MENU_UI_SCALE, Screen, Title, BigButton } from "../components/ui";
 import { PointsIcon } from "../components/PointsIcon";
@@ -64,6 +64,7 @@ export function HomeScreen({
   onCreate,
   onJoin,
   onProfile,
+  onFriends,
   onInventory,
   deviceId,
   onRanked,
@@ -77,6 +78,7 @@ export function HomeScreen({
   onCreate: () => void;
   onJoin: () => void;
   onProfile: () => void;
+  onFriends: () => void;
   onInventory: () => void;
   deviceId: string | null;
   onRanked: () => void;
@@ -190,10 +192,12 @@ export function HomeScreen({
           <Text numberOfLines={1} style={styles.popupLabel}>{t("shop.shortTitle")}</Text>
         </Pressable>
       </View>
-      <Title>🔥 {t("home.title")}</Title>
-      <View style={styles.actions}>
-        <BigButton label={t("home.createGame")} onPress={onCreate} />
-        <BigButton label={t("home.joinGame")} onPress={onJoin} variant="secondary" />
+      <View style={styles.mainActionsBlock}>
+        <Title>🔥 {t("home.title")}</Title>
+        <View style={styles.actions}>
+          <BigButton label={t("home.createGame")} onPress={onCreate} style={styles.homePlayButton} textStyle={styles.homePlayButtonText} />
+          <BigButton label={t("home.joinGame")} onPress={onJoin} variant="secondary" style={styles.homePlayButton} textStyle={styles.homePlayButtonText} />
+        </View>
       </View>
       <Pressable accessibilityRole="button" accessibilityLabel={t("home.profile")} onPress={onProfile} style={({ pressed }) => [styles.profileButton, pressed && styles.profileButtonPressed]}>
         <Image source={avatarHead} defaultSource={avatarHead} fadeDuration={0} resizeMode="contain" style={styles.profileAvatar} />
@@ -202,6 +206,10 @@ export function HomeScreen({
       <Pressable accessibilityRole="button" accessibilityLabel={t("shop.tabs.inventory")} onPress={onInventory} style={({ pressed }) => [styles.profileButton, styles.inventoryButton, pressed && styles.profileButtonPressed]}>
         <Text style={styles.inventoryIcon}>▤</Text>
         <Text numberOfLines={1} style={styles.profileLabel}>{t("shop.tabs.inventory")}</Text>
+      </Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel={t("home.friends")} onPress={onFriends} style={({ pressed }) => [styles.profileButton, styles.friendsButton, pressed && styles.profileButtonPressed]}>
+        <Text style={styles.friendsIcon}>●●</Text>
+        <Text numberOfLines={1} style={styles.profileLabel}>{t("home.friends")}</Text>
       </Pressable>
       {showCelebration && activeCelebration ? (
         <View style={styles.celebrationBackdrop}>
@@ -236,18 +244,23 @@ export function HomeScreen({
 }
 
 const styles = StyleSheet.create({
+  mainActionsBlock: Platform.OS === "android" ? { width: "100%", alignItems: "center", transform: [{ translateY: -24 }] } : { width: "100%", alignItems: "center" },
   actions: {
     width: "100%",
-    maxWidth: 420,
+    maxWidth: Platform.OS === "android" ? 460 : 420,
     alignSelf: "center",
   },
-  profileButton: { position: "absolute", right: 8, bottom: 4, width: 126, height: 44, paddingHorizontal: 8, borderRadius: 14, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 2, borderColor: "#7C5CFF", backgroundColor: "transparent" },
+  homePlayButton: Platform.OS === "android" ? { maxWidth: 430, minHeight: 52, paddingVertical: 12, marginTop: 7 } : {},
+  homePlayButtonText: Platform.OS === "android" ? { paddingHorizontal: 5, fontSize: 16 } : {},
+  profileButton: { position: "absolute", right: 8, bottom: Platform.OS === "android" ? 26 : 4, width: 126, height: 44, paddingHorizontal: 8, borderRadius: 14, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 2, borderColor: "#7C5CFF", backgroundColor: "transparent" },
   inventoryButton: { right: 142 },
+  friendsButton: { right: 276 },
   inventoryIcon: { width: 30, color: "#7C5CFF", fontSize: 27, lineHeight: 31, fontWeight: "900", textAlign: "center" },
+  friendsIcon: { width: 31, color: "#7C5CFF", fontSize: 13, letterSpacing: -2, fontWeight: "900", textAlign: "center" },
   profileButtonPressed: { opacity: 0.72, transform: [{ scale: 0.97 }] },
   profileAvatar: { width: 34, height: 34 },
   profileLabel: { color: "#7C5CFF", fontSize: 14, fontWeight: "800", flexShrink: 1 },
-  popupRail: { position: "absolute", left: 1, top: 38, bottom: 12, width: SIDEBAR_ITEM_WIDTH, justifyContent: "flex-start", gap: 3, zIndex: 5 },
+  popupRail: { position: "absolute", left: Platform.OS === "android" ? 24 : 1, top: 38, bottom: 12, width: SIDEBAR_ITEM_WIDTH, justifyContent: "flex-start", gap: 3, zIndex: 5 },
   popup: { width: SIDEBAR_ITEM_WIDTH, height: SIDEBAR_ITEM_HEIGHT, alignItems: "center", justifyContent: "flex-end", paddingBottom: 2 },
   popupDisabled: { opacity: 0.55 },
   popupPressed: { transform: [{ scale: 0.96 }] },

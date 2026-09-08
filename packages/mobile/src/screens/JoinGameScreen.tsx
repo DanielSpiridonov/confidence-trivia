@@ -77,7 +77,7 @@ export function JoinGameScreen({
   }
 
   return (
-    <Screen style={styles.screen} androidScale={ANDROID_MENU_UI_SCALE}>
+    <Screen style={styles.screen} androidScale={ANDROID_MENU_UI_SCALE * 0.81}>
       <BackIconButton label={t("common.back")} onPress={onBack} disabled={Boolean(joiningRoomId)} />
       <Title>{t("home.joinGame")}</Title>
       <View style={styles.columns}>

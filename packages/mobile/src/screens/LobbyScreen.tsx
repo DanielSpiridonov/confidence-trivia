@@ -91,7 +91,7 @@ export function LobbyScreen({ room, mySessionId }: { room: Room; mySessionId: st
   }
 
   return (
-    <Screen androidScale={ANDROID_GAME_UI_SCALE}>
+    <Screen androidScale={ANDROID_GAME_UI_SCALE * 0.9}>
       <View style={styles.contentWrap}>
         <View style={styles.lobbyColumns}>
           <View style={styles.playersColumn}>

@@ -187,6 +187,48 @@ export async function getRankedLeaderboard(deviceId: string): Promise<RankedLead
   }
 }
 
+export interface FriendSummary {
+  friendshipId: string;
+  playerId: string;
+  displayName: string;
+  direction: "friend" | "incoming" | "outgoing";
+  giftSentToday: boolean;
+  giftId: string | null;
+}
+
+export interface FriendsResponse {
+  friends: FriendSummary[];
+  incoming: FriendSummary[];
+  outgoing: FriendSummary[];
+  unclaimedGiftCount: number;
+}
+
+export interface FriendSearchResult {
+  playerId: string;
+  displayName: string;
+  relationship: "none" | "friend" | "incoming" | "outgoing" | "blocked";
+}
+
+async function friendRequest<T>(path: string, options?: RequestInit): Promise<T> {
+  const accessToken = await getAccessToken();
+  if (!accessToken) throw new Error("Your session expired. Please sign in again.");
+  const response = await fetch(`${HTTP_SERVER_URL}${path}`, {
+    ...options,
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}`, ...options?.headers },
+  });
+  const payload = await response.json().catch(() => null) as (T & { error?: string }) | null;
+  if (!response.ok) throw new Error(payload?.error ?? `Server returned ${response.status}`);
+  return payload as T;
+}
+
+export const getFriends = (playerId: string) => friendRequest<FriendsResponse>(`/friends?playerId=${encodeURIComponent(playerId)}`);
+export const searchFriends = (playerId: string, query: string) => friendRequest<FriendSearchResult[]>(`/friends/search?playerId=${encodeURIComponent(playerId)}&query=${encodeURIComponent(query)}`);
+export const requestFriend = (playerId: string, targetPlayerId: string) => friendRequest<{ ok: true }>("/friends/requests", { method: "POST", body: JSON.stringify({ playerId, targetPlayerId }) });
+export const respondFriendRequest = (playerId: string, friendshipId: string, action: "accept" | "reject") => friendRequest<{ ok: true }>(`/friends/requests/${encodeURIComponent(friendshipId)}`, { method: "PATCH", body: JSON.stringify({ playerId, action }) });
+export const updateFriendship = (playerId: string, friendshipId: string, action: "remove" | "block") => friendRequest<{ ok: true }>(`/friends/${encodeURIComponent(friendshipId)}`, { method: "PATCH", body: JSON.stringify({ playerId, action }) });
+export const sendFriendGift = (playerId: string, friendshipId: string) => friendRequest<{ ok: true }>(`/friends/${encodeURIComponent(friendshipId)}/gifts`, { method: "POST", body: JSON.stringify({ playerId }) });
+export const claimFriendGift = (playerId: string, giftId: string) => friendRequest<{ ok: true; stars: number }>(`/friends/gifts/${encodeURIComponent(giftId)}/claim`, { method: "POST", body: JSON.stringify({ playerId }) });
+
 async function withRoomRequestTimeout<T>(promise: Promise<T>): Promise<T> {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
 

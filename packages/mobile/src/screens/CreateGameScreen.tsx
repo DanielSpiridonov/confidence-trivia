@@ -76,7 +76,7 @@ export function CreateGameScreen({
   }
 
   return (
-    <Screen androidScale={ANDROID_COMPACT_MENU_UI_SCALE}>
+    <Screen androidScale={ANDROID_COMPACT_MENU_UI_SCALE * 0.9}>
       <BackIconButton label={t("common.back")} onPress={onBack} disabled={submitting} />
       <Title>{t("home.createGame")}</Title>
       <View style={styles.titleGap} />
@@ -221,7 +221,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 28,
   },
-  titleGap: { height: Platform.OS === "android" ? 44 : 0 },
+  titleGap: { height: Platform.OS === "android" ? 10 : 0 },
   formColumn: { width: "62%", maxWidth: 560 },
   actionsColumn: { width: "30%", maxWidth: 300, justifyContent: "center" },
   settingsRow: { width: "100%", flexDirection: "row", gap: 10 },
@@ -277,6 +277,7 @@ const styles = StyleSheet.create({
   modeComingSoon: { color: theme.textDim, fontSize: 10, fontWeight: "700", marginTop: 2 },
   actionButton: {
     width: "100%",
+    ...(Platform.OS === "android" ? { minHeight: 58, paddingVertical: 17 } : {}),
   },
   roundsLabel: {
     color: theme.textDim,

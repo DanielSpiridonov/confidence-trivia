@@ -5,6 +5,9 @@
   "scripts": {
     "start": "expo start",
     "start:tunnel": "expo start --tunnel",
+    "start:dev-client": "expo start --dev-client --tunnel --clear",
+    "build:ios:device": "eas build --platform ios --profile preview",
+    "build:ios:development": "eas build --platform ios --profile development",
     "android": "expo start --android",
     "android:clean": "expo start --android --clear",
     "ios": "expo start --ios"
