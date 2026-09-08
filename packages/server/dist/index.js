@@ -276,6 +276,14 @@ app.post("/friends/:friendshipId/gifts", async (req, res) => {
     }
     sendFriendActionResponse(res, await (0, database_1.sendFriendGift)(playerId, req.params.friendshipId));
 });
+app.post("/friends/gifts/claim-all", async (req, res) => {
+    const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
+    if (!isDeviceId(playerId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
+        res.status(403).json({ error: "Invalid blessing claim" });
+        return;
+    }
+    sendFriendActionResponse(res, await (0, database_1.claimAllFriendGifts)(playerId));
+});
 app.post("/friends/gifts/:giftId/claim", async (req, res) => {
     const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
     if (!isDeviceId(playerId) || !isDeviceId(req.params.giftId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {

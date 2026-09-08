@@ -230,6 +230,7 @@ export const respondFriendRequest = (playerId: string, friendshipId: string, act
 export const updateFriendship = (playerId: string, friendshipId: string, action: "remove" | "block" | "unblock") => friendRequest<{ ok: true }>(`/friends/${encodeURIComponent(friendshipId)}`, { method: "PATCH", body: JSON.stringify({ playerId, action }) });
 export const sendFriendGift = (playerId: string, friendshipId: string) => friendRequest<{ ok: true }>(`/friends/${encodeURIComponent(friendshipId)}/gifts`, { method: "POST", body: JSON.stringify({ playerId }) });
 export const claimFriendGift = (playerId: string, giftId: string) => friendRequest<{ ok: true; stars: number }>(`/friends/gifts/${encodeURIComponent(giftId)}/claim`, { method: "POST", body: JSON.stringify({ playerId }) });
+export const claimAllFriendGifts = (playerId: string) => friendRequest<{ ok: true; stars: number; claimedCount: number }>("/friends/gifts/claim-all", { method: "POST", body: JSON.stringify({ playerId }) });
 
 export interface PlayerChallenge {
   id: string;

@@ -1,11 +1,12 @@
 import React from "react";
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { ANDROID_MENU_UI_SCALE, BackIconButton, Screen, Title, theme } from "../components/ui";
-import { FriendSearchResult, FriendSummary, challengeFriend, claimFriendGift, getFriendSuggestions, getFriends, requestFriend, respondFriendRequest, searchFriends, sendFriendGift, updateFriendship } from "../network/client";
+import { FriendSearchResult, FriendSummary, challengeFriend, claimAllFriendGifts, claimFriendGift, getFriendSuggestions, getFriends, requestFriend, respondFriendRequest, searchFriends, sendFriendGift, updateFriendship } from "../network/client";
 import { PointsIcon } from "../components/PointsIcon";
 
 type FriendsTab = "friends" | "requests" | "blocked";
+const BLESSING_GIFT_IMAGE = require("../../assets/stars-gift.png");
 
 export function FriendsScreen({ playerId, onStarsChange, onBack }: { playerId: string; onStarsChange: (stars: number) => void; onBack: () => void }) {
   const { t } = useTranslation();
@@ -78,7 +79,7 @@ export function FriendsScreen({ playerId, onStarsChange, onBack }: { playerId: s
         </View>
         <View style={styles.listPanel}>
           {loading ? <ActivityIndicator color={theme.primary} style={styles.loader} /> : null}
-          {!loading && tab === "friends" ? <ScrollView contentContainerStyle={styles.listContent}>
+          {!loading && tab === "friends" ? <ScrollView style={styles.friendListScroll} contentContainerStyle={styles.listContent}>
             {data?.friends.map((friend) => <FriendRow key={friend.friendshipId} item={friend} expanded={expandedId === friend.friendshipId} busy={busyId === friend.friendshipId} onToggle={() => setExpandedId((current) => current === friend.friendshipId ? null : friend.friendshipId)} onBless={() => void runAction(friend.friendshipId, () => sendFriendGift(playerId, friend.friendshipId))} onClaim={() => void runAction(friend.friendshipId, async () => { const claimed = await claimFriendGift(playerId, friend.giftId!); onStarsChange(claimed.stars); })} onChallenge={() => void runAction(friend.friendshipId, async () => { await challengeFriend(playerId, friend.playerId); Alert.alert(t("friends.challengeSent")); })} onRemove={() => confirmAction(t("friends.removeConfirm", { name: friend.displayName }), () => void runAction(friend.friendshipId, () => updateFriendship(playerId, friend.friendshipId, "remove")))} onBlock={() => confirmAction(t("friends.blockConfirm", { name: friend.displayName }), () => void runAction(friend.friendshipId, () => updateFriendship(playerId, friend.friendshipId, "block")))} />)}
             {data?.friends.length === 0 ? <Empty text={t("friends.noFriends")} /> : null}
           </ScrollView> : null}
@@ -91,6 +92,7 @@ export function FriendsScreen({ playerId, onStarsChange, onBack }: { playerId: s
             {data?.blocked.map((blocked) => <View key={blocked.friendshipId} style={styles.personRow}><Text numberOfLines={1} style={styles.personName}>{blocked.displayName}</Text><SmallButton label={t("friends.unblock")} onPress={() => void runAction(blocked.friendshipId, () => updateFriendship(playerId, blocked.friendshipId, "unblock"))} disabled={busyId === blocked.friendshipId} /></View>)}
             {data?.blocked.length === 0 ? <Empty text={t("friends.noBlocked")} /> : null}
           </ScrollView> : null}
+          {!loading && tab === "friends" && (data?.unclaimedGiftCount ?? 0) > 0 ? <Pressable disabled={busyId === "claim-all"} onPress={() => void runAction("claim-all", async () => { const claimed = await claimAllFriendGifts(playerId); onStarsChange(claimed.stars); })} style={[styles.claimAllButton, busyId === "claim-all" && styles.buttonDisabled]}><Image source={BLESSING_GIFT_IMAGE} defaultSource={BLESSING_GIFT_IMAGE} fadeDuration={0} resizeMode="contain" style={styles.claimAllGiftImage} /><Text style={styles.claimAllText}>{t("friends.claimAll")} ({data?.unclaimedGiftCount})</Text></Pressable> : null}
         </View>
       </View>
     </Screen>
@@ -104,13 +106,21 @@ function DiscoveryRow({ item, busy, onAdd }: { item: FriendSearchResult; busy: b
 
 function FriendRow({ item, expanded, busy, onToggle, onBless, onClaim, onChallenge, onRemove, onBlock }: { item: FriendSummary; expanded: boolean; busy: boolean; onToggle: () => void; onBless: () => void; onClaim: () => void; onChallenge: () => void; onRemove: () => void; onBlock: () => void }) {
   const { t } = useTranslation();
-  return <View style={[styles.friendCard, expanded && styles.friendCardExpanded]}><Pressable onPress={onToggle} style={styles.friendMainRow}><View style={styles.friendAvatar}><Text style={styles.friendAvatarText}>{item.displayName.slice(0, 1).toUpperCase()}</Text></View><Text numberOfLines={1} style={styles.personName}>{item.displayName}</Text>{item.giftId ? <SmallButton label={t("friends.claimBlessing")} onPress={onClaim} disabled={busy} icon /> : <SmallButton label={item.giftSentToday ? t("friends.blessedToday") : t("friends.bless")} onPress={onBless} disabled={busy || item.giftSentToday} icon />}<Text style={styles.expandIcon}>{expanded ? "⌃" : "⌄"}</Text></Pressable>{expanded ? <View style={styles.manageRow}><SmallButton label={t("friends.challenge")} onPress={onChallenge} disabled={busy} /><Text style={styles.manageHint}>{t("friends.manageHint")}</Text><SmallButton label={t("friends.remove")} onPress={onRemove} disabled={busy} muted /><SmallButton label={t("friends.block")} onPress={onBlock} disabled={busy} danger /></View> : null}</View>;
+  const blessingAction = item.giftId ? <Pressable accessibilityRole="button" accessibilityLabel={t("friends.claimBlessing")} disabled={busy} onPress={onClaim} style={({ pressed }) => [styles.giftClaimButton, pressed && styles.giftClaimPressed, busy && styles.buttonDisabled]}><Image source={BLESSING_GIFT_IMAGE} defaultSource={BLESSING_GIFT_IMAGE} fadeDuration={0} resizeMode="contain" style={styles.giftClaimImage} /></Pressable> : <SmallButton label={item.giftSentToday ? t("friends.blessedToday") : t("friends.bless")} onPress={onBless} disabled={busy || item.giftSentToday} icon />;
+  return <View style={[styles.friendCard, expanded && styles.friendCardExpanded]}><Pressable onPress={onToggle} style={styles.friendMainRow}><View style={styles.friendAvatar}><Text style={styles.friendAvatarText}>{item.displayName.slice(0, 1).toUpperCase()}</Text></View><Text numberOfLines={1} style={styles.personName}>{item.displayName}</Text>{blessingAction}<Text style={styles.expandIcon}>{expanded ? "⌃" : "⌄"}</Text></Pressable>{expanded ? <View style={styles.manageRow}><SmallButton label={t("friends.challenge")} onPress={onChallenge} disabled={busy} /><Text style={styles.manageHint}>{t("friends.manageHint")}</Text><SmallButton label={t("friends.remove")} onPress={onRemove} disabled={busy} muted /><SmallButton label={t("friends.block")} onPress={onBlock} disabled={busy} danger /></View> : null}</View>;
 }
 
 function SmallButton({ label, onPress, disabled, muted, danger, icon }: { label: string; onPress: () => void; disabled?: boolean; muted?: boolean; danger?: boolean; icon?: boolean }) { return <Pressable disabled={disabled} onPress={onPress} style={[styles.smallButton, muted && styles.smallButtonMuted, danger && styles.smallButtonDanger, disabled && styles.buttonDisabled]}>{icon ? <PointsIcon size={15} /> : null}<Text numberOfLines={1} style={styles.smallButtonText}>{label}</Text></Pressable>; }
 function Empty({ text }: { text: string }) { return <Text style={styles.empty}>{text}</Text>; }
 
 const styles = StyleSheet.create({
+  giftClaimButton: { width: 58, height: 38, alignItems: "center", justifyContent: "center" },
+  giftClaimPressed: { transform: [{ scale: 0.92 }] },
+  giftClaimImage: { width: 42, height: 42 },
+  friendListScroll: { flex: 1, minHeight: 0 },
+  claimAllButton: { alignSelf: "center", minWidth: 180, height: 38, marginTop: 8, paddingHorizontal: 16, borderRadius: 10, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, backgroundColor: theme.primary, borderWidth: 1, borderColor: "#B9AAFF" },
+  claimAllGiftImage: { width: 30, height: 30 },
+  claimAllText: { color: "#FFF", fontSize: 12, fontWeight: "900" },
   screen: { justifyContent: "flex-start", paddingTop: 10 }, toolbar: { width: "100%", flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 5 }, tabs: { flexDirection: "row", gap: 7 },
   tab: { minWidth: 98, paddingHorizontal: 13, paddingVertical: 8, borderRadius: 10, alignItems: "center", backgroundColor: "rgba(31,26,51,0.86)", borderWidth: 1, borderColor: "rgba(185,176,214,0.18)" }, tabSelected: { borderColor: theme.primary, backgroundColor: "rgba(124,92,255,0.26)" }, tabText: { color: theme.textDim, fontSize: 11, fontWeight: "900" }, tabTextSelected: { color: theme.text },
   searchRow: { width: "39%", minWidth: 265, flexDirection: "row", gap: 6, position: "relative" }, searchInput: { flex: 1, height: 38, borderRadius: 9, paddingLeft: 10, paddingRight: 28, color: theme.text, backgroundColor: "rgba(10,8,19,0.78)", borderWidth: 1, borderColor: "rgba(185,176,214,0.28)", fontSize: 12, fontWeight: "700" }, clearButton: { position: "absolute", right: 72, top: 4, zIndex: 2, width: 28, height: 30, alignItems: "center", justifyContent: "center" }, clearText: { color: theme.textDim, fontSize: 21, lineHeight: 23 }, searchButton: { width: 68, height: 38, alignItems: "center", justifyContent: "center", borderRadius: 9, backgroundColor: theme.primary }, searchButtonText: { color: "white", fontWeight: "900", fontSize: 10 },

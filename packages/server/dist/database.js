@@ -21,6 +21,7 @@ exports.respondToFriendRequest = respondToFriendRequest;
 exports.updateFriendRelationship = updateFriendRelationship;
 exports.sendFriendGift = sendFriendGift;
 exports.claimFriendGift = claimFriendGift;
+exports.claimAllFriendGifts = claimAllFriendGifts;
 exports.linkPlayerAccount = linkPlayerAccount;
 exports.getPlayerCustomization = getPlayerCustomization;
 exports.equipFreeNameColor = equipFreeNameColor;
@@ -423,6 +424,35 @@ async function claimFriendGift(playerId, giftId) {
     catch (error) {
         console.error("Could not claim friend gift", error);
         return { ok: false, error: "Could not claim gift" };
+    }
+}
+async function claimAllFriendGifts(playerId) {
+    if (!sql)
+        return { ok: false, error: "Gifts are temporarily unavailable" };
+    try {
+        return await sql.begin(async (transaction) => {
+            const gifts = await transaction `
+        select id, stars from public.friend_gifts
+        where receiver_id = ${playerId} and gift_date = (now() at time zone 'utc')::date and claimed_at is null
+        order by sent_at for update
+      `;
+            if (gifts.length === 0)
+                return { ok: false, error: "No blessings are waiting to be claimed" };
+            const total = gifts.reduce((sum, gift) => sum + gift.stars, 0);
+            await transaction `update public.friend_gifts set claimed_at = now() where id in ${transaction(gifts.map((gift) => gift.id))}`;
+            const [updated] = await transaction `update public.players set stars = stars + ${total} where id = ${playerId} returning stars`;
+            for (const gift of gifts) {
+                await transaction `
+          insert into public.star_transactions (id, player_id, amount, reason)
+          values (${(0, crypto_1.randomUUID)()}, ${playerId}, ${gift.stars}, ${`friend_gift:${gift.id}`})
+        `;
+            }
+            return { ok: true, stars: updated.stars, claimedCount: gifts.length };
+        });
+    }
+    catch (error) {
+        console.error("Could not claim all friend gifts", error);
+        return { ok: false, error: "Could not claim blessings" };
     }
 }
 async function linkPlayerAccount(guestPlayerId, displayName, authUserId, provider) {

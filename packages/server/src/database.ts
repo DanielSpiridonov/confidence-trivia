@@ -430,7 +430,7 @@ export async function claimAllFriendGifts(playerId: string): Promise<FriendActio
     return await sql.begin(async (transaction) => {
       const gifts = await transaction<{ id: string; stars: number }[]>`
         select id, stars from public.friend_gifts
-        where receiver_idlish = ${playerId} and gift_date = (now() at time zone 'utc')::date and claimed_at is null
+        where receiver_id = ${playerId} and gift_date = (now() at time zone 'utc')::date and claimed_at is null
         order by sent_at for update
       `;
       if (gifts.length === 0) return { ok: false, error: "No blessings are waiting to be claimed" } as FriendActionResult;
