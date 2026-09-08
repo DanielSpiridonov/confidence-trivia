@@ -1,7 +1,7 @@
 import React from "react";
-import { Image, ImageSourcePropType, StyleProp, ImageStyle } from "react-native";
+import { Image, StyleProp, ImageStyle } from "react-native";
 
-export const RANK_IMAGES: Record<string, ImageSourcePropType> = {
+export const RANK_IMAGES: Record<string, number> = {
   bronze_iii: require("../../assets/ranks/bronze-3.png"),
   bronze_ii: require("../../assets/ranks/bronze-2.png"),
   bronze_i: require("../../assets/ranks/bronze-1.png"),
@@ -26,5 +26,5 @@ export const RANK_IMAGE_SOURCES = Object.values(RANK_IMAGES);
 export function RankIcon({ rankKey, size, style }: { rankKey: string; size: number; style?: StyleProp<ImageStyle> }) {
   const source = RANK_IMAGES[rankKey];
   if (!source) return null;
-  return <Image source={source} fadeDuration={0} resizeMode="contain" style={[{ width: size, height: size }, style]} />;
+  return <Image source={source} defaultSource={source} fadeDuration={0} resizeMode="contain" style={[{ width: size, height: size }, style]} />;
 }

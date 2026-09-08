@@ -8,10 +8,12 @@ const CONTENT_WIDTH = "100%";
 export const GAME_BACKGROUND = require("../../assets/game-background.png");
 const ANDROID_DESIGN_WIDTH = 844;
 const ANDROID_DESIGN_HEIGHT = 390;
-const ANDROID_UI_SCALE = 0.94;
+// Android layouts use a fixed landscape design canvas. Keep the platform-wide
+// reduction here so individual screens retain their existing proportions.
+const ANDROID_UI_SCALE = 0.846;
 export const ANDROID_MENU_UI_SCALE = ANDROID_UI_SCALE * 0.95;
 export const ANDROID_COMPACT_MENU_UI_SCALE = ANDROID_MENU_UI_SCALE * 0.95;
-export const ANDROID_GAME_UI_SCALE = 0.82;
+export const ANDROID_GAME_UI_SCALE = 0.738;
 
 function AndroidDesignCanvas({ children, style, uiScale }: { children: React.ReactNode; style?: ViewStyle; uiScale: number }) {
   const [viewport, setViewport] = useState({ width: ANDROID_DESIGN_WIDTH, height: ANDROID_DESIGN_HEIGHT });

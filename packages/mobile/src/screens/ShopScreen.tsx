@@ -1,5 +1,5 @@
 import React from "react";
-import { Alert, FlatList, Image, ImageSourcePropType, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, FlatList, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { ANDROID_MENU_UI_SCALE, BackIconButton, Screen, Title, theme } from "../components/ui";
 import { PointsIcon } from "../components/PointsIcon";
@@ -8,9 +8,9 @@ import { equipAvatar, equipFrame, equipNameColor, getPlayerCustomization } from 
 
 type ShopTab = "featured" | "avatars" | "frames" | "inventory" | "stars";
 
-type CosmeticItem = { id: string; icon?: string; image?: ImageSourcePropType; name: string; price?: number; tag?: string; color?: string; free?: boolean };
+type CosmeticItem = { id: string; icon?: string; image?: number; name: string; price?: number; tag?: string; color?: string; free?: boolean };
 
-const SHOP_TAB_IMAGES: Partial<Record<ShopTab, ImageSourcePropType>> = {
+const SHOP_TAB_IMAGES: Partial<Record<ShopTab, number>> = {
   featured: require("../../assets/shop-tabs/colors.png"),
   avatars: require("../../assets/shop-tabs/avatars.png"),
   frames: require("../../assets/shop-tabs/frames.png"),
@@ -44,15 +44,27 @@ const COSMETICS: Record<Exclude<ShopTab, "stars" | "inventory">, CosmeticItem[]>
   ],
 };
 
-const STAR_PACKS: Array<{ stars: number; price: string; bonus?: string }> = [
-  { stars: 100, price: "€0.99" },
-  { stars: 550, price: "€4.49", bonus: "+10%" },
-  { stars: 1200, price: "€8.99", bonus: "+20%" },
-  { stars: 2600, price: "€17.99", bonus: "+30%" },
-  { stars: 7000, price: "€39.99", bonus: "Best value" },
+const STAR_PACKS: Array<{ stars: number; price: string; name: "handful" | "pouch" | "chest" | "vault" | "treasury"; bonus?: string }> = [
+  { stars: 100, price: "€0.99", name: "handful" },
+  { stars: 550, price: "€4.49", name: "pouch", bonus: "+10%" },
+  { stars: 1200, price: "€8.99", name: "chest", bonus: "+20%" },
+  { stars: 2600, price: "€17.99", name: "vault", bonus: "+30%" },
+  { stars: 6000, price: "€39.99", name: "treasury", bonus: "Best value" },
 ];
+const STAR_PACK_IMAGES: Record<(typeof STAR_PACKS)[number]["name"], number> = {
+  handful: require("../../assets/star-packs/handful.png"),
+  pouch: require("../../assets/star-packs/pouch.png"),
+  chest: require("../../assets/star-packs/chest.png"),
+  vault: require("../../assets/star-packs/vault.png"),
+  treasury: require("../../assets/star-packs/treasury.png"),
+};
 
 const SHOP_AVATAR_IMAGES = COSMETICS.avatars.flatMap((item) => item.image ? [item.image] : []);
+const SHOP_PERSISTENT_IMAGES = [
+  ...SHOP_AVATAR_IMAGES,
+  ...Object.values(SHOP_TAB_IMAGES).filter((source): source is number => Boolean(source)),
+  ...Object.values(STAR_PACK_IMAGES),
+];
 const customizationCache = new Map<string, { nameColorId: string; avatarId: string; frameId: string; stars?: number; rankKey?: string; ownedCosmeticIds?: string[] }>();
 
 export function ShopScreen({ deviceId, displayName, stars, onStarsChange, requestedTab = "featured", requestId = 0, onBack }: { deviceId: string; displayName: string; stars: number; onStarsChange: (stars: number) => void; requestedTab?: ShopTab; requestId?: number; onBack: () => void }) {
@@ -198,7 +210,7 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
   return (
     <Screen style={styles.screen} androidScale={ANDROID_MENU_UI_SCALE}>
       <View pointerEvents="none" style={styles.avatarPreloader}>
-        {SHOP_AVATAR_IMAGES.map((source, index) => <Image key={index} source={source} fadeDuration={0} resizeMode="contain" style={styles.preloadedAvatar} />)}
+        {SHOP_PERSISTENT_IMAGES.map((source, index) => <Image key={index} source={source} defaultSource={source} fadeDuration={0} resizeMode="contain" style={styles.preloadedAvatar} />)}
       </View>
       <BackIconButton label={t("common.back")} onPress={onBack} />
       <View style={styles.headerRow}>
@@ -209,7 +221,7 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
           {tabs.map((item) => (
             <Pressable key={item} onPress={() => setTab(item)} style={[styles.tab, tab === item && styles.tabSelected]}>
               <View style={styles.tabIconSlot}>
-                {item === "stars" ? <PointsIcon size={25} /> : <Image source={SHOP_TAB_IMAGES[item]} fadeDuration={0} resizeMode="contain" style={styles.tabIconImage} />}
+                {item === "stars" ? <PointsIcon size={38} /> : <Image source={SHOP_TAB_IMAGES[item]} defaultSource={SHOP_TAB_IMAGES[item]} fadeDuration={0} resizeMode="contain" style={styles.tabIconImage} />}
               </View>
               <Text numberOfLines={1} style={[styles.tabText, tab === item && styles.tabTextSelected]}>{t(`shop.tabs.${item}`)}</Text>
             </Pressable>
@@ -227,24 +239,24 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
               const locked = item.id === "omniscient_avatar" && rankKey !== "omniscient";
               return (
                 <Pressable disabled={locked} onPress={() => void equipPlayerAvatar(item.id)} style={[styles.cosmeticCard, item.id === equippedAvatarId && styles.cosmeticCardEquipped, locked && styles.cosmeticCardLocked]}>
-                  <Image source={item.image} fadeDuration={0} resizeMode="contain" style={styles.avatarImage} />
+                  <Image source={item.image} defaultSource={item.image} fadeDuration={0} resizeMode="contain" style={styles.avatarImage} />
                   <Text numberOfLines={1} style={styles.cosmeticName}>{t(`shop.avatarNames.${item.id}`)}</Text>
                   <CosmeticStatus equipped={item.id === equippedAvatarId} equipping={equippingIds.has(item.id)} owned={ownedCosmeticIds.has(item.id)} price={price} locked={locked} />
                 </Pressable>
               );
             }} />
           </View>
-          {tab === "avatars" ? null : tab === "stars" ? (
-            <FlatList key="star-packs" horizontal data={STAR_PACKS} keyExtractor={(item) => String(item.stars)} contentContainerStyle={styles.packList} showsHorizontalScrollIndicator={false} renderItem={({ item }) => (
-              <View style={[styles.starPack, item.stars === 7000 && styles.starPackBest]}>
+          <View pointerEvents={tab === "stars" ? "auto" : "none"} style={[styles.persistentStarCatalogue, tab !== "stars" && styles.persistentCatalogueHidden]}>
+            <FlatList key="star-packs" horizontal data={STAR_PACKS} keyExtractor={(item) => String(item.stars)} contentContainerStyle={styles.packList} showsHorizontalScrollIndicator={false} renderItem={({ item, index }) => (
+              <View style={[styles.starPack, item.stars === 6000 && styles.starPackBest]}>
                 {item.bonus ? <Text style={styles.packBonus}>{item.bonus}</Text> : null}
-                <PointsIcon size={34} />
+                <Image source={STAR_PACK_IMAGES[item.name]} defaultSource={STAR_PACK_IMAGES[item.name]} fadeDuration={0} resizeMode="contain" style={[styles.packImage, { width: 66 + index * 4, height: 66 + index * 4 }]} />
                 <Text style={styles.packAmount}>{item.stars}</Text>
-                <Text style={styles.packStars}>{t("common.stars")}</Text>
                 <Pressable disabled style={styles.buyButton}><Text style={styles.buyText}>{item.price}</Text></Pressable>
               </View>
             )} />
-          ) : tab === "frames" ? (
+          </View>
+          {tab === "avatars" || tab === "stars" ? null : tab === "frames" ? (
             <ScrollView style={styles.frameScroll} contentContainerStyle={styles.frameSections} showsVerticalScrollIndicator={false}>
               <Text style={styles.frameSectionTitle}>{t("shop.frameCategories.solid")}</Text>
               <View style={styles.frameGrid}>{COSMETICS.frames.slice(0, 6).map(renderFrameCard)}</View>
@@ -264,8 +276,28 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
                   ))}
                 </View>
               </InventoryCategory>
-              <InventoryCategory title={t("shop.inventoryCategories.avatars")}><Text style={styles.emptyInventory}>{t("shop.noOwnedAvatars")}</Text></InventoryCategory>
-              <InventoryCategory title={t("shop.inventoryCategories.frames")}><Text style={styles.emptyInventory}>{t("shop.noOwnedFrames")}</Text></InventoryCategory>
+              <InventoryCategory title={t("shop.inventoryCategories.avatars")}>
+                <View style={styles.inventoryItems}>
+                  {COSMETICS.avatars.filter((item) => ownedCosmeticIds.has(item.id) || item.id === "smart_owl").map((item) => (
+                    <Pressable key={item.id} onPress={() => void equipPlayerAvatar(item.id)} style={[styles.inventoryCosmeticItem, item.id === equippedAvatarId && styles.inventoryItemEquipped]}>
+                      <Image source={item.image} defaultSource={item.image} fadeDuration={0} resizeMode="contain" style={styles.inventoryAvatarImage} />
+                      <Text numberOfLines={1} style={styles.inventoryItemName}>{t(`shop.avatarNames.${item.id}`)}</Text>
+                      <Text style={[styles.inventoryItemState, item.id === equippedAvatarId && styles.equippedState]}>{item.id === equippedAvatarId ? t("shop.equipped") : t("shop.equip")}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </InventoryCategory>
+              <InventoryCategory title={t("shop.inventoryCategories.frames")}>
+                <View style={styles.inventoryItems}>
+                  {COSMETICS.frames.filter((item) => ownedCosmeticIds.has(item.id) || item.id === "").map((item) => (
+                    <Pressable key={item.id || "no-frame"} onPress={() => void equipPlayerFrame(item.id)} style={[styles.inventoryCosmeticItem, item.id === equippedFrameId && styles.inventoryItemEquipped, item.id ? { borderColor: FRAME_COSMETIC_COLORS[item.id as keyof typeof FRAME_COSMETIC_COLORS] } : null]}>
+                      <Text style={[styles.inventoryFrameIcon, { color: item.id ? FRAME_COSMETIC_COLORS[item.id as keyof typeof FRAME_COSMETIC_COLORS] : theme.textDim }]}>{item.icon}</Text>
+                      <Text numberOfLines={1} style={styles.inventoryItemName}>{item.name}</Text>
+                      <Text style={[styles.inventoryItemState, item.id === equippedFrameId && styles.equippedState]}>{item.id === equippedFrameId ? t("shop.equipped") : t("shop.equip")}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </InventoryCategory>
             </ScrollView>
           ) : (
             <FlatList key={`cosmetics-${tab}`} data={COSMETICS[tab]} numColumns={3} keyExtractor={(item) => item.id} columnWrapperStyle={styles.cosmeticRow} contentContainerStyle={styles.cosmeticList} showsVerticalScrollIndicator={false} renderItem={({ item }) => (
@@ -307,13 +339,14 @@ const styles = StyleSheet.create({
   tabRailHidden: { opacity: 0 },
   tab: { minHeight: 48, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 10, borderRadius: 10, backgroundColor: "rgba(31,26,51,0.84)", borderWidth: 1, borderColor: "rgba(185,176,214,0.16)" },
   tabSelected: { backgroundColor: "rgba(124,92,255,0.25)", borderColor: theme.primary },
-  tabIconSlot: { width: 31, height: 31, alignItems: "center", justifyContent: "center" },
+  tabIconSlot: { width: 39, height: 39, alignItems: "center", justifyContent: "center" },
   tabIconImage: { width: 31, height: 31 },
   tabText: { flex: 1, color: theme.textDim, fontSize: 10, fontWeight: "800" },
   tabTextSelected: { color: theme.text },
   catalogue: { flex: 1, minWidth: 0, borderRadius: 14, backgroundColor: "rgba(31,26,51,0.88)", padding: 11 },
   catalogueWithTabRail: { marginLeft: 124 },
   persistentAvatarCatalogue: { ...StyleSheet.absoluteFillObject, top: 43, paddingHorizontal: 11, paddingBottom: 11, opacity: 1 },
+  persistentStarCatalogue: { ...StyleSheet.absoluteFillObject, top: 43, paddingHorizontal: 11, paddingBottom: 11, opacity: 1 },
   persistentCatalogueHidden: { opacity: 0 },
   catalogueHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 7 },
   sectionTitle: { color: theme.text, fontSize: 17, fontWeight: "900" },
@@ -344,17 +377,20 @@ const styles = StyleSheet.create({
   inventoryCategoryTitle: { color: theme.text, fontSize: 12, fontWeight: "900", marginBottom: 7 },
   inventoryItems: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
   inventoryColorItem: { width: "31.5%", minHeight: 48, flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 5, backgroundColor: "rgba(31,26,51,0.84)", borderWidth: 1, borderColor: "transparent" },
+  inventoryCosmeticItem: { width: "31.5%", minHeight: 48, flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 4, backgroundColor: "rgba(31,26,51,0.84)", borderWidth: 1, borderColor: "transparent" },
+  inventoryAvatarImage: { width: 35, height: 35 },
+  inventoryFrameIcon: { width: 30, fontSize: 25, fontWeight: "900", textAlign: "center" },
   inventoryItemEquipped: { borderColor: "#7CFFA0", backgroundColor: "rgba(56,104,68,0.22)" },
   colorSwatch: { width: 17, height: 17, borderRadius: 9, borderWidth: 1, borderColor: "rgba(255,255,255,0.55)" },
-  inventoryItemName: { flex: 1, minWidth: 0, fontSize: 9, fontWeight: "900" },
+  inventoryItemName: { flex: 1, minWidth: 0, color: theme.text, fontSize: 9, fontWeight: "900" },
   inventoryItemState: { color: theme.textDim, fontSize: 7, fontWeight: "900", textTransform: "uppercase" },
   emptyInventory: { color: theme.textDim, fontSize: 10, fontWeight: "700", paddingVertical: 5 },
   packList: { flexGrow: 1, alignItems: "center", gap: 9, paddingVertical: 5 },
-  starPack: { width: 105, height: 142, alignItems: "center", justifyContent: "center", borderRadius: 12, backgroundColor: "rgba(15,12,27,0.8)", borderWidth: 1, borderColor: "rgba(247,216,91,0.25)", padding: 8 },
+  starPack: { width: 105, height: 172, alignItems: "center", justifyContent: "center", borderRadius: 12, backgroundColor: "rgba(15,12,27,0.8)", borderWidth: 1, borderColor: "rgba(247,216,91,0.25)", padding: 8 },
   starPackBest: { borderColor: "#F7D85B", backgroundColor: "rgba(72,58,20,0.45)" },
   packBonus: { position: "absolute", top: 5, color: "#7CFFA0", fontSize: 8, fontWeight: "900", textTransform: "uppercase" },
-  packAmount: { color: "#F7D85B", fontSize: 18, fontWeight: "900", marginTop: 3 },
-  packStars: { color: theme.textDim, fontSize: 9, fontWeight: "700" },
+  packImage: { marginTop: 3, marginBottom: 2 },
+  packAmount: { color: "#F7D85B", fontSize: 18, fontWeight: "900", marginTop: 1 },
   buyButton: { width: "100%", marginTop: 8, paddingVertical: 5, alignItems: "center", borderRadius: 7, backgroundColor: "rgba(124,92,255,0.7)" },
   buyText: { color: theme.text, fontSize: 11, fontWeight: "900" },
 });

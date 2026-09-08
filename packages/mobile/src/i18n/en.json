@@ -245,6 +245,13 @@
       "solid": "Solid",
       "animated": "Animated"
     },
+    "starPacks": {
+      "handful": "Handful",
+      "pouch": "Pouch",
+      "chest": "Chest",
+      "vault": "Vault",
+      "treasury": "Treasury"
+    },
     "inventoryCategories": {
       "nameColors": "Name Colors",
       "avatars": "Avatars",

@@ -245,6 +245,13 @@
       "solid": "Едноцветни",
       "animated": "Анимирани"
     },
+    "starPacks": {
+      "handful": "Шепа",
+      "pouch": "Торба",
+      "chest": "Сандък",
+      "vault": "Трезор",
+      "treasury": "Съкровищница"
+    },
     "inventoryCategories": {
       "nameColors": "Цветове за име",
       "avatars": "Аватари",

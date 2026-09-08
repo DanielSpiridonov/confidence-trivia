@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Alert, Animated, AppState, Image, Platform, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import * as NavigationBar from "expo-navigation-bar";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Room } from "colyseus.js";
 import "./src/i18n";
@@ -39,6 +40,7 @@ const HAPTICS_STORAGE_KEY = "confidence-trivia:haptics-enabled";
 const HIGH_CONTRAST_STORAGE_KEY = "confidence-trivia:high-contrast-enabled";
 const RECENT_QUESTIONS_STORAGE_KEY = "confidence-trivia:recent-question-ids";
 const RECENT_QUESTION_LIMIT = 40;
+const LOADING_EMBLEM = require("./assets/loading-emblem.png");
 const UI_PRELOAD_IMAGES = [
   ...RANK_IMAGE_SOURCES,
   require("./assets/avatar-thumbnails/smart-owl.png"),
@@ -56,6 +58,12 @@ const UI_PRELOAD_IMAGES = [
   require("./assets/shop-tabs/colors.png"),
   require("./assets/shop-tabs/avatars.png"),
   require("./assets/shop-tabs/frames.png"),
+  require("./assets/star-currency-icon.png"),
+  require("./assets/star-packs/handful.png"),
+  require("./assets/star-packs/pouch.png"),
+  require("./assets/star-packs/chest.png"),
+  require("./assets/star-packs/vault.png"),
+  require("./assets/star-packs/treasury.png"),
 ] as const;
 const FULL_COMBAT_PRELOAD_IMAGES = [
   require("./assets/avatars/smart-owl.png"),
@@ -102,7 +110,44 @@ function AssetPreloader({ sources, onReady }: { sources: readonly number[]; onRe
 
   return (
     <View pointerEvents="none" style={styles.combatPreloader}>
-      {sources.map((source, index) => <Image key={index} source={source} fadeDuration={0} onLoadEnd={() => handleLoadEnd(index)} style={styles.combatPreloadImage} />)}
+      {sources.map((source, index) => <Image key={index} source={source} defaultSource={source} fadeDuration={0} onLoadEnd={() => handleLoadEnd(index)} style={styles.combatPreloadImage} />)}
+    </View>
+  );
+}
+
+function LoadingScreen() {
+  const pulse = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 650, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 650, useNativeDriver: true }),
+      ]),
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [pulse]);
+
+  const emblemScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1.02] });
+  const glowOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.25, 0.6] });
+
+  return (
+    <View style={styles.loadingRoot}>
+      <Animated.View style={[styles.loadingGlow, { opacity: glowOpacity, transform: [{ scale: emblemScale }] }]} />
+      <Animated.Image
+        source={LOADING_EMBLEM}
+        defaultSource={LOADING_EMBLEM}
+        fadeDuration={0}
+        resizeMode="contain"
+        style={[styles.loadingEmblem, { transform: [{ scale: emblemScale }] }]}
+      />
+      <Text style={styles.loadingTitle}>CONFIDENCE TRIVIA</Text>
+      <View style={styles.loadingDots}>
+        <View style={styles.loadingDot} />
+        <View style={[styles.loadingDot, styles.loadingDotMiddle]} />
+        <View style={styles.loadingDot} />
+      </View>
     </View>
   );
 }
@@ -124,6 +169,7 @@ function AppFrame({ children, highContrast = false }: { children: React.ReactNod
       <Image
         key={backgroundRevision}
         source={GAME_BACKGROUND}
+        defaultSource={GAME_BACKGROUND}
         resizeMode="cover"
         fadeDuration={0}
         style={styles.appBackgroundImage}
@@ -151,7 +197,7 @@ function StarsBadge({ stars, gain, onPress }: { stars: number; gain: { id: numbe
   return (
     <View pointerEvents="box-none" style={styles.starsHud}>
       <Pressable accessibilityRole="button" accessibilityLabel={`${stars} stars`} onPress={onPress} style={({ pressed }) => [styles.pointsBadge, pressed && styles.pointsBadgePressed]}>
-        <PointsIcon />
+        <PointsIcon size={38} />
         <Text style={styles.pointsBadgeText}>{stars}</Text>
       </Pressable>
       {gain ? (
@@ -187,6 +233,29 @@ export default function App() {
   const intentionalLeaveRef = useRef(false);
   const reconnectionTokenRef = useRef<string | null>(null);
   const intentionalSignOutRef = useRef(false);
+
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+
+    const applyAndroidSystemBars = () => {
+      void (async () => {
+        if (nav === "in-room") {
+          await NavigationBar.setBehaviorAsync("overlay-swipe");
+          await NavigationBar.setVisibilityAsync("hidden");
+        } else {
+          await NavigationBar.setVisibilityAsync("visible");
+        }
+      })().catch(() => {
+        // Some Android gesture-navigation modes do not expose bar visibility.
+      });
+    };
+
+    applyAndroidSystemBars();
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") applyAndroidSystemBars();
+    });
+    return () => subscription.remove();
+  }, [nav]);
 
   useEffect(() => subscribeToAuthChanges(() => {
     if (intentionalSignOutRef.current || !registeredAccount) return;
@@ -567,7 +636,7 @@ export default function App() {
     return (
       <AppFrame highContrast={highContrastEnabled}>
         <AssetPreloader sources={UI_PRELOAD_IMAGES} onReady={() => setUiImagesReady(true)} />
-        <View style={styles.loadingRoot} />
+        <LoadingScreen />
       </AppFrame>
     );
   }
@@ -576,7 +645,7 @@ export default function App() {
     <AppFrame highContrast={highContrastEnabled}>
       <AssetPreloader sources={UI_PRELOAD_IMAGES} />
       <AssetPreloader sources={COMBAT_PRELOAD_IMAGES} />
-      <StatusBar style="light" />
+      <StatusBar style="light" hidden={Platform.OS === "android" && nav === "in-room"} animated />
       <View pointerEvents={nav === "home" ? "auto" : "none"} style={[styles.persistentScreen, nav !== "home" && styles.persistentScreenHidden]}>
         <HomeScreen
           onCreate={() => {
@@ -678,7 +747,12 @@ export default function App() {
           </Pressable>
         </>
       ) : null}
-      {nav !== "in-room" ? <StarsBadge stars={stars} gain={starGain} onPress={() => openRegisteredFeature("shop", () => openShop("stars"))} /> : null}
+      <View
+        pointerEvents={nav !== "in-room" ? "box-none" : "none"}
+        style={[styles.starsPersistentLayer, nav === "in-room" && styles.persistentScreenHidden]}
+      >
+        <StarsBadge stars={stars} gain={starGain} onPress={() => openRegisteredFeature("shop", () => openShop("stars"))} />
+      </View>
     </AppFrame>
   );
 }
@@ -870,7 +944,13 @@ function InRoomRouter({
 }
 
 const styles = StyleSheet.create({
-  loadingRoot: { flex: 1, backgroundColor: "transparent" },
+  loadingRoot: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "transparent" },
+  loadingGlow: { position: "absolute", width: 230, height: 150, borderRadius: 115, backgroundColor: "#8D3DFF", shadowColor: "#B865FF", shadowOpacity: 0.9, shadowRadius: 34 },
+  loadingEmblem: { width: 210, height: 150 },
+  loadingTitle: { marginTop: 3, color: "#FFF1B8", fontSize: 17, fontWeight: "900", letterSpacing: 2.2, textShadowColor: "rgba(112,38,190,0.95)", textShadowRadius: 9 },
+  loadingDots: { flexDirection: "row", gap: 6, marginTop: 10 },
+  loadingDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: "rgba(255,218,70,0.45)" },
+  loadingDotMiddle: { backgroundColor: "#FFDA46" },
   appFrame: {
     flex: 1,
     backgroundColor: theme.bg,
@@ -893,6 +973,7 @@ const styles = StyleSheet.create({
   persistentScreen: { ...StyleSheet.absoluteFillObject, opacity: 1 },
   persistentScreenHidden: { opacity: 0 },
   persistentDamageReveal: { ...StyleSheet.absoluteFillObject, opacity: 1 },
+  starsPersistentLayer: { ...StyleSheet.absoluteFillObject, zIndex: 20 },
   combatPreloader: { position: "absolute", left: 0, top: 0, width: 192, height: 192, opacity: 0.001, overflow: "hidden" },
   combatPreloadImage: { position: "absolute", width: 192, height: 192 },
   starsHud: {

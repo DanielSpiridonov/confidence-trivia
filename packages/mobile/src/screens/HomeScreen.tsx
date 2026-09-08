@@ -1,17 +1,17 @@
 import React from "react";
-import { Animated, Image, ImageSourcePropType, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { ANDROID_MENU_UI_SCALE, Screen, Title, BigButton } from "../components/ui";
 import { PointsIcon } from "../components/PointsIcon";
 import { getPlayerCustomization } from "../network/client";
 
-const DAILY_REWARD_PLATFORM_IMAGE: ImageSourcePropType = require("../../assets/popup-platform.png");
-const DAILY_REWARD_PRESENT_IMAGE: ImageSourcePropType = require("../../assets/stars-gift.png");
-const CLAIMED_REWARD_PRESENT_IMAGE: ImageSourcePropType = require("../../assets/ui-thumbnails/gift-opened.png");
-const RANKED_TROPHY_IMAGE: ImageSourcePropType = require("../../assets/ui-thumbnails/trophy.png");
-const SHOP_IMAGE: ImageSourcePropType = require("../../assets/ui-thumbnails/shop.png");
-const DEFAULT_AVATAR_HEAD_IMAGE: ImageSourcePropType = require("../../assets/avatar-heads/smart-owl.png");
-const AVATAR_HEAD_IMAGES: Record<string, ImageSourcePropType> = {
+const DAILY_REWARD_PLATFORM_IMAGE: number = require("../../assets/popup-platform.png");
+const DAILY_REWARD_PRESENT_IMAGE: number = require("../../assets/stars-gift.png");
+const CLAIMED_REWARD_PRESENT_IMAGE: number = require("../../assets/ui-thumbnails/gift-opened.png");
+const RANKED_TROPHY_IMAGE: number = require("../../assets/ui-thumbnails/trophy.png");
+const SHOP_IMAGE: number = require("../../assets/ui-thumbnails/shop.png");
+const DEFAULT_AVATAR_HEAD_IMAGE: number = require("../../assets/avatar-heads/smart-owl.png");
+const AVATAR_HEAD_IMAGES: Record<string, number> = {
   smart_owl: DEFAULT_AVATAR_HEAD_IMAGE,
   clever_fox: require("../../assets/avatar-heads/fox.png"),
   quiz_bot: require("../../assets/avatar-heads/quiz-bot.png"),
@@ -31,8 +31,8 @@ function HomePopup({ label, amount, streakLabel, claimed, claimedLabel, countdow
   claimed: boolean;
   claimedLabel: string;
   countdown?: string;
-  platformImage?: ImageSourcePropType;
-  featureImage?: ImageSourcePropType;
+  platformImage?: number;
+  featureImage?: number;
   disabled?: boolean;
   onPress: () => void;
 }) {
@@ -45,9 +45,9 @@ function HomePopup({ label, amount, streakLabel, claimed, claimedLabel, countdow
       style={({ pressed }) => [styles.popup, disabled && !claimed && styles.popupDisabled, pressed && !disabled && styles.popupPressed]}
     >
       <View style={styles.popupArtwork}>
-        {platformImage ? <Image source={platformImage} fadeDuration={0} resizeMode="contain" style={[styles.popupPlatformImage, claimed && styles.popupPlatformClaimed]} /> : null}
+        {platformImage ? <Image source={platformImage} defaultSource={platformImage} fadeDuration={0} resizeMode="contain" style={[styles.popupPlatformImage, claimed && styles.popupPlatformClaimed]} /> : null}
         {featureImage ? (
-          <Image source={featureImage} fadeDuration={0} resizeMode="contain" style={[styles.popupFeatureImage, claimed && styles.popupFeatureClaimed]} />
+          <Image source={featureImage} defaultSource={featureImage} fadeDuration={0} resizeMode="contain" style={[styles.popupFeatureImage, claimed && styles.popupFeatureClaimed]} />
         ) : (
           <View style={styles.popupFeatureFallback}><PointsIcon size={38} /></View>
         )}
@@ -91,7 +91,7 @@ export function HomeScreen({
   const [now, setNow] = React.useState(Date.now());
   const [showCelebration, setShowCelebration] = React.useState(false);
   const [activeCelebration, setActiveCelebration] = React.useState(dailyRewardCelebration);
-  const [avatarHead, setAvatarHead] = React.useState<ImageSourcePropType>(DEFAULT_AVATAR_HEAD_IMAGE);
+  const [avatarHead, setAvatarHead] = React.useState<number>(DEFAULT_AVATAR_HEAD_IMAGE);
   const celebrationOpacity = React.useRef(new Animated.Value(0)).current;
   const celebrationScale = React.useRef(new Animated.Value(0.94)).current;
 
@@ -178,14 +178,14 @@ export function HomeScreen({
           style={({ pressed }) => [styles.popup, pressed && styles.popupPressed]}
         >
           <View style={styles.popupArtwork}>
-            <Image source={DAILY_REWARD_PLATFORM_IMAGE} fadeDuration={0} resizeMode="contain" style={styles.popupPlatformImage} />
-            <Image source={RANKED_TROPHY_IMAGE} fadeDuration={0} resizeMode="contain" style={styles.rankedTrophyImage} />
+            <Image source={DAILY_REWARD_PLATFORM_IMAGE} defaultSource={DAILY_REWARD_PLATFORM_IMAGE} fadeDuration={0} resizeMode="contain" style={styles.popupPlatformImage} />
+            <Image source={RANKED_TROPHY_IMAGE} defaultSource={RANKED_TROPHY_IMAGE} fadeDuration={0} resizeMode="contain" style={styles.rankedTrophyImage} />
           </View>
           <Text numberOfLines={1} style={styles.popupLabel}>{t("ranked.shortTitle")}</Text>
         </Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel={t("shop.title")} onPress={onShop} style={({ pressed }) => [styles.popup, pressed && styles.popupPressed]}>
           <View style={styles.popupArtwork}>
-            <Image source={SHOP_IMAGE} fadeDuration={0} resizeMode="contain" style={styles.shopFeatureImage} />
+            <Image source={SHOP_IMAGE} defaultSource={SHOP_IMAGE} fadeDuration={0} resizeMode="contain" style={styles.shopFeatureImage} />
           </View>
           <Text numberOfLines={1} style={styles.popupLabel}>{t("shop.shortTitle")}</Text>
         </Pressable>
@@ -196,7 +196,7 @@ export function HomeScreen({
         <BigButton label={t("home.joinGame")} onPress={onJoin} variant="secondary" />
       </View>
       <Pressable accessibilityRole="button" accessibilityLabel={t("home.profile")} onPress={onProfile} style={({ pressed }) => [styles.profileButton, pressed && styles.profileButtonPressed]}>
-        <Image source={avatarHead} fadeDuration={0} resizeMode="contain" style={styles.profileAvatar} />
+        <Image source={avatarHead} defaultSource={avatarHead} fadeDuration={0} resizeMode="contain" style={styles.profileAvatar} />
         <Text numberOfLines={1} style={styles.profileLabel}>{t("home.profile")}</Text>
       </Pressable>
       <Pressable accessibilityRole="button" accessibilityLabel={t("shop.tabs.inventory")} onPress={onInventory} style={({ pressed }) => [styles.profileButton, styles.inventoryButton, pressed && styles.profileButtonPressed]}>
