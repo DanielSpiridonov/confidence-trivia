@@ -10,6 +10,7 @@ const ws_transport_1 = require("@colyseus/ws-transport");
 const GameRoom_1 = require("./rooms/GameRoom");
 const database_1 = require("./database");
 const auth_1 = require("./auth");
+const shared_1 = require("@confidence-trivia/shared");
 const port = Number(process.env.PORT ?? 2567);
 const app = (0, express_1.default)();
 app.use(express_1.default.json());
@@ -321,11 +322,12 @@ app.get("/challenges", async (req, res) => {
 app.post("/challenges", async (req, res) => {
     const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
     const challengedId = typeof req.body?.challengedId === "string" ? req.body.challengedId : "";
-    if (!isDeviceId(playerId) || !isDeviceId(challengedId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
+    const damageWager = Number(req.body?.damageWager);
+    if (!isDeviceId(playerId) || !isDeviceId(challengedId) || !(0, shared_1.isDamageWager)(damageWager) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
         res.status(403).json({ error: "Invalid challenge" });
         return;
     }
-    sendFriendActionResponse(res, await (0, database_1.createPlayerChallenge)(playerId, challengedId));
+    sendFriendActionResponse(res, await (0, database_1.createPlayerChallenge)(playerId, challengedId, damageWager));
 });
 app.patch("/challenges/:challengeId", async (req, res) => {
     const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";

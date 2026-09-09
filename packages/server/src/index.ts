@@ -5,6 +5,7 @@ import { WebSocketTransport } from "@colyseus/ws-transport";
 import { GameRoom } from "./rooms/GameRoom";
 import { claimAllFriendGifts, claimDailyReward, claimFriendGift, createPlayerChallenge, equipFreeAvatar, equipFreeFrame, equipFreeNameColor, getAccountProfile, getDailyRewardStatus, getDatabaseStatus, getPlayerChallenges, getPlayerCustomization, getPlayerStars, getRankedLeaderboard, isAuthenticatedPlayer, linkPlayerAccount, listFriends, respondToFriendRequest, respondToPlayerChallenge, searchFriendPlayers, sendFriendGift, sendFriendRequest, suggestFriendPlayers, updateAccountDisplayName, updateFriendRelationship, updatePlayerPresence } from "./database";
 import { verifySupabaseIdentity } from "./auth";
+import { isDamageWager } from "@confidence-trivia/shared";
 
 const port = Number(process.env.PORT ?? 2567);
 const app = express();
@@ -271,8 +272,9 @@ app.get("/challenges", async (req, res) => {
 app.post("/challenges", async (req, res) => {
   const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
   const challengedId = typeof req.body?.challengedId === "string" ? req.body.challengedId : "";
-  if (!isDeviceId(playerId) || !isDeviceId(challengedId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) { res.status(403).json({ error: "Invalid challenge" }); return; }
-  sendFriendActionResponse(res, await createPlayerChallenge(playerId, challengedId));
+  const damageWager = Number(req.body?.damageWager);
+  if (!isDeviceId(playerId) || !isDeviceId(challengedId) || !isDamageWager(damageWager) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) { res.status(403).json({ error: "Invalid challenge" }); return; }
+  sendFriendActionResponse(res, await createPlayerChallenge(playerId, challengedId, damageWager));
 });
 
 app.patch("/challenges/:challengeId", async (req, res) => {

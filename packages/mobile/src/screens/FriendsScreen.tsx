@@ -1,6 +1,7 @@
 import React from "react";
-import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
+import { DAMAGE_WAGER_OPTIONS, DEFAULT_DAMAGE_WAGER } from "@confidence-trivia/shared";
 import { ANDROID_MENU_UI_SCALE, BackIconButton, Screen, Title, theme } from "../components/ui";
 import { FriendSearchResult, FriendSummary, challengeFriend, claimAllFriendGifts, claimFriendGift, getFriendSuggestions, getFriends, requestFriend, respondFriendRequest, searchFriends, sendFriendGift, updateFriendship } from "../network/client";
 import { PointsIcon } from "../components/PointsIcon";
@@ -8,7 +9,7 @@ import { PointsIcon } from "../components/PointsIcon";
 type FriendsTab = "friends" | "requests" | "blocked";
 const BLESSING_GIFT_IMAGE = require("../../assets/stars-gift.png");
 
-export function FriendsScreen({ playerId, onStarsChange, onChallengeSent, onBack }: { playerId: string; onStarsChange: (stars: number) => void; onChallengeSent: (playerName: string) => void; onBack: () => void }) {
+export function FriendsScreen({ playerId, stars, onStarsChange, onChallengeSent, onBack }: { playerId: string; stars: number; onStarsChange: (stars: number) => void; onChallengeSent: (playerName: string, damageWager: number) => void; onBack: () => void }) {
   const { t } = useTranslation();
   const [tab, setTab] = React.useState<FriendsTab>("friends");
   const [data, setData] = React.useState<Awaited<ReturnType<typeof getFriends>> | null>(null);
@@ -20,6 +21,8 @@ export function FriendsScreen({ playerId, onStarsChange, onChallengeSent, onBack
   const [searching, setSearching] = React.useState(false);
   const [busyId, setBusyId] = React.useState<string | null>(null);
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
+  const [challengeTarget, setChallengeTarget] = React.useState<FriendSummary | null>(null);
+  const [challengeWager, setChallengeWager] = React.useState<number>(DEFAULT_DAMAGE_WAGER);
 
   const showError = React.useCallback((error: unknown) => Alert.alert(t("feedback.actionFailed"), error instanceof Error ? error.message : t("feedback.tryAgain")), [t]);
   const refresh = React.useCallback(async () => {
@@ -95,7 +98,7 @@ export function FriendsScreen({ playerId, onStarsChange, onChallengeSent, onBack
         <View style={styles.listPanel}>
           {loading ? <ActivityIndicator color={theme.primary} style={styles.loader} /> : null}
           {!loading && tab === "friends" ? <ScrollView style={styles.friendListScroll} contentContainerStyle={styles.listContent}>
-            {data?.friends.map((friend) => <FriendRow key={friend.friendshipId} item={friend} expanded={expandedId === friend.friendshipId} busy={busyId === friend.friendshipId} onToggle={() => setExpandedId((current) => current === friend.friendshipId ? null : friend.friendshipId)} onBless={() => void runAction(friend.friendshipId, () => sendFriendGift(playerId, friend.friendshipId))} onClaim={() => void runAction(friend.friendshipId, async () => { const claimed = await claimFriendGift(playerId, friend.giftId!); onStarsChange(claimed.stars); })} onChallenge={() => void runAction(friend.friendshipId, async () => { await challengeFriend(playerId, friend.playerId); onChallengeSent(friend.displayName); })} onRemove={() => confirmAction(t("friends.removeConfirm", { name: friend.displayName }), () => void runAction(friend.friendshipId, () => updateFriendship(playerId, friend.friendshipId, "remove")))} onBlock={() => confirmAction(t("friends.blockConfirm", { name: friend.displayName }), () => void runAction(friend.friendshipId, () => updateFriendship(playerId, friend.friendshipId, "block")))} />)}
+            {data?.friends.map((friend) => <FriendRow key={friend.friendshipId} item={friend} expanded={expandedId === friend.friendshipId} busy={busyId === friend.friendshipId} onToggle={() => setExpandedId((current) => current === friend.friendshipId ? null : friend.friendshipId)} onBless={() => void runAction(friend.friendshipId, () => sendFriendGift(playerId, friend.friendshipId))} onClaim={() => void runAction(friend.friendshipId, async () => { const claimed = await claimFriendGift(playerId, friend.giftId!); onStarsChange(claimed.stars); })} onChallenge={() => { setChallengeWager(DEFAULT_DAMAGE_WAGER); setChallengeTarget(friend); }} onRemove={() => confirmAction(t("friends.removeConfirm", { name: friend.displayName }), () => void runAction(friend.friendshipId, () => updateFriendship(playerId, friend.friendshipId, "remove")))} onBlock={() => confirmAction(t("friends.blockConfirm", { name: friend.displayName }), () => void runAction(friend.friendshipId, () => updateFriendship(playerId, friend.friendshipId, "block")))} />)}
             {data?.friends.length === 0 ? <Empty text={t("friends.noFriends")} /> : null}
           </ScrollView> : null}
           {!loading && tab === "requests" ? <ScrollView contentContainerStyle={styles.listContent}>
@@ -113,6 +116,20 @@ export function FriendsScreen({ playerId, onStarsChange, onChallengeSent, onBack
           </Pressable>
         </View>
       </View>
+      <Modal transparent visible={Boolean(challengeTarget)} animationType="fade" onRequestClose={() => setChallengeTarget(null)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.wagerModal}>
+            <Text style={styles.wagerTitle}>{t("friends.challengeWagerTitle")}</Text>
+            <Text style={styles.wagerSubtitle}>{t("friends.challengeWagerFor", { player: challengeTarget?.displayName })}</Text>
+            <View style={styles.wagerGrid}>{DAMAGE_WAGER_OPTIONS.map((value) => <Pressable key={value} onPress={() => { if (value > stars) { Alert.alert(t("shop.notEnoughStars")); return; } setChallengeWager(value); }} style={[styles.wagerChip, challengeWager === value && styles.wagerChipSelected, value > stars && styles.wagerChipDisabled]}><Text style={[styles.wagerChipText, challengeWager === value && styles.wagerChipTextSelected]}>★ {value}</Text></Pressable>)}</View>
+            <Text style={styles.wagerPot}>{t("friends.challengePot", { count: challengeWager * 2 })}</Text>
+            <View style={styles.wagerActions}>
+              <SmallButton label={t("validation.cancel")} onPress={() => setChallengeTarget(null)} muted />
+              <SmallButton label={t("friends.sendChallenge")} disabled={busyId === challengeTarget?.friendshipId || challengeWager > stars} onPress={() => { const target = challengeTarget; if (!target) return; void runAction(target.friendshipId, async () => { await challengeFriend(playerId, target.playerId, challengeWager); onChallengeSent(target.displayName, challengeWager); setChallengeTarget(null); }); }} />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </Screen>
   );
 }
@@ -150,4 +167,16 @@ const styles = StyleSheet.create({
   reloadButton: { position: "absolute", right: 10, bottom: 8, width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", backgroundColor: theme.primary, borderWidth: 1, borderColor: "#B9AAFF" },
   reloadButtonPressed: { transform: [{ scale: 0.92 }] },
   reloadIcon: { color: "#FFF", fontSize: 24, lineHeight: 27, fontWeight: "900" },
+  modalBackdrop: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(5,3,12,0.72)" },
+  wagerModal: { width: "78%", maxWidth: 520, padding: 20, borderRadius: 18, alignItems: "center", backgroundColor: "#211A36", borderWidth: 2, borderColor: theme.primary },
+  wagerTitle: { color: theme.text, fontSize: 22, fontWeight: "900" },
+  wagerSubtitle: { color: theme.textDim, fontSize: 12, fontWeight: "700", marginTop: 4, marginBottom: 15 },
+  wagerGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 8 },
+  wagerChip: { minWidth: 76, paddingHorizontal: 11, paddingVertical: 9, borderRadius: 9, alignItems: "center", backgroundColor: "rgba(13,10,24,0.9)", borderWidth: 1, borderColor: "rgba(185,176,214,0.3)" },
+  wagerChipSelected: { backgroundColor: "rgba(124,92,255,0.34)", borderColor: "#B9AAFF" },
+  wagerChipDisabled: { opacity: 0.38 },
+  wagerChipText: { color: theme.textDim, fontSize: 12, fontWeight: "900" },
+  wagerChipTextSelected: { color: "#FFF" },
+  wagerPot: { color: "#FFD75E", fontSize: 13, fontWeight: "900", marginTop: 14 },
+  wagerActions: { width: "100%", flexDirection: "row", justifyContent: "center", gap: 12, marginTop: 16 },
 });

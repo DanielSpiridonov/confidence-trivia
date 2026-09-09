@@ -232,7 +232,7 @@ export default function App() {
   const [stars, setStars] = useState(0);
   const [starGain, setStarGain] = useState<{ id: number; amount: number } | null>(null);
   const [incomingChallenge, setIncomingChallenge] = useState<PlayerChallenge | null>(null);
-  const [challengeSentNotice, setChallengeSentNotice] = useState<{ id: number; playerName: string } | null>(null);
+  const [challengeSentNotice, setChallengeSentNotice] = useState<{ id: number; playerName: string; damageWager: number } | null>(null);
   const challengeOpacity = useRef(new Animated.Value(0)).current;
   const challengeSentOpacity = useRef(new Animated.Value(0)).current;
   const handledChallengeIds = useRef(new Set<string>());
@@ -703,7 +703,7 @@ export default function App() {
     if (!deviceId || nav === "in-room" || joiningChallengeId.current === challenge.id || handledChallengeIds.current.has(challenge.id)) return;
     joiningChallengeId.current = challenge.id;
     try {
-      const challengeRoom = await createRoom(deviceId, defaultPlayerName, 10, locale, "damage", [], "private", 5, challenge.id);
+      const challengeRoom = await createRoom(deviceId, defaultPlayerName, 10, locale, "damage", [], "private", challenge.damageWager, challenge.id);
       handledChallengeIds.current.add(challenge.id);
       reconnectionTokenRef.current = challengeRoom.reconnectionToken;
       setRoom(challengeRoom);
@@ -843,7 +843,7 @@ export default function App() {
             />
           )}
           {nav === "rules" && <RulesScreen onBack={() => setNav("home")} />}
-          {nav === "friends" && deviceId ? <FriendsScreen playerId={deviceId} onStarsChange={setStars} onChallengeSent={(playerName) => setChallengeSentNotice({ id: Date.now(), playerName })} onBack={() => setNav("home")} /> : null}
+          {nav === "friends" && deviceId ? <FriendsScreen playerId={deviceId} stars={stars} onStarsChange={setStars} onChallengeSent={(playerName, damageWager) => setChallengeSentNotice({ id: Date.now(), playerName, damageWager })} onBack={() => setNav("home")} /> : null}
           {nav === "profile" && (
             <ProfileScreen
               displayName={defaultPlayerName}
@@ -873,7 +873,7 @@ export default function App() {
       {incomingChallenge && deviceId ? (
         <Animated.View style={[styles.challengePopup, { opacity: challengeOpacity }]}>
           <Text style={styles.challengePopupTitle}>{i18n.t("friends.challengeIncoming", { player: incomingChallenge.challengerName })}</Text>
-          <Text style={styles.challengePopupMode}>{i18n.t("friends.challengeMode")}</Text>
+          <Text style={styles.challengePopupMode}>{i18n.t("friends.challengeMode", { wager: incomingChallenge.damageWager })}</Text>
           <View style={styles.challengePopupActions}>
             <Pressable onPress={() => { const challenge = incomingChallenge; setIncomingChallenge(null); void respondChallenge(deviceId, challenge.id, "decline").catch(() => undefined); }} style={[styles.challengePopupButton, styles.challengeDecline]}><Text style={styles.challengePopupButtonText}>{i18n.t("friends.decline")}</Text></Pressable>
             <Pressable onPress={() => { const challenge = incomingChallenge; setIncomingChallenge(null); void (async () => { try { await respondChallenge(deviceId, challenge.id, "accept"); await enterChallengeLobby({ ...challenge, status: "accepted" }); } catch (error) { Alert.alert(i18n.t("friends.challengeFailed"), error instanceof Error ? error.message : i18n.t("feedback.tryAgain")); } })(); }} style={styles.challengePopupButton}><Text style={styles.challengePopupButtonText}>{i18n.t("friends.accept")}</Text></Pressable>
@@ -883,7 +883,7 @@ export default function App() {
       {challengeSentNotice && !incomingChallenge ? (
         <Animated.View pointerEvents="none" style={[styles.challengePopup, { opacity: challengeSentOpacity }]}>
           <Text style={styles.challengePopupTitle}>{i18n.t("friends.challengeSent", { player: challengeSentNotice.playerName })}</Text>
-          <Text style={styles.challengePopupMode}>{i18n.t("friends.challengeMode")}</Text>
+          <Text style={styles.challengePopupMode}>{i18n.t("friends.challengeMode", { wager: challengeSentNotice.damageWager })}</Text>
         </Animated.View>
       ) : null}
       <View

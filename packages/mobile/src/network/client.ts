@@ -239,12 +239,13 @@ export interface PlayerChallenge {
   challengedId: string;
   gameMode: "damage";
   status: "pending" | "accepted";
+  damageWager: number;
   expiresAt: string;
 }
 
 export const updatePresence = (playerId: string, available: boolean) => friendRequest<{ ok: true }>("/presence", { method: "POST", body: JSON.stringify({ playerId, available }) });
 export const getChallenges = (playerId: string) => friendRequest<PlayerChallenge[]>(`/challenges?playerId=${encodeURIComponent(playerId)}`);
-export const challengeFriend = (playerId: string, challengedId: string) => friendRequest<{ ok: true; challengeId: string }>("/challenges", { method: "POST", body: JSON.stringify({ playerId, challengedId }) });
+export const challengeFriend = (playerId: string, challengedId: string, damageWager: number) => friendRequest<{ ok: true; challengeId: string }>("/challenges", { method: "POST", body: JSON.stringify({ playerId, challengedId, damageWager }) });
 export const respondChallenge = (playerId: string, challengeId: string, action: "accept" | "decline") => friendRequest<{ ok: true }>(`/challenges/${encodeURIComponent(challengeId)}`, { method: "PATCH", body: JSON.stringify({ playerId, action }) });
 
 async function withRoomRequestTimeout<T>(promise: Promise<T>): Promise<T> {

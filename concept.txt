@@ -1819,6 +1819,8 @@ Eventually, it may become:
 * Profiles
 * Seasonal content
 * Leaderboards
+* News screen
+* Email/inbox screen
 
 But do NOT build all of this now.
 

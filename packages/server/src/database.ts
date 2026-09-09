@@ -127,6 +127,7 @@ export interface PlayerChallenge {
   challengedId: string;
   gameMode: "damage";
   status: "pending" | "accepted";
+  damageWager: number;
   expiresAt: string;
 }
 
@@ -138,7 +139,7 @@ export async function updatePlayerPresence(playerId: string, available: boolean)
   } catch (error) { console.error("Could not update player presence", error); return false; }
 }
 
-export async function createPlayerChallenge(challengerId: string, challengedId: string): Promise<FriendActionResult & { challengeId?: string }> {
+export async function createPlayerChallenge(challengerId: string, challengedId: string, damageWager: number): Promise<FriendActionResult & { challengeId?: string }> {
   if (!sql || challengerId === challengedId) return { ok: false, error: "Invalid challenge" };
   try {
     const [eligible] = await sql<{ available: boolean }[]>`
@@ -154,8 +155,8 @@ export async function createPlayerChallenge(challengerId: string, challengedId: 
     if (!eligible) return { ok: false, error: "Player is not online" };
     await sql`update public.player_challenges set status = 'expired' where status = 'pending' and expires_at <= now()`;
     const [challenge] = await sql<{ id: string }[]>`
-      insert into public.player_challenges (challenger_id, challenged_id)
-      values (${challengerId}, ${challengedId}) returning id
+      insert into public.player_challenges (challenger_id, challenged_id, damage_wager)
+      values (${challengerId}, ${challengedId}, ${damageWager}) returning id
     `;
     return { ok: true, challengeId: challenge.id };
   } catch (error) { console.error("Could not create challenge", error); return { ok: false, error: "Could not send challenge" }; }
@@ -165,16 +166,16 @@ export async function getPlayerChallenges(playerId: string): Promise<PlayerChall
   if (!sql) return null;
   try {
     await sql`update public.player_challenges set status = 'expired' where status = 'pending' and expires_at <= now()`;
-    const rows = await sql<{ id: string; challenger_id: string; challenger_name: string; challenged_id: string; status: "pending" | "accepted"; expires_at: Date }[]>`
+    const rows = await sql<{ id: string; challenger_id: string; challenger_name: string; challenged_id: string; status: "pending" | "accepted"; damage_wager: number; expires_at: Date }[]>`
       select challenge.id, challenge.challenger_id, challenger.display_name as challenger_name,
-        challenge.challenged_id, challenge.status, challenge.expires_at
+        challenge.challenged_id, challenge.status, challenge.damage_wager, challenge.expires_at
       from public.player_challenges challenge
       join public.players challenger on challenger.id = challenge.challenger_id
       where ${playerId} in (challenge.challenger_id, challenge.challenged_id)
         and (challenge.status = 'pending' or (challenge.status = 'accepted' and challenge.responded_at > now() - interval '20 seconds'))
       order by challenge.created_at desc limit 5
     `;
-    return rows.map((row) => ({ id: row.id, challengerId: row.challenger_id, challengerName: row.challenger_name, challengedId: row.challenged_id, gameMode: "damage", status: row.status, expiresAt: row.expires_at.toISOString() }));
+    return rows.map((row) => ({ id: row.id, challengerId: row.challenger_id, challengerName: row.challenger_name, challengedId: row.challenged_id, gameMode: "damage", status: row.status, damageWager: row.damage_wager, expiresAt: row.expires_at.toISOString() }));
   } catch (error) { console.error("Could not load challenges", error); return null; }
 }
 

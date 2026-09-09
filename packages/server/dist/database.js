@@ -112,7 +112,7 @@ async function updatePlayerPresence(playerId, available) {
         return false;
     }
 }
-async function createPlayerChallenge(challengerId, challengedId) {
+async function createPlayerChallenge(challengerId, challengedId, damageWager) {
     if (!sql || challengerId === challengedId)
         return { ok: false, error: "Invalid challenge" };
     try {
@@ -130,8 +130,8 @@ async function createPlayerChallenge(challengerId, challengedId) {
             return { ok: false, error: "Player is not online" };
         await sql `update public.player_challenges set status = 'expired' where status = 'pending' and expires_at <= now()`;
         const [challenge] = await sql `
-      insert into public.player_challenges (challenger_id, challenged_id)
-      values (${challengerId}, ${challengedId}) returning id
+      insert into public.player_challenges (challenger_id, challenged_id, damage_wager)
+      values (${challengerId}, ${challengedId}, ${damageWager}) returning id
     `;
         return { ok: true, challengeId: challenge.id };
     }
@@ -147,14 +147,14 @@ async function getPlayerChallenges(playerId) {
         await sql `update public.player_challenges set status = 'expired' where status = 'pending' and expires_at <= now()`;
         const rows = await sql `
       select challenge.id, challenge.challenger_id, challenger.display_name as challenger_name,
-        challenge.challenged_id, challenge.status, challenge.expires_at
+        challenge.challenged_id, challenge.status, challenge.damage_wager, challenge.expires_at
       from public.player_challenges challenge
       join public.players challenger on challenger.id = challenge.challenger_id
       where ${playerId} in (challenge.challenger_id, challenge.challenged_id)
         and (challenge.status = 'pending' or (challenge.status = 'accepted' and challenge.responded_at > now() - interval '20 seconds'))
       order by challenge.created_at desc limit 5
     `;
-        return rows.map((row) => ({ id: row.id, challengerId: row.challenger_id, challengerName: row.challenger_name, challengedId: row.challenged_id, gameMode: "damage", status: row.status, expiresAt: row.expires_at.toISOString() }));
+        return rows.map((row) => ({ id: row.id, challengerId: row.challenger_id, challengerName: row.challenger_name, challengedId: row.challenged_id, gameMode: "damage", status: row.status, damageWager: row.damage_wager, expiresAt: row.expires_at.toISOString() }));
     }
     catch (error) {
         console.error("Could not load challenges", error);
