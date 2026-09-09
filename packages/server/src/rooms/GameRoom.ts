@@ -31,7 +31,7 @@ import {
   RevealEntrySchema,
 } from "../state/schema";
 import { getLocalizedCorrectAnswer, getQuestionSet, localize, localizeAnswer, localizeAnswerItems } from "../content/questions";
-import { getPlayerCustomization, isAcceptedChallengeParticipant, isAuthenticatedPlayer, reserveDamageWager, saveCompletedMatch, settleDamageWager, upsertPlayer } from "../database";
+import { getAcceptedChallengeParticipantRole, getPlayerCustomization, isAuthenticatedPlayer, reserveDamageWager, saveCompletedMatch, settleDamageWager, upsertPlayer } from "../database";
 import { verifySupabaseIdentity } from "../auth";
 
 interface JoinOptions {
@@ -89,6 +89,7 @@ export class GameRoom extends Room<RoomStateSchema> {
   // Stable installation identifiers stay server-only. Connection-scoped
   // session IDs remain the room keys and public gameplay identifiers.
   private deviceIds = new Map<string, string>();
+  private challengeRoles = new Map<string, "challenger" | "challenged">();
   private readonly matchId = randomUUID();
   private gameStartedAt = new Date();
   private resultsPersisted = false;
@@ -116,6 +117,7 @@ export class GameRoom extends Room<RoomStateSchema> {
 
     this.setState(new RoomStateSchema());
     this.challengeId = typeof options.challengeId === "string" && DEVICE_ID_PATTERN.test(options.challengeId) ? options.challengeId : "";
+    this.state.isChallenge = Boolean(this.challengeId);
     this.state.code = this.roomId;
     this.state.gameMode = options.gameMode === "damage"
       ? "damage"
@@ -153,7 +155,7 @@ export class GameRoom extends Room<RoomStateSchema> {
     this.onMessage("skipSideBet", (client) => this.handleSkipSideBet(client));
   }
 
-  async onAuth(_client: Client, options: JoinOptions = {}) {
+  async onAuth(client: Client, options: JoinOptions = {}) {
     // Reconnecting players use Colyseus' reconnection flow and do not pass
     // through this admission path. New players may only enter the lobby.
     const basicAdmissionAllowed = !this.state.gameStarted
@@ -163,7 +165,11 @@ export class GameRoom extends Room<RoomStateSchema> {
     if (!basicAdmissionAllowed) return false;
     if (this.challengeId) {
       const identity = await verifySupabaseIdentity(options.accessToken ? `Bearer ${options.accessToken}` : undefined);
-      return Boolean(identity && await isAuthenticatedPlayer(options.deviceId!, identity.userId) && await isAcceptedChallengeParticipant(this.challengeId, options.deviceId!));
+      if (!identity || !await isAuthenticatedPlayer(options.deviceId!, identity.userId)) return false;
+      const role = await getAcceptedChallengeParticipantRole(this.challengeId, options.deviceId!);
+      if (!role) return false;
+      this.challengeRoles.set(client.sessionId, role);
+      return true;
     }
     if (this.state.gameMode !== "ranked") return true;
     if (process.env.NODE_ENV === "test" && process.env.RANKED_TEST_AUTH_BYPASS === "true") return true;
@@ -177,10 +183,15 @@ export class GameRoom extends Room<RoomStateSchema> {
     player.name = isValidPlayerName(options.name) ? options.name.trim() : "Player";
     this.deviceIds.set(client.sessionId, options.deviceId ?? "");
     const deviceId = options.deviceId ?? "";
-    player.isHost = this.state.players.size === 0;
+    const challengeRole = this.challengeRoles.get(client.sessionId) ?? null;
+    player.isHost = this.challengeId ? challengeRole === "challenger" : this.state.players.size === 0;
     player.health = 15;
-    if (player.isHost) this.state.hostId = player.id;
+    if (player.isHost) {
+      this.state.players.forEach((existingPlayer) => { existingPlayer.isHost = false; });
+      this.state.hostId = player.id;
+    }
     this.state.players.set(client.sessionId, player);
+    this.challengeRoles.delete(client.sessionId);
     const [stars, customization] = await Promise.all([
       upsertPlayer(deviceId, player.name),
       getPlayerCustomization(deviceId),
@@ -196,7 +207,7 @@ export class GameRoom extends Room<RoomStateSchema> {
       await this.lock();
       this.beginGame();
     }
-    if (this.state.gameMode === "damage" && this.state.players.size === 2 && !this.state.gameStarted) {
+    if (this.state.gameMode === "damage" && !this.state.isChallenge && this.state.players.size === 2 && !this.state.gameStarted) {
       const host = this.clients.find((roomClient) => roomClient.sessionId === this.state.hostId);
       if (host) await this.handleStartGame(host);
     }

@@ -13,6 +13,7 @@ exports.createPlayerChallenge = createPlayerChallenge;
 exports.getPlayerChallenges = getPlayerChallenges;
 exports.respondToPlayerChallenge = respondToPlayerChallenge;
 exports.isAcceptedChallengeParticipant = isAcceptedChallengeParticipant;
+exports.getAcceptedChallengeParticipantRole = getAcceptedChallengeParticipantRole;
 exports.listFriends = listFriends;
 exports.searchFriendPlayers = searchFriendPlayers;
 exports.suggestFriendPlayers = suggestFriendPlayers;
@@ -184,6 +185,17 @@ async function isAcceptedChallengeParticipant(challengeId, playerId) {
     where id = ${challengeId} and status = 'accepted' and ${playerId} in (challenger_id, challenged_id)
   `;
     return Boolean(challenge);
+}
+async function getAcceptedChallengeParticipantRole(challengeId, playerId) {
+    if (!sql)
+        return null;
+    const [challenge] = await sql `
+    select challenger_id, challenged_id from public.player_challenges
+    where id = ${challengeId} and status = 'accepted' and ${playerId} in (challenger_id, challenged_id)
+  `;
+    if (!challenge)
+        return null;
+    return challenge.challenger_id === playerId ? "challenger" : "challenged";
 }
 async function listFriends(playerId) {
     if (!sql)

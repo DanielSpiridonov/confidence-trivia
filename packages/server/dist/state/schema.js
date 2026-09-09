@@ -251,6 +251,7 @@ class RoomStateSchema extends schema_1.Schema {
         this.phase = "lobby";
         this.hostId = "";
         this.isPublic = false;
+        this.isChallenge = false;
         this.damageWager = 0;
         this.damagePot = 0;
         this.pendingDamageBonus = 0;
@@ -287,6 +288,10 @@ __decorate([
     (0, schema_1.type)("boolean"),
     __metadata("design:type", Boolean)
 ], RoomStateSchema.prototype, "isPublic", void 0);
+__decorate([
+    (0, schema_1.type)("boolean"),
+    __metadata("design:type", Boolean)
+], RoomStateSchema.prototype, "isChallenge", void 0);
 __decorate([
     (0, schema_1.type)("number"),
     __metadata("design:type", Number)

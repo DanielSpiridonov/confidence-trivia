@@ -81,7 +81,8 @@ export function LobbyScreen({ room, mySessionId }: { room: Room; mySessionId: st
   const isHost = me?.isHost ?? false;
   const requiredPlayers = state.gameMode === "damage" ? 2 : state.gameMode === "ranked" ? RANKED_PLAYER_COUNT : MIN_PLAYERS_TO_START;
   const isRanked = state.gameMode === "ranked";
-  const isMatchmade = isRanked || state.gameMode === "damage";
+  const isChallenge = Boolean(state.isChallenge);
+  const isMatchmade = isRanked || (state.gameMode === "damage" && !isChallenge);
   const canStart = isHost && (state.gameMode === "damage" || state.gameMode === "ranked" ? players.length === requiredPlayers : players.length >= requiredPlayers);
 
   async function handleCopyCode() {
@@ -106,12 +107,12 @@ export function LobbyScreen({ room, mySessionId }: { room: Room; mySessionId: st
           </View>
 
           <View style={styles.infoColumn}>
-            {isMatchmade ? <View style={styles.rankedQueue}><Subtitle>{t(isRanked ? "lobby.rankedSearching" : "lobby.damageSearching")}</Subtitle><Text style={styles.rankedCount}>{players.length}/{requiredPlayers}</Text><Text style={styles.copyHint}>{t(isRanked ? "lobby.rankedAutoStart" : "lobby.damageAutoStart")}</Text></View> : <><Subtitle>{t("lobby.roomCode")}</Subtitle><Pressable onPress={() => void handleCopyCode()} style={styles.codeWrap}><Title>{state.code}</Title><Text style={styles.copyHint}>{copied ? t("lobby.copied") : t("lobby.tapToCopy")}</Text></Pressable></>}
+            {isMatchmade ? <View style={styles.rankedQueue}><Subtitle>{t(isRanked ? "lobby.rankedSearching" : "lobby.damageSearching")}</Subtitle><Text style={styles.rankedCount}>{players.length}/{requiredPlayers}</Text><Text style={styles.copyHint}>{t(isRanked ? "lobby.rankedAutoStart" : "lobby.damageAutoStart")}</Text></View> : isChallenge ? <View style={styles.rankedQueue}><Subtitle>{t("lobby.challengeLobby")}</Subtitle><Text style={styles.rankedCount}>{players.length}/{requiredPlayers}</Text><Text style={styles.copyHint}>{t("lobby.challengeManualStart")}</Text></View> : <><Subtitle>{t("lobby.roomCode")}</Subtitle><Pressable onPress={() => void handleCopyCode()} style={styles.codeWrap}><Title>{state.code}</Title><Text style={styles.copyHint}>{copied ? t("lobby.copied") : t("lobby.tapToCopy")}</Text></Pressable></>}
             {state.gameMode === "damage" ? <View style={styles.wagerBanner}>
               <Text style={styles.wagerStake}>{t("lobby.wagerStake", { count: state.damageWager })}</Text>
               <Text style={styles.wagerPot}>{t("lobby.wagerPot", { count: state.damagePot })}</Text>
             </View> : null}
-            {!isMatchmade && isHost && !isStarting ? <Pressable accessibilityRole="switch" accessibilityState={{ checked: Boolean(state.isPublic) }} onPress={() => room.send("toggleRoomVisibility")} style={styles.visibilityControl}>
+            {!isMatchmade && !isChallenge && isHost && !isStarting ? <Pressable accessibilityRole="switch" accessibilityState={{ checked: Boolean(state.isPublic) }} onPress={() => room.send("toggleRoomVisibility")} style={styles.visibilityControl}>
               <Text style={styles.visibilityLabel}>{state.isPublic ? t("lobby.partyPublic") : t("lobby.partyPrivate")}</Text>
               <View style={[styles.visibilityTrack, state.isPublic && styles.visibilityTrackEnabled]}><View style={[styles.visibilityThumb, state.isPublic && styles.visibilityThumbEnabled]} /></View>
             </Pressable> : null}

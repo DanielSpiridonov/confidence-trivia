@@ -232,7 +232,9 @@ export default function App() {
   const [stars, setStars] = useState(0);
   const [starGain, setStarGain] = useState<{ id: number; amount: number } | null>(null);
   const [incomingChallenge, setIncomingChallenge] = useState<PlayerChallenge | null>(null);
+  const [challengeSentNotice, setChallengeSentNotice] = useState<{ id: number; playerName: string } | null>(null);
   const challengeOpacity = useRef(new Animated.Value(0)).current;
+  const challengeSentOpacity = useRef(new Animated.Value(0)).current;
   const handledChallengeIds = useRef(new Set<string>());
   const joiningChallengeId = useRef<string | null>(null);
   const [dailyRewardCelebration, setDailyRewardCelebration] = useState<{ id: number; amount: number; streakDay: number } | null>(null);
@@ -685,23 +687,7 @@ export default function App() {
         const incoming = challenges.find((challenge) => challenge.status === "pending" && challenge.challengedId === deviceId) ?? null;
         setIncomingChallenge(incoming);
         const accepted = challenges.find((challenge) => challenge.status === "accepted" && !handledChallengeIds.current.has(challenge.id));
-        if (accepted && nav !== "in-room" && joiningChallengeId.current !== accepted.id) {
-          joiningChallengeId.current = accepted.id;
-          try {
-            const challengeRoom = await createRoom(deviceId, defaultPlayerName, 10, "en", "damage", [], "private", 5, accepted.id);
-            handledChallengeIds.current.add(accepted.id);
-            reconnectionTokenRef.current = challengeRoom.reconnectionToken;
-            setRoom(challengeRoom);
-            setRoomRecovery(null);
-            setRoomRecoveryMessage(null);
-            setIncomingChallenge(null);
-            setNav("in-room");
-          } catch (error) {
-            Alert.alert(i18n.t("friends.challengeFailed"), error instanceof Error ? error.message : i18n.t("feedback.tryAgain"));
-          } finally {
-            joiningChallengeId.current = null;
-          }
-        }
+        if (accepted && nav !== "in-room") await enterChallengeLobby(accepted);
       } catch {
         // Presence polling recovers automatically on the next interval.
       } finally {
@@ -712,6 +698,25 @@ export default function App() {
     const interval = setInterval(() => void poll(), 2_000);
     return () => { cancelled = true; clearInterval(interval); };
   }, [defaultPlayerName, deviceId, nav, registeredAccount]);
+
+  async function enterChallengeLobby(challenge: PlayerChallenge) {
+    if (!deviceId || nav === "in-room" || joiningChallengeId.current === challenge.id || handledChallengeIds.current.has(challenge.id)) return;
+    joiningChallengeId.current = challenge.id;
+    try {
+      const challengeRoom = await createRoom(deviceId, defaultPlayerName, 10, locale, "damage", [], "private", 5, challenge.id);
+      handledChallengeIds.current.add(challenge.id);
+      reconnectionTokenRef.current = challengeRoom.reconnectionToken;
+      setRoom(challengeRoom);
+      setRoomRecovery(null);
+      setRoomRecoveryMessage(null);
+      setIncomingChallenge(null);
+      setNav("in-room");
+    } catch (error) {
+      Alert.alert(i18n.t("friends.challengeFailed"), error instanceof Error ? error.message : i18n.t("feedback.tryAgain"));
+    } finally {
+      joiningChallengeId.current = null;
+    }
+  }
 
   useEffect(() => {
     if (!incomingChallenge || !deviceId) {
@@ -732,6 +737,17 @@ export default function App() {
     });
     return () => animation.stop();
   }, [challengeOpacity, deviceId, incomingChallenge?.id]);
+
+  useEffect(() => {
+    if (!challengeSentNotice) return;
+    challengeSentOpacity.setValue(1);
+    const animation = Animated.sequence([
+      Animated.delay(2_200),
+      Animated.timing(challengeSentOpacity, { toValue: 0, duration: 350, useNativeDriver: true }),
+    ]);
+    animation.start(({ finished }) => { if (finished) setChallengeSentNotice(null); });
+    return () => animation.stop();
+  }, [challengeSentNotice?.id, challengeSentOpacity]);
 
   if (!localeReady || !uiImagesReady) {
     return (
@@ -827,7 +843,7 @@ export default function App() {
             />
           )}
           {nav === "rules" && <RulesScreen onBack={() => setNav("home")} />}
-          {nav === "friends" && deviceId ? <FriendsScreen playerId={deviceId} onStarsChange={setStars} onBack={() => setNav("home")} /> : null}
+          {nav === "friends" && deviceId ? <FriendsScreen playerId={deviceId} onStarsChange={setStars} onChallengeSent={(playerName) => setChallengeSentNotice({ id: Date.now(), playerName })} onBack={() => setNav("home")} /> : null}
           {nav === "profile" && (
             <ProfileScreen
               displayName={defaultPlayerName}
@@ -860,8 +876,14 @@ export default function App() {
           <Text style={styles.challengePopupMode}>{i18n.t("friends.challengeMode")}</Text>
           <View style={styles.challengePopupActions}>
             <Pressable onPress={() => { const challenge = incomingChallenge; setIncomingChallenge(null); void respondChallenge(deviceId, challenge.id, "decline").catch(() => undefined); }} style={[styles.challengePopupButton, styles.challengeDecline]}><Text style={styles.challengePopupButtonText}>{i18n.t("friends.decline")}</Text></Pressable>
-            <Pressable onPress={() => { const challenge = incomingChallenge; setIncomingChallenge(null); void respondChallenge(deviceId, challenge.id, "accept").catch((error) => Alert.alert(i18n.t("friends.challengeFailed"), error instanceof Error ? error.message : i18n.t("feedback.tryAgain"))); }} style={styles.challengePopupButton}><Text style={styles.challengePopupButtonText}>{i18n.t("friends.accept")}</Text></Pressable>
+            <Pressable onPress={() => { const challenge = incomingChallenge; setIncomingChallenge(null); void (async () => { try { await respondChallenge(deviceId, challenge.id, "accept"); await enterChallengeLobby({ ...challenge, status: "accepted" }); } catch (error) { Alert.alert(i18n.t("friends.challengeFailed"), error instanceof Error ? error.message : i18n.t("feedback.tryAgain")); } })(); }} style={styles.challengePopupButton}><Text style={styles.challengePopupButtonText}>{i18n.t("friends.accept")}</Text></Pressable>
           </View>
+        </Animated.View>
+      ) : null}
+      {challengeSentNotice && !incomingChallenge ? (
+        <Animated.View pointerEvents="none" style={[styles.challengePopup, { opacity: challengeSentOpacity }]}>
+          <Text style={styles.challengePopupTitle}>{i18n.t("friends.challengeSent", { player: challengeSentNotice.playerName })}</Text>
+          <Text style={styles.challengePopupMode}>{i18n.t("friends.challengeMode")}</Text>
         </Animated.View>
       ) : null}
       <View

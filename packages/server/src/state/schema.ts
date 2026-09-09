@@ -67,6 +67,7 @@ export class RoomStateSchema extends Schema {
   @type("string") phase: RoundPhase = "lobby";
   @type("string") hostId: string = "";
   @type("boolean") isPublic: boolean = false;
+  @type("boolean") isChallenge: boolean = false;
   @type("number") damageWager: number = 0;
   @type("number") damagePot: number = 0;
   @type("number") pendingDamageBonus: number = 0;

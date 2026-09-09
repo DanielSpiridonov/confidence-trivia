@@ -199,6 +199,16 @@ export async function isAcceptedChallengeParticipant(challengeId: string, player
   return Boolean(challenge);
 }
 
+export async function getAcceptedChallengeParticipantRole(challengeId: string, playerId: string): Promise<"challenger" | "challenged" | null> {
+  if (!sql) return null;
+  const [challenge] = await sql<{ challenger_id: string; challenged_id: string }[]>`
+    select challenger_id, challenged_id from public.player_challenges
+    where id = ${challengeId} and status = 'accepted' and ${playerId} in (challenger_id, challenged_id)
+  `;
+  if (!challenge) return null;
+  return challenge.challenger_id === playerId ? "challenger" : "challenged";
+}
+
 export async function listFriends(playerId: string): Promise<FriendsResponse | null> {
   if (!sql) return null;
   try {

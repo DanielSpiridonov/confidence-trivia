@@ -44,6 +44,7 @@ class GameRoom extends colyseus_1.Room {
         // Stable installation identifiers stay server-only. Connection-scoped
         // session IDs remain the room keys and public gameplay identifiers.
         this.deviceIds = new Map();
+        this.challengeRoles = new Map();
         this.matchId = (0, crypto_1.randomUUID)();
         this.gameStartedAt = new Date();
         this.resultsPersisted = false;
@@ -70,6 +71,7 @@ class GameRoom extends colyseus_1.Room {
         }
         this.setState(new schema_1.RoomStateSchema());
         this.challengeId = typeof options.challengeId === "string" && DEVICE_ID_PATTERN.test(options.challengeId) ? options.challengeId : "";
+        this.state.isChallenge = Boolean(this.challengeId);
         this.state.code = this.roomId;
         this.state.gameMode = options.gameMode === "damage"
             ? "damage"
@@ -107,7 +109,7 @@ class GameRoom extends colyseus_1.Room {
         this.onMessage("submitSideBet", (client, msg) => this.handleSubmitSideBet(client, msg));
         this.onMessage("skipSideBet", (client) => this.handleSkipSideBet(client));
     }
-    async onAuth(_client, options = {}) {
+    async onAuth(client, options = {}) {
         // Reconnecting players use Colyseus' reconnection flow and do not pass
         // through this admission path. New players may only enter the lobby.
         const basicAdmissionAllowed = !this.state.gameStarted
@@ -118,7 +120,13 @@ class GameRoom extends colyseus_1.Room {
             return false;
         if (this.challengeId) {
             const identity = await (0, auth_1.verifySupabaseIdentity)(options.accessToken ? `Bearer ${options.accessToken}` : undefined);
-            return Boolean(identity && await (0, database_1.isAuthenticatedPlayer)(options.deviceId, identity.userId) && await (0, database_1.isAcceptedChallengeParticipant)(this.challengeId, options.deviceId));
+            if (!identity || !await (0, database_1.isAuthenticatedPlayer)(options.deviceId, identity.userId))
+                return false;
+            const role = await (0, database_1.getAcceptedChallengeParticipantRole)(this.challengeId, options.deviceId);
+            if (!role)
+                return false;
+            this.challengeRoles.set(client.sessionId, role);
+            return true;
         }
         if (this.state.gameMode !== "ranked")
             return true;
@@ -133,11 +141,15 @@ class GameRoom extends colyseus_1.Room {
         player.name = isValidPlayerName(options.name) ? options.name.trim() : "Player";
         this.deviceIds.set(client.sessionId, options.deviceId ?? "");
         const deviceId = options.deviceId ?? "";
-        player.isHost = this.state.players.size === 0;
+        const challengeRole = this.challengeRoles.get(client.sessionId) ?? null;
+        player.isHost = this.challengeId ? challengeRole === "challenger" : this.state.players.size === 0;
         player.health = 15;
-        if (player.isHost)
+        if (player.isHost) {
+            this.state.players.forEach((existingPlayer) => { existingPlayer.isHost = false; });
             this.state.hostId = player.id;
+        }
         this.state.players.set(client.sessionId, player);
+        this.challengeRoles.delete(client.sessionId);
         const [stars, customization] = await Promise.all([
             (0, database_1.upsertPlayer)(deviceId, player.name),
             (0, database_1.getPlayerCustomization)(deviceId),
@@ -154,7 +166,7 @@ class GameRoom extends colyseus_1.Room {
             await this.lock();
             this.beginGame();
         }
-        if (this.state.gameMode === "damage" && this.state.players.size === 2 && !this.state.gameStarted) {
+        if (this.state.gameMode === "damage" && !this.state.isChallenge && this.state.players.size === 2 && !this.state.gameStarted) {
             const host = this.clients.find((roomClient) => roomClient.sessionId === this.state.hostId);
             if (host)
                 await this.handleStartGame(host);
