@@ -3,7 +3,7 @@ import express from "express";
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { GameRoom } from "./rooms/GameRoom";
-import { claimAllFriendGifts, claimDailyReward, claimFriendGift, createPlayerChallenge, equipFreeAvatar, equipFreeFrame, equipFreeNameColor, getAccountProfile, getDailyRewardStatus, getDatabaseStatus, getPlayerChallenges, getPlayerCustomization, getPlayerStars, getRankedLeaderboard, isAuthenticatedPlayer, linkPlayerAccount, listFriends, respondToFriendRequest, respondToPlayerChallenge, searchFriendPlayers, sendFriendGift, sendFriendRequest, suggestFriendPlayers, updateAccountDisplayName, updateFriendRelationship, updatePlayerPresence } from "./database";
+import { claimAllFriendGifts, claimDailyReward, claimFriendGift, createPlayerChallenge, equipFreeAvatar, equipFreeFrame, equipFreeNameColor, getAccountProfile, getDailyRewardStatus, getDatabaseStatus, getNewsPosts, getPlayerChallenges, getPlayerCustomization, getPlayerStars, getRankedLeaderboard, isAuthenticatedPlayer, linkPlayerAccount, listFriends, redeemPromoCode, respondToFriendRequest, respondToPlayerChallenge, searchFriendPlayers, sendFriendGift, sendFriendRequest, suggestFriendPlayers, updateAccountDisplayName, updateFriendRelationship, updatePlayerPresence } from "./database";
 import { verifySupabaseIdentity } from "./auth";
 import { isDamageWager } from "@confidence-trivia/shared";
 
@@ -14,6 +14,22 @@ app.use(express.json());
 app.get("/health", async (_req, res) => {
   const database = await getDatabaseStatus();
   res.json({ ok: true, database });
+});
+
+app.get("/news", async (req, res) => {
+  const locale = req.query.locale === "bg" ? "bg" : "en";
+  const posts = await getNewsPosts(locale);
+  if (!posts) { res.status(503).json({ error: "News is temporarily unavailable" }); return; }
+  res.json(posts);
+});
+
+app.post("/promo-codes/redeem", async (req, res) => {
+  const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
+  const code = typeof req.body?.code === "string" ? req.body.code : "";
+  if (!isDeviceId(playerId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) { res.status(403).json({ error: "Sign in to redeem codes" }); return; }
+  const result = await redeemPromoCode(playerId, code);
+  if (!result.ok) { res.status(409).json({ error: result.error }); return; }
+  res.json(result);
 });
 
 app.post("/accounts/link", async (req, res) => {

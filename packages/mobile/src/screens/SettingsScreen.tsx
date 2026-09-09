@@ -1,9 +1,10 @@
 import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { ANDROID_COMPACT_MENU_UI_SCALE, BackIconButton, Screen, Title, BigButton, theme } from "../components/ui";
+import { redeemPromoCode } from "../network/client";
 
-type SettingsSection = "sounds" | "haptics" | "language" | "accessibility";
+type SettingsSection = "sounds" | "haptics" | "language" | "accessibility" | "redeem";
 
 function SettingsToggle({ label, value, onChange }: { label: string; value: boolean; onChange: (value: boolean) => void }) {
   return (
@@ -102,6 +103,9 @@ export function SettingsScreen({
   onChangeMusicVolume,
   onChangeHapticsEnabled,
   onChangeHighContrastEnabled,
+  playerId,
+  registered,
+  onStarsChange,
   onBack,
 }: {
   locale: "en" | "bg";
@@ -114,10 +118,27 @@ export function SettingsScreen({
   onChangeMusicVolume: (volume: number) => void;
   onChangeHapticsEnabled: (enabled: boolean) => void;
   onChangeHighContrastEnabled: (enabled: boolean) => void;
+  playerId: string | null;
+  registered: boolean;
+  onStarsChange: (stars: number) => void;
   onBack: () => void;
 }) {
   const { t } = useTranslation();
   const [section, setSection] = React.useState<SettingsSection>("sounds");
+  const [code, setCode] = React.useState("");
+  const [redeeming, setRedeeming] = React.useState(false);
+  const [redeemMessage, setRedeemMessage] = React.useState<{ ok: boolean; text: string } | null>(null);
+
+  async function handleRedeem() {
+    if (!playerId || !registered || !code.trim() || redeeming) return;
+    setRedeeming(true); setRedeemMessage(null);
+    try {
+      const result = await redeemPromoCode(playerId, code);
+      onStarsChange(result.stars); setCode("");
+      setRedeemMessage({ ok: true, text: t("settings.redeemSuccess", { count: result.reward }) });
+    } catch (error) { setRedeemMessage({ ok: false, text: error instanceof Error ? error.message : t("feedback.tryAgain") }); }
+    finally { setRedeeming(false); }
+  }
 
   function renderPanel() {
     switch (section) {
@@ -139,6 +160,8 @@ export function SettingsScreen({
         );
       case "accessibility":
         return <View style={styles.panelContent}><SettingsToggle label={t("settings.highContrast")} value={highContrastEnabled} onChange={onChangeHighContrastEnabled} /></View>;
+      case "redeem":
+        return <View style={styles.panelContent}>{registered ? <><Text style={styles.redeemHint}>{t("settings.redeemHint")}</Text><View style={styles.redeemRow}><TextInput value={code} onChangeText={(value) => { setCode(value.toUpperCase()); setRedeemMessage(null); }} onSubmitEditing={() => void handleRedeem()} autoCapitalize="characters" autoCorrect={false} maxLength={32} placeholder={t("settings.redeemPlaceholder")} placeholderTextColor={theme.textDim} style={styles.codeInput} /><Pressable disabled={!code.trim() || redeeming} onPress={() => void handleRedeem()} style={[styles.redeemButton, (!code.trim() || redeeming) && styles.disabled]}>{redeeming ? <ActivityIndicator color="#FFF" size="small" /> : <Text style={styles.redeemButtonText}>{t("settings.redeemAction")}</Text>}</Pressable></View>{redeemMessage ? <Text style={[styles.redeemMessage, redeemMessage.ok ? styles.redeemSuccess : styles.redeemError]}>{redeemMessage.text}</Text> : null}</> : <Text style={styles.redeemHint}>{t("settings.redeemSignIn")}</Text>}</View>;
     }
   }
 
@@ -148,7 +171,7 @@ export function SettingsScreen({
       <Title>{t("settings.title")}</Title>
       <View style={styles.settingsLayout}>
         <View style={styles.sidebar}>
-          {(["sounds", "haptics", "language", "accessibility"] as const).map((value) => (
+          {(["sounds", "haptics", "language", "accessibility", "redeem"] as const).map((value) => (
             <Pressable
               key={value}
               onPress={() => setSection(value)}
@@ -218,4 +241,10 @@ const styles = StyleSheet.create({
     borderColor: theme.primary,
   },
   volumeHint: { color: theme.textDim, fontSize: 11, marginTop: 7 },
+  redeemHint: { color: theme.textDim, fontSize: 12, fontWeight: "700", marginBottom: 10 },
+  redeemRow: { width: "100%", flexDirection: "row", gap: 8 },
+  codeInput: { flex: 1, height: 46, paddingHorizontal: 14, borderRadius: 10, color: theme.text, fontSize: 15, fontWeight: "900", letterSpacing: 1, backgroundColor: theme.surface, borderWidth: 1, borderColor: "rgba(185,176,214,0.3)" },
+  redeemButton: { minWidth: 112, height: 46, paddingHorizontal: 14, borderRadius: 10, alignItems: "center", justifyContent: "center", backgroundColor: theme.primary },
+  redeemButtonText: { color: "#FFF", fontSize: 12, fontWeight: "900" }, disabled: { opacity: 0.45 },
+  redeemMessage: { marginTop: 10, fontSize: 12, fontWeight: "800" }, redeemSuccess: { color: "#79E6A5" }, redeemError: { color: "#FF8F9C" },
 });

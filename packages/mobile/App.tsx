@@ -25,13 +25,14 @@ import { ShopScreen } from "./src/screens/ShopScreen";
 import { ProfileScreen } from "./src/screens/ProfileScreen";
 import { RulesScreen } from "./src/screens/RulesScreen";
 import { FriendsScreen } from "./src/screens/FriendsScreen";
+import { NewsScreen } from "./src/screens/NewsScreen";
 import { AccountProfile, claimDailyReward, createRoom, DailyRewardStatus, getAccountProfile, getChallenges, getDailyRewardStatus, getPlayerStars, joinPublicRoom, joinRoom, linkPlayerAccount, PlayerChallenge, reconnectRoom, respondChallenge, updateAccountName, updatePresence, useRoomState } from "./src/network/client";
 import { prepareSoundEffects, setSoundEffectsVolume, stopAllSoundEffects } from "./src/audio/sounds";
 import { pauseMusicForBackground, prepareMusic, setMusicVolume as applyMusicVolume, startMenuMusic, stopMenuMusic } from "./src/audio/music";
 import { createFreshGuestIdentity, getOrCreateDeviceId, getOrCreateGuestName } from "./src/utils/deviceId";
 import { authConfigured, getStoredSession, signInWithSocialProvider, signOutAccount, subscribeToAuthChanges } from "./src/auth/supabase";
 
-type Nav = "home" | "create" | "join" | "ranked" | "shop" | "settings" | "profile" | "friends" | "rules" | "in-room";
+type Nav = "home" | "create" | "join" | "ranked" | "shop" | "settings" | "profile" | "friends" | "rules" | "news" | "in-room";
 type RoomRecoveryState = "reconnecting" | "failed";
 const LANGUAGE_STORAGE_KEY = "confidence-trivia:locale";
 const SFX_VOLUME_STORAGE_KEY = "confidence-trivia:sfx-volume";
@@ -786,6 +787,7 @@ export default function App() {
           onJoin={() => setNav("join")}
           onProfile={() => setNav("profile")}
           onFriends={() => openRegisteredFeature("friends", () => setNav("friends"))}
+          onNews={() => setNav("news")}
           onInventory={() => openRegisteredFeature("shop", () => openShop("inventory"))}
           deviceId={deviceId}
           onRanked={() => openRegisteredFeature("ranked", () => setNav("ranked"))}
@@ -839,10 +841,14 @@ export default function App() {
               onChangeMusicVolume={handleMusicVolume}
               onChangeHapticsEnabled={handleHapticsEnabled}
               onChangeHighContrastEnabled={handleHighContrastEnabled}
+              playerId={deviceId}
+              registered={Boolean(registeredAccount)}
+              onStarsChange={setStars}
               onBack={() => setNav("home")}
             />
           )}
           {nav === "rules" && <RulesScreen onBack={() => setNav("home")} />}
+          {nav === "news" && <NewsScreen onBack={() => setNav("home")} />}
           {nav === "friends" && deviceId ? <FriendsScreen playerId={deviceId} stars={stars} onStarsChange={setStars} onChallengeSent={(playerName, damageWager) => setChallengeSentNotice({ id: Date.now(), playerName, damageWager })} onBack={() => setNav("home")} /> : null}
           {nav === "profile" && (
             <ProfileScreen

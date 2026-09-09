@@ -354,6 +354,12 @@
     "haptics": "Haptics",
     "language": "Language",
     "accessibility": "Accessibility",
+    "redeem": "Redeem Code",
+    "redeemHint": "Enter an event or promotional code to claim its reward.",
+    "redeemPlaceholder": "ENTER CODE",
+    "redeemAction": "Redeem",
+    "redeemSignIn": "Sign in to redeem promotional codes.",
+    "redeemSuccess": "+{{count}} stars claimed!",
     "defaultName": "Default player name",
     "hapticsEnabled": "Haptic feedback",
     "highContrast": "High contrast",
@@ -362,6 +368,12 @@
     "soundEffects": "Sound Effects",
     "music": "Music",
     "musicComingSoon": "Ready for future music"
+  },
+  "news": {
+    "title": "News",
+    "shortTitle": "News",
+    "empty": "There are no updates yet.",
+    "retry": "Try Again"
   },
   "common": {
     "close": "Close",

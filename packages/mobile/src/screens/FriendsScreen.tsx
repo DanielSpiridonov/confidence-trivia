@@ -23,6 +23,7 @@ export function FriendsScreen({ playerId, stars, onStarsChange, onChallengeSent,
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
   const [challengeTarget, setChallengeTarget] = React.useState<FriendSummary | null>(null);
   const [challengeWager, setChallengeWager] = React.useState<number>(DEFAULT_DAMAGE_WAGER);
+  const [challengeError, setChallengeError] = React.useState<string | null>(null);
 
   const showError = React.useCallback((error: unknown) => Alert.alert(t("feedback.actionFailed"), error instanceof Error ? error.message : t("feedback.tryAgain")), [t]);
   const refresh = React.useCallback(async () => {
@@ -67,6 +68,23 @@ export function FriendsScreen({ playerId, stars, onStarsChange, onChallengeSent,
     finally { setSearching(false); }
   }
 
+  async function sendSelectedChallenge() {
+    const target = challengeTarget;
+    if (!target || busyId) return;
+    setBusyId(target.friendshipId);
+    setChallengeError(null);
+    try {
+      await challengeFriend(playerId, target.playerId, challengeWager);
+      onChallengeSent(target.displayName, challengeWager);
+      setChallengeTarget(null);
+      setExpandedId(null);
+    } catch (error) {
+      setChallengeError(error instanceof Error ? error.message : t("feedback.tryAgain"));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   function confirmAction(message: string, action: () => void) {
     Alert.alert(t("friends.confirmTitle"), message, [{ text: t("validation.cancel"), style: "cancel" }, { text: t("friends.confirm"), style: "destructive", onPress: action }]);
   }
@@ -98,7 +116,7 @@ export function FriendsScreen({ playerId, stars, onStarsChange, onChallengeSent,
         <View style={styles.listPanel}>
           {loading ? <ActivityIndicator color={theme.primary} style={styles.loader} /> : null}
           {!loading && tab === "friends" ? <ScrollView style={styles.friendListScroll} contentContainerStyle={styles.listContent}>
-            {data?.friends.map((friend) => <FriendRow key={friend.friendshipId} item={friend} expanded={expandedId === friend.friendshipId} busy={busyId === friend.friendshipId} onToggle={() => setExpandedId((current) => current === friend.friendshipId ? null : friend.friendshipId)} onBless={() => void runAction(friend.friendshipId, () => sendFriendGift(playerId, friend.friendshipId))} onClaim={() => void runAction(friend.friendshipId, async () => { const claimed = await claimFriendGift(playerId, friend.giftId!); onStarsChange(claimed.stars); })} onChallenge={() => { setChallengeWager(DEFAULT_DAMAGE_WAGER); setChallengeTarget(friend); }} onRemove={() => confirmAction(t("friends.removeConfirm", { name: friend.displayName }), () => void runAction(friend.friendshipId, () => updateFriendship(playerId, friend.friendshipId, "remove")))} onBlock={() => confirmAction(t("friends.blockConfirm", { name: friend.displayName }), () => void runAction(friend.friendshipId, () => updateFriendship(playerId, friend.friendshipId, "block")))} />)}
+            {data?.friends.map((friend) => <FriendRow key={friend.friendshipId} item={friend} expanded={expandedId === friend.friendshipId} busy={busyId === friend.friendshipId} onToggle={() => setExpandedId((current) => current === friend.friendshipId ? null : friend.friendshipId)} onBless={() => void runAction(friend.friendshipId, () => sendFriendGift(playerId, friend.friendshipId))} onClaim={() => void runAction(friend.friendshipId, async () => { const claimed = await claimFriendGift(playerId, friend.giftId!); onStarsChange(claimed.stars); })} onChallenge={() => { setChallengeWager(DEFAULT_DAMAGE_WAGER); setChallengeError(null); setChallengeTarget(friend); }} onRemove={() => confirmAction(t("friends.removeConfirm", { name: friend.displayName }), () => void runAction(friend.friendshipId, () => updateFriendship(playerId, friend.friendshipId, "remove")))} onBlock={() => confirmAction(t("friends.blockConfirm", { name: friend.displayName }), () => void runAction(friend.friendshipId, () => updateFriendship(playerId, friend.friendshipId, "block")))} />)}
             {data?.friends.length === 0 ? <Empty text={t("friends.noFriends")} /> : null}
           </ScrollView> : null}
           {!loading && tab === "requests" ? <ScrollView contentContainerStyle={styles.listContent}>
@@ -116,16 +134,17 @@ export function FriendsScreen({ playerId, stars, onStarsChange, onChallengeSent,
           </Pressable>
         </View>
       </View>
-      <Modal transparent visible={Boolean(challengeTarget)} animationType="fade" onRequestClose={() => setChallengeTarget(null)}>
+      <Modal transparent visible={Boolean(challengeTarget)} animationType="fade" supportedOrientations={["landscape", "landscape-left", "landscape-right"]} onRequestClose={() => setChallengeTarget(null)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.wagerModal}>
             <Text style={styles.wagerTitle}>{t("friends.challengeWagerTitle")}</Text>
             <Text style={styles.wagerSubtitle}>{t("friends.challengeWagerFor", { player: challengeTarget?.displayName })}</Text>
-            <View style={styles.wagerGrid}>{DAMAGE_WAGER_OPTIONS.map((value) => <Pressable key={value} onPress={() => { if (value > stars) { Alert.alert(t("shop.notEnoughStars")); return; } setChallengeWager(value); }} style={[styles.wagerChip, challengeWager === value && styles.wagerChipSelected, value > stars && styles.wagerChipDisabled]}><Text style={[styles.wagerChipText, challengeWager === value && styles.wagerChipTextSelected]}>★ {value}</Text></Pressable>)}</View>
+            <View style={styles.wagerGrid}>{DAMAGE_WAGER_OPTIONS.map((value) => <Pressable key={value} onPress={() => { if (value > stars) { setChallengeError(t("shop.notEnoughStars")); return; } setChallengeError(null); setChallengeWager(value); }} style={[styles.wagerChip, challengeWager === value && styles.wagerChipSelected, value > stars && styles.wagerChipDisabled]}><Text style={[styles.wagerChipText, challengeWager === value && styles.wagerChipTextSelected]}>★ {value}</Text></Pressable>)}</View>
             <Text style={styles.wagerPot}>{t("friends.challengePot", { count: challengeWager * 2 })}</Text>
+            {challengeError ? <Text style={styles.wagerError}>{challengeError}</Text> : null}
             <View style={styles.wagerActions}>
-              <SmallButton label={t("validation.cancel")} onPress={() => setChallengeTarget(null)} muted />
-              <SmallButton label={t("friends.sendChallenge")} disabled={busyId === challengeTarget?.friendshipId || challengeWager > stars} onPress={() => { const target = challengeTarget; if (!target) return; void runAction(target.friendshipId, async () => { await challengeFriend(playerId, target.playerId, challengeWager); onChallengeSent(target.displayName, challengeWager); setChallengeTarget(null); }); }} />
+              <SmallButton label={t("validation.cancel")} onPress={() => { setChallengeError(null); setChallengeTarget(null); }} muted />
+              <SmallButton label={t("friends.sendChallenge")} disabled={busyId === challengeTarget?.friendshipId || challengeWager > stars} onPress={() => void sendSelectedChallenge()} />
             </View>
           </View>
         </View>
@@ -178,5 +197,6 @@ const styles = StyleSheet.create({
   wagerChipText: { color: theme.textDim, fontSize: 12, fontWeight: "900" },
   wagerChipTextSelected: { color: "#FFF" },
   wagerPot: { color: "#FFD75E", fontSize: 13, fontWeight: "900", marginTop: 14 },
+  wagerError: { color: "#FF8F9C", fontSize: 11, fontWeight: "800", marginTop: 8, textAlign: "center" },
   wagerActions: { width: "100%", flexDirection: "row", justifyContent: "center", gap: 12, marginTop: 16 },
 });

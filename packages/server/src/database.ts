@@ -29,6 +29,45 @@ const sql = databaseUrl
 
 export type DatabaseStatus = "connected" | "not_configured" | "unavailable";
 
+export interface NewsPost { id: string; title: string; body: string; publishedAt: string; }
+export type RedeemCodeResult = { ok: true; stars: number; reward: number } | { ok: false; error: string };
+
+export async function getNewsPosts(locale: "en" | "bg"): Promise<NewsPost[] | null> {
+  if (!sql) return null;
+  try {
+    const rows = await sql<{ id: string; title: string; body: string; published_at: Date }[]>`
+      select id, title, body, published_at from public.news_posts
+      where locale = ${locale} and active = true and published_at <= now()
+      order by published_at desc limit 30
+    `;
+    return rows.map((row) => ({ id: row.id, title: row.title, body: row.body, publishedAt: row.published_at.toISOString() }));
+  } catch (error) { console.error("Could not load news", error); return null; }
+}
+
+export async function redeemPromoCode(playerId: string, rawCode: string): Promise<RedeemCodeResult> {
+  if (!sql) return { ok: false, error: "Promo codes are temporarily unavailable" };
+  const code = rawCode.trim().toUpperCase();
+  if (!/^[A-Z0-9_-]{3,32}$/.test(code)) return { ok: false, error: "Invalid promo code" };
+  try {
+    return await sql.begin(async (transaction) => {
+      const [promo] = await transaction<{ id: string; star_reward: number; redemption_count: number; max_redemptions: number | null }[]>`
+        select id, star_reward, redemption_count, max_redemptions from public.promo_codes
+        where code = ${code} and active = true and (expires_at is null or expires_at > now()) for update
+      `;
+      if (!promo) return { ok: false, error: "This code is invalid or expired" } as RedeemCodeResult;
+      if (promo.max_redemptions !== null && promo.redemption_count >= promo.max_redemptions) return { ok: false, error: "This code has reached its redemption limit" } as RedeemCodeResult;
+      const [existing] = await transaction<{ promo_code_id: string }[]>`select promo_code_id from public.promo_code_redemptions where promo_code_id = ${promo.id} and player_id = ${playerId}`;
+      if (existing) return { ok: false, error: "You have already redeemed this code" } as RedeemCodeResult;
+      await transaction`insert into public.promo_code_redemptions (promo_code_id, player_id) values (${promo.id}, ${playerId})`;
+      await transaction`update public.promo_codes set redemption_count = redemption_count + 1 where id = ${promo.id}`;
+      const [player] = await transaction<{ stars: number }[]>`update public.players set stars = stars + ${promo.star_reward} where id = ${playerId} returning stars`;
+      if (!player) throw new Error("player_not_found");
+      await transaction`insert into public.star_transactions (id, player_id, amount, reason) values (${randomUUID()}, ${playerId}, ${promo.star_reward}, ${`promo_code:${promo.id}`})`;
+      return { ok: true, stars: player.stars, reward: promo.star_reward } as RedeemCodeResult;
+    });
+  } catch (error) { console.error("Could not redeem promo code", error); return { ok: false, error: "Could not redeem this code" }; }
+}
+
 export interface PlayerAccount {
   playerId: string;
   accountType: "guest" | "registered";

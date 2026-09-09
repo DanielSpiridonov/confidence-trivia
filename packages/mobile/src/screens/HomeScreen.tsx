@@ -65,6 +65,7 @@ export function HomeScreen({
   onJoin,
   onProfile,
   onFriends,
+  onNews,
   onInventory,
   deviceId,
   onRanked,
@@ -79,6 +80,7 @@ export function HomeScreen({
   onJoin: () => void;
   onProfile: () => void;
   onFriends: () => void;
+  onNews: () => void;
   onInventory: () => void;
   deviceId: string | null;
   onRanked: () => void;
@@ -191,6 +193,10 @@ export function HomeScreen({
           </View>
           <Text numberOfLines={1} style={styles.popupLabel}>{t("shop.shortTitle")}</Text>
         </Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel={t("news.title")} onPress={onNews} style={({ pressed }) => [styles.popup, styles.newsPopup, pressed && styles.popupPressed]}>
+          <View style={styles.newsIcon}><Text style={styles.newsIconMark}>!</Text></View>
+          <Text numberOfLines={1} style={styles.popupLabel}>{t("news.shortTitle")}</Text>
+        </Pressable>
       </View>
       <View style={styles.mainActionsBlock}>
         <Title>🔥 {t("home.title")}</Title>
@@ -277,6 +283,9 @@ const styles = StyleSheet.create({
   popupTextClaimed: { color: "rgba(255, 255, 255, 0.68)" },
   rankedTrophyImage: { position: "absolute", width: 55, height: 53, bottom: 9 },
   shopFeatureImage: { position: "absolute", width: 57, height: 57, bottom: 5 },
+  newsPopup: { height: 66, justifyContent: "center", gap: 2 },
+  newsIcon: { width: 38, height: 38, borderRadius: 10, alignItems: "center", justifyContent: "center", backgroundColor: "#7C5CFF", borderWidth: 2, borderColor: "#B9AAFF" },
+  newsIconMark: { color: "#FFF", fontSize: 26, lineHeight: 29, fontWeight: "900" },
   celebrationBackdrop: { ...StyleSheet.absoluteFillObject, zIndex: 30, alignItems: "center", justifyContent: "center" },
   celebrationPanel: { width: "78%", maxWidth: 620, minHeight: 204, borderRadius: 8, backgroundColor: "rgba(31, 26, 51, 0.98)", borderWidth: 1, borderColor: "rgba(181, 165, 255, 0.35)", paddingHorizontal: 28, paddingVertical: 18, alignItems: "center" },
   celebrationClose: { position: "absolute", top: 8, right: 10, zIndex: 2, width: 30, height: 30, alignItems: "center", justifyContent: "center" },

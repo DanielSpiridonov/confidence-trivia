@@ -18,6 +18,29 @@ app.get("/health", async (_req, res) => {
     const database = await (0, database_1.getDatabaseStatus)();
     res.json({ ok: true, database });
 });
+app.get("/news", async (req, res) => {
+    const locale = req.query.locale === "bg" ? "bg" : "en";
+    const posts = await (0, database_1.getNewsPosts)(locale);
+    if (!posts) {
+        res.status(503).json({ error: "News is temporarily unavailable" });
+        return;
+    }
+    res.json(posts);
+});
+app.post("/promo-codes/redeem", async (req, res) => {
+    const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
+    const code = typeof req.body?.code === "string" ? req.body.code : "";
+    if (!isDeviceId(playerId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
+        res.status(403).json({ error: "Sign in to redeem codes" });
+        return;
+    }
+    const result = await (0, database_1.redeemPromoCode)(playerId, code);
+    if (!result.ok) {
+        res.status(409).json({ error: result.error });
+        return;
+    }
+    res.json(result);
+});
 app.post("/accounts/link", async (req, res) => {
     const guestPlayerId = typeof req.body?.guestPlayerId === "string" ? req.body.guestPlayerId : "";
     const displayName = typeof req.body?.displayName === "string" ? req.body.displayName.trim().slice(0, 20) : "Guest";

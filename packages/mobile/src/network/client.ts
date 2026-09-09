@@ -28,6 +28,24 @@ async function accountRequest(path: string, options?: RequestInit): Promise<Acco
 export const getAccountProfile = (playerId: string) => accountRequest(`/accounts/me?playerId=${encodeURIComponent(playerId)}`);
 export const updateAccountName = (playerId: string, displayName: string) => accountRequest("/accounts/me/name", { method: "PATCH", body: JSON.stringify({ playerId, displayName }) });
 
+export interface NewsPost { id: string; title: string; body: string; publishedAt: string; }
+export async function getNews(locale: "en" | "bg"): Promise<NewsPost[]> {
+  const response = await fetch(`${HTTP_SERVER_URL}/news?locale=${locale}`);
+  const payload = await response.json().catch(() => null) as (NewsPost[] & { error?: string }) | null;
+  if (!response.ok) throw new Error(payload?.error ?? `Server returned ${response.status}`);
+  return Array.isArray(payload) ? payload : [];
+}
+
+export async function redeemPromoCode(playerId: string, code: string): Promise<{ stars: number; reward: number }> {
+  const accessToken = await getAccessToken();
+  if (!accessToken) throw new Error("Sign in to redeem codes");
+  const response = await fetch(`${HTTP_SERVER_URL}/promo-codes/redeem`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ playerId, code }) });
+  const payload = await response.json().catch(() => null) as { stars?: number; reward?: number; error?: string } | null;
+  if (!response.ok) throw new Error(payload?.error ?? `Server returned ${response.status}`);
+  if (typeof payload?.stars !== "number" || typeof payload.reward !== "number") throw new Error("Invalid reward response");
+  return { stars: payload.stars, reward: payload.reward };
+}
+
 export async function linkPlayerAccount(guestPlayerId: string, displayName: string, accessToken: string): Promise<PlayerAccount> {
   try {
     const response = await fetch(`${HTTP_SERVER_URL}/accounts/link`, {

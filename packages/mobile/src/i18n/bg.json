@@ -354,6 +354,12 @@
     "haptics": "Вибрации",
     "language": "Език",
     "accessibility": "Достъпност",
+    "redeem": "Използвай код",
+    "redeemHint": "Въведи код от събитие или промоция, за да получиш наградата.",
+    "redeemPlaceholder": "ВЪВЕДИ КОД",
+    "redeemAction": "Вземи",
+    "redeemSignIn": "Влез в профила си, за да използваш промо кодове.",
+    "redeemSuccess": "+{{count}} звезди получени!",
     "defaultName": "Име по подразбиране",
     "hapticsEnabled": "Вибрации",
     "highContrast": "Висок контраст",
@@ -362,6 +368,12 @@
     "soundEffects": "Звукови ефекти",
     "music": "Музика",
     "musicComingSoon": "Готово за бъдещата музика"
+  },
+  "news": {
+    "title": "Новини",
+    "shortTitle": "Новини",
+    "empty": "Все още няма новини.",
+    "retry": "Опитай пак"
   },
   "common": {
     "close": "Затвори",
