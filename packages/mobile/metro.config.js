@@ -10,12 +10,6 @@ const browserAliases = {
 };
 
 const config = getDefaultConfig(projectRoot);
-config.watchFolders = [workspaceRoot];
-config.resolver.nodeModulesPaths = [
-  path.resolve(projectRoot, "node_modules"),
-  path.resolve(workspaceRoot, "node_modules"),
-];
-config.resolver.disableHierarchicalLookup = true;
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   const alias = browserAliases[moduleName];
   return context.resolveRequest(context, alias ?? moduleName, platform);

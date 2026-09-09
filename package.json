@@ -12,6 +12,7 @@
     "dev:mobile": "npm run start --workspace=packages/mobile",
     "dev:mobile:tunnel": "npm run start:tunnel --workspace=packages/mobile",
     "dev:mobile:client": "npm run start:dev-client --workspace=packages/mobile",
+    "build:android:development": "npm run build:android:development --workspace=packages/mobile",
     "build:ios:device": "npm run build:ios:device --workspace=packages/mobile",
     "build:ios:development": "npm run build:ios:development --workspace=packages/mobile",
     "build:shared": "npm run build --workspace=packages/shared"
