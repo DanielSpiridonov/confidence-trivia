@@ -1,10 +1,12 @@
 import React from "react";
-import { Alert, FlatList, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { FlatList, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { ANDROID_MENU_UI_SCALE, BackIconButton, Screen, Title, theme } from "../components/ui";
 import { PointsIcon } from "../components/PointsIcon";
 import { FRAME_COSMETIC_COLORS, getCosmeticStarPrice, NAME_COLOR_COSMETICS } from "@confidence-trivia/shared";
 import { equipAvatar, equipFrame, equipNameColor, getPlayerCustomization } from "../network/client";
+import { FeedbackPopup, useFeedbackPopup } from "../components/FeedbackPopup";
+import { GameDialog, useGameDialog } from "../components/GameDialog";
 
 type ShopTab = "featured" | "avatars" | "frames" | "inventory" | "stars";
 
@@ -44,8 +46,8 @@ const COSMETICS: Record<Exclude<ShopTab, "stars" | "inventory">, CosmeticItem[]>
   ],
 };
 
-const STAR_PACKS: Array<{ stars: number; price: string; name: "handful" | "pouch" | "chest" | "vault" | "treasury"; bonus?: string }> = [
-  { stars: 100, price: "€0.99", name: "handful" },
+const STAR_PACKS: Array<{ stars: number; price?: string; name: "handful" | "pouch" | "chest" | "vault" | "treasury"; bonus?: string; rewardedAd?: boolean }> = [
+  { stars: 100, name: "handful", rewardedAd: true },
   { stars: 550, price: "€4.49", name: "pouch", bonus: "+10%" },
   { stars: 1200, price: "€8.99", name: "chest", bonus: "+20%" },
   { stars: 2600, price: "€17.99", name: "vault", bonus: "+30%" },
@@ -69,6 +71,8 @@ const customizationCache = new Map<string, { nameColorId: string; avatarId: stri
 
 export function ShopScreen({ deviceId, displayName, stars, onStarsChange, requestedTab = "featured", requestId = 0, onBack }: { deviceId: string; displayName: string; stars: number; onStarsChange: (stars: number) => void; requestedTab?: ShopTab; requestId?: number; onBack: () => void }) {
   const { t } = useTranslation();
+  const { notice, showFeedback, clearFeedback } = useFeedbackPopup();
+  const { dialog, showDialog, dismissDialog, confirmDialog } = useGameDialog();
   const cachedCustomization = customizationCache.get(deviceId);
   const [tab, setTab] = React.useState<ShopTab>("featured");
   const [equippedNameColorId, setEquippedNameColorId] = React.useState(cachedCustomization?.nameColorId ?? "name_white");
@@ -124,7 +128,7 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
     if (ownedCosmeticIds.has(cosmeticId)) return true;
     const price = getCosmeticStarPrice(cosmeticType, cosmeticId);
     if (typeof price === "number" && price > stars) {
-      Alert.alert(t("shop.notEnoughStars"));
+      showFeedback(t("shop.notEnoughStars"));
       return false;
     }
     return true;
@@ -135,15 +139,7 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
     const price = getCosmeticStarPrice(cosmeticType, cosmeticId);
     if (!price) return Promise.resolve(true);
     return new Promise<boolean>((resolve) => {
-      Alert.alert(
-        t("shop.confirmPurchaseTitle"),
-        t("shop.confirmPurchaseMessage", { item: itemName, price }),
-        [
-          { text: t("validation.cancel"), style: "cancel", onPress: () => resolve(false) },
-          { text: t("shop.buy"), onPress: () => resolve(true) },
-        ],
-        { cancelable: true, onDismiss: () => resolve(false) },
-      );
+      showDialog({ title: t("shop.confirmPurchaseTitle"), message: t("shop.confirmPurchaseMessage", { item: itemName, price }), cancelLabel: t("validation.cancel"), confirmLabel: t("shop.buy"), onConfirm: () => resolve(true), onCancel: () => resolve(false) });
     });
   }
 
@@ -188,7 +184,7 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
       rollbackOptimisticPurchase(cosmeticId, purchase.alreadyOwned, purchase.price);
       setEquippedNameColorId(previous);
       cacheCustomization(previous, equippedAvatarId, equippedFrameId);
-      Alert.alert(t("feedback.actionFailed"), t("feedback.tryAgain"));
+      showFeedback(t("feedback.actionFailed"), t("feedback.tryAgain"));
     }
   }
 
@@ -213,7 +209,7 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
       rollbackOptimisticPurchase(cosmeticId, purchase.alreadyOwned, purchase.price);
       setEquippedAvatarId(previous);
       cacheCustomization(equippedNameColorId, previous, equippedFrameId);
-      Alert.alert(t("feedback.actionFailed"), t("feedback.tryAgain"));
+      showFeedback(t("feedback.actionFailed"), t("feedback.tryAgain"));
     }
   }
 
@@ -238,7 +234,7 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
       rollbackOptimisticPurchase(cosmeticId, purchase.alreadyOwned, purchase.price);
       setEquippedFrameId(previous);
       cacheCustomization(equippedNameColorId, equippedAvatarId, previous);
-      Alert.alert(t("feedback.actionFailed"), t("feedback.tryAgain"));
+      showFeedback(t("feedback.actionFailed"), t("feedback.tryAgain"));
     }
   }
 
@@ -298,7 +294,7 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
                 {item.bonus ? <Text style={styles.packBonus}>{item.bonus}</Text> : null}
                 <Image source={STAR_PACK_IMAGES[item.name]} defaultSource={STAR_PACK_IMAGES[item.name]} fadeDuration={0} resizeMode="contain" style={[styles.packImage, { width: 79 + index * 4, height: 79 + index * 4 }]} />
                 <Text style={styles.packAmount}>{item.stars}</Text>
-                <Pressable disabled style={styles.buyButton}><Text style={styles.buyText}>{item.price}</Text></Pressable>
+                <Pressable disabled style={[styles.buyButton, item.rewardedAd && styles.watchAdButton]}><Text style={styles.buyText}>{item.rewardedAd ? t("shop.watchAd") : item.price}</Text></Pressable>
               </View>
             )} />
           </View>
@@ -357,6 +353,8 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
           )}
         </View>
       </View>
+      <FeedbackPopup notice={notice} onDismiss={clearFeedback} />
+      <GameDialog dialog={dialog} onCancel={dismissDialog} onConfirm={confirmDialog} />
     </Screen>
   );
 }
@@ -442,5 +440,6 @@ const styles = StyleSheet.create({
   packImage: { marginTop: 3, marginBottom: 2 },
   packAmount: { color: "#F7D85B", fontSize: 18, fontWeight: "900", marginTop: 1 },
   buyButton: { width: "100%", marginTop: 8, paddingVertical: 5, alignItems: "center", borderRadius: 7, backgroundColor: "rgba(124,92,255,0.7)" },
+  watchAdButton: { backgroundColor: "rgba(52,164,103,0.78)" },
   buyText: { color: theme.text, fontSize: 11, fontWeight: "900" },
 });

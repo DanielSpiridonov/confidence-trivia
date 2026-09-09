@@ -1,10 +1,12 @@
 import React from "react";
-import { ActivityIndicator, Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { DAMAGE_WAGER_OPTIONS, DEFAULT_DAMAGE_WAGER } from "@confidence-trivia/shared";
 import { ANDROID_MENU_UI_SCALE, BackIconButton, Screen, Title, theme } from "../components/ui";
 import { FriendSearchResult, FriendSummary, challengeFriend, claimAllFriendGifts, claimFriendGift, getFriendSuggestions, getFriends, requestFriend, respondFriendRequest, searchFriends, sendFriendGift, updateFriendship } from "../network/client";
 import { PointsIcon } from "../components/PointsIcon";
+import { FeedbackPopup, useFeedbackPopup } from "../components/FeedbackPopup";
+import { GameDialog, useGameDialog } from "../components/GameDialog";
 
 type FriendsTab = "friends" | "requests" | "blocked";
 const BLESSING_GIFT_IMAGE = require("../../assets/stars-gift.png");
@@ -24,8 +26,10 @@ export function FriendsScreen({ playerId, stars, onStarsChange, onChallengeSent,
   const [challengeTarget, setChallengeTarget] = React.useState<FriendSummary | null>(null);
   const [challengeWager, setChallengeWager] = React.useState<number>(DEFAULT_DAMAGE_WAGER);
   const [challengeError, setChallengeError] = React.useState<string | null>(null);
+  const { notice, showFeedback, clearFeedback } = useFeedbackPopup();
+  const { dialog, showDialog, dismissDialog, confirmDialog } = useGameDialog();
 
-  const showError = React.useCallback((error: unknown) => Alert.alert(t("feedback.actionFailed"), error instanceof Error ? error.message : t("feedback.tryAgain")), [t]);
+  const showError = React.useCallback((error: unknown) => showFeedback(t("feedback.actionFailed"), error instanceof Error ? error.message : t("feedback.tryAgain")), [showFeedback, t]);
   const refresh = React.useCallback(async () => {
     try {
       const [friends, suggested] = await Promise.all([getFriends(playerId), getFriendSuggestions(playerId)]);
@@ -61,7 +65,7 @@ export function FriendsScreen({ playerId, stars, onStarsChange, onChallengeSent,
 
   async function search() {
     const trimmed = query.trim();
-    if (trimmed.length < 2) { Alert.alert(t("friends.searchHint")); return; }
+    if (trimmed.length < 2) { showFeedback(t("friends.searchHint"), undefined, "info"); return; }
     setSearching(true);
     try { setResults(await searchFriends(playerId, trimmed)); }
     catch (error) { showError(error); }
@@ -86,7 +90,7 @@ export function FriendsScreen({ playerId, stars, onStarsChange, onChallengeSent,
   }
 
   function confirmAction(message: string, action: () => void) {
-    Alert.alert(t("friends.confirmTitle"), message, [{ text: t("validation.cancel"), style: "cancel" }, { text: t("friends.confirm"), style: "destructive", onPress: action }]);
+    showDialog({ title: t("friends.confirmTitle"), message, cancelLabel: t("validation.cancel"), confirmLabel: t("friends.confirm"), destructive: true, onConfirm: action });
   }
 
   const discoveryItems = results ?? suggestions;
@@ -149,6 +153,8 @@ export function FriendsScreen({ playerId, stars, onStarsChange, onChallengeSent,
           </View>
         </View>
       </Modal>
+      <FeedbackPopup notice={notice} onDismiss={clearFeedback} />
+      <GameDialog dialog={dialog} onCancel={dismissDialog} onConfirm={confirmDialog} />
     </Screen>
   );
 }

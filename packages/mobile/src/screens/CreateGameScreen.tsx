@@ -1,10 +1,12 @@
 import React, { useState } from "react";
-import { Alert, StyleSheet, Text, ScrollView, Pressable, View, Platform } from "react-native";
+import { StyleSheet, Text, ScrollView, Pressable, View, Platform } from "react-native";
 import { useTranslation } from "react-i18next";
 import { ANDROID_COMPACT_MENU_UI_SCALE, BackIconButton, Screen, Title, BigButton, theme } from "../components/ui";
 import { DAMAGE_WAGER_OPTIONS, DEFAULT_DAMAGE_WAGER, DEFAULT_ROUND_COUNT, getRankedDivision, RANKED_PLACEMENT_MATCHES } from "@confidence-trivia/shared";
 import { getRankedLeaderboard, RankedLeaderboardEntry } from "../network/client";
 import { RankIcon } from "../components/RankIcon";
+import { FeedbackPopup, useFeedbackPopup } from "../components/FeedbackPopup";
+import { GameDialog, useGameDialog } from "../components/GameDialog";
 
 const ROUND_OPTIONS = [3, 5, 7, 9, 11, 13, 15];
 const DEFAULT_ROUNDS = ROUND_OPTIONS.reduce((closest, value) => {
@@ -38,7 +40,8 @@ export function CreateGameScreen({
   const [rounds, setRounds] = useState(DEFAULT_ROUNDS);
   const [damageWager, setDamageWager] = useState<number>(DEFAULT_DAMAGE_WAGER);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { notice, showFeedback, clearFeedback } = useFeedbackPopup();
+  const { dialog, showDialog, dismissDialog, confirmDialog } = useGameDialog();
   const [rankedProfile, setRankedProfile] = useState<RankedLeaderboardEntry | null>(null);
   const [rankedLoading, setRankedLoading] = useState(false);
   const trimmedName = initialName.trim();
@@ -59,17 +62,16 @@ export function CreateGameScreen({
   async function handleSubmit() {
     if (submitting || !trimmedName) return;
     if (gameMode === "damage" && damageWager > stars) {
-      Alert.alert(t("shop.notEnoughStars"));
+      showFeedback(t("shop.notEnoughStars"));
       return;
     }
 
     try {
       setSubmitting(true);
-      setError(null);
       await onCreate(trimmedName, rounds, gameMode, visibility, damageWager);
     } catch (err) {
       const message = err instanceof Error ? err.message : t("network.unknownError");
-      setError(message);
+      showFeedback(t("feedback.actionFailed"), t("network.createFailed", { message }));
     } finally {
       setSubmitting(false);
     }
@@ -95,10 +97,7 @@ export function CreateGameScreen({
               <Pressable
                 onPress={() => {
                   if (!registered) {
-                    Alert.alert(t("account.signInRequired"), t("account.rankedRequiresAccount"), [
-                      { text: t("validation.cancel"), style: "cancel" },
-                      { text: t("account.signIn"), onPress: onSignInRequired },
-                    ]);
+                    showDialog({ title: t("account.signInRequired"), message: t("account.rankedRequiresAccount"), cancelLabel: t("validation.cancel"), confirmLabel: t("account.signIn"), onConfirm: onSignInRequired });
                     return;
                   }
                   setGameMode("ranked");
@@ -147,7 +146,7 @@ export function CreateGameScreen({
                   return (
                     <Pressable key={value} onPress={() => {
                       if (value > stars) {
-                        Alert.alert(t("shop.notEnoughStars"));
+                        showFeedback(t("shop.notEnoughStars"));
                         return;
                       }
                       setDamageWager(value);
@@ -198,7 +197,6 @@ export function CreateGameScreen({
           ) : null}
         </View>
         <View style={styles.actionsColumn}>
-          {error && <Text style={styles.error}>{t("network.createFailed", { message: error })}</Text>}
           <BigButton
             label={gameMode === "ranked" || gameMode === "damage" ? (submitting ? t("create.queueing") : t("create.queue")) : (submitting ? t("create.creating") : t("create.create"))}
             onPress={handleSubmit}
@@ -207,6 +205,8 @@ export function CreateGameScreen({
           />
         </View>
       </View>
+      <FeedbackPopup notice={notice} onDismiss={clearFeedback} />
+      <GameDialog dialog={dialog} onCancel={dismissDialog} onConfirm={confirmDialog} />
     </Screen>
   );
 }

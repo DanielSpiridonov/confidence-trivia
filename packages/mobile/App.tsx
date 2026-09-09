@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Alert, Animated, AppState, Image, Platform, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
+import { Animated, AppState, Image, Keyboard, Platform, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import * as NavigationBar from "expo-navigation-bar";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -9,6 +9,8 @@ import i18n from "./src/i18n";
 import { BigButton, GAME_BACKGROUND, theme } from "./src/components/ui";
 import { PointsIcon } from "./src/components/PointsIcon";
 import { RANK_IMAGE_SOURCES } from "./src/components/RankIcon";
+import { FeedbackPopup, useFeedbackPopup } from "./src/components/FeedbackPopup";
+import { GameDialog, useGameDialog } from "./src/components/GameDialog";
 
 import { HomeScreen } from "./src/screens/HomeScreen";
 import { CreateGameScreen } from "./src/screens/CreateGameScreen";
@@ -32,7 +34,7 @@ import { pauseMusicForBackground, prepareMusic, setMusicVolume as applyMusicVolu
 import { createFreshGuestIdentity, getOrCreateDeviceId, getOrCreateGuestName } from "./src/utils/deviceId";
 import { authConfigured, getStoredSession, signInWithSocialProvider, signOutAccount, subscribeToAuthChanges } from "./src/auth/supabase";
 
-type Nav = "home" | "create" | "join" | "ranked" | "shop" | "settings" | "profile" | "friends" | "rules" | "news" | "in-room";
+type Nav = "home" | "create" | "join" | "ranked" | "shop" | "settings" | "profile" | "friends" | "rules" | "in-room";
 type RoomRecoveryState = "reconnecting" | "failed";
 const LANGUAGE_STORAGE_KEY = "confidence-trivia:locale";
 const SFX_VOLUME_STORAGE_KEY = "confidence-trivia:sfx-volume";
@@ -217,7 +219,10 @@ function StarsBadge({ stars, gain, width, onPress }: { stars: number; gain: { id
 }
 
 export default function App() {
+  const { notice: appNotice, showFeedback, clearFeedback } = useFeedbackPopup();
+  const { dialog: appDialog, showDialog, dismissDialog, confirmDialog } = useGameDialog();
   const [nav, setNav] = useState<Nav>("home");
+  const [newsOpen, setNewsOpen] = useState(false);
   const [shopRequest, setShopRequest] = useState<{ tab: "featured" | "inventory" | "stars"; id: number }>({ tab: "featured", id: 0 });
   const [room, setRoom] = useState<Room | null>(null);
   const [locale, setLocale] = useState<"en" | "bg">("en");
@@ -254,12 +259,8 @@ export default function App() {
 
     const applyAndroidSystemBars = () => {
       void (async () => {
-        if (nav === "in-room") {
-          await NavigationBar.setBehaviorAsync("overlay-swipe");
-          await NavigationBar.setVisibilityAsync("hidden");
-        } else {
-          await NavigationBar.setVisibilityAsync("visible");
-        }
+        await NavigationBar.setBehaviorAsync("overlay-swipe");
+        await NavigationBar.setVisibilityAsync("hidden");
       })().catch(() => {
         // Some Android gesture-navigation modes do not expose bar visibility.
       });
@@ -269,14 +270,15 @@ export default function App() {
     const subscription = AppState.addEventListener("change", (state) => {
       if (state === "active") applyAndroidSystemBars();
     });
-    return () => subscription.remove();
+    const keyboardSubscription = Keyboard.addListener("keyboardDidHide", applyAndroidSystemBars);
+    return () => { subscription.remove(); keyboardSubscription.remove(); };
   }, [nav]);
 
   useEffect(() => subscribeToAuthChanges(() => {
     if (intentionalSignOutRef.current || !registeredAccount) return;
     void createFreshGuestIdentity().then((guest) => {
       setGuestPlayerId(guest.deviceId); setDeviceId(guest.deviceId); setDefaultPlayerName(guest.displayName); setRegisteredAccount(null); setStars(0);
-      Alert.alert(i18n.t("account.sessionExpired"), i18n.t("account.sessionExpiredMessage"));
+      showFeedback(i18n.t("account.sessionExpired"), i18n.t("account.sessionExpiredMessage"), "info");
     });
   }), [registeredAccount]);
 
@@ -380,7 +382,7 @@ export default function App() {
 
   async function handleSocialSignIn(provider: "google" | "apple") {
     if (!authConfigured) {
-      Alert.alert(i18n.t("account.configurationTitle"), i18n.t("account.configurationRequired"));
+      showFeedback(i18n.t("account.configurationTitle"), i18n.t("account.configurationRequired"));
       return;
     }
     if (!guestPlayerId || authBusy) return;
@@ -390,7 +392,7 @@ export default function App() {
       await applyAuthenticatedSession(guestPlayerId, session.access_token);
     } catch (error) {
       if (error instanceof Error && error.message === "auth_cancelled") return;
-      Alert.alert(i18n.t("account.signInFailed"), error instanceof Error ? error.message : i18n.t("network.unknownError"));
+      showFeedback(i18n.t("account.signInFailed"), error instanceof Error ? error.message : i18n.t("network.unknownError"));
     } finally {
       setAuthBusy(false);
     }
@@ -408,20 +410,18 @@ export default function App() {
       const profile = await updateAccountName(registeredAccount.playerId, displayName);
       setRegisteredAccount(profile); setDefaultPlayerName(profile.displayName);
       void AsyncStorage.setItem(PLAYER_NAME_STORAGE_KEY, profile.displayName);
-      Alert.alert(i18n.t("account.nameUpdated"));
+      showFeedback(i18n.t("account.nameUpdated"), undefined, "success");
     } catch (error) {
       setRegisteredAccount(previousAccount);
       setDefaultPlayerName(previousName);
       void AsyncStorage.setItem(PLAYER_NAME_STORAGE_KEY, previousName);
-      Alert.alert(i18n.t("account.nameUpdateFailed"), error instanceof Error ? error.message : i18n.t("network.unknownError"));
+      showFeedback(i18n.t("account.nameUpdateFailed"), error instanceof Error ? error.message : i18n.t("network.unknownError"));
     }
     finally { setAuthBusy(false); }
   }
 
   function handleSignOut() {
-    Alert.alert(i18n.t("account.signOut"), i18n.t("account.signOutConfirm"), [
-      { text: i18n.t("validation.cancel"), style: "cancel" },
-      { text: i18n.t("account.signOut"), style: "destructive", onPress: () => void (async () => {
+    showDialog({ title: i18n.t("account.signOut"), message: i18n.t("account.signOutConfirm"), cancelLabel: i18n.t("validation.cancel"), confirmLabel: i18n.t("account.signOut"), destructive: true, onConfirm: () => void (async () => {
         setAuthBusy(true);
         try {
           intentionalSignOutRef.current = true;
@@ -429,8 +429,7 @@ export default function App() {
           const guest = await createFreshGuestIdentity();
           setGuestPlayerId(guest.deviceId); setDeviceId(guest.deviceId); setDefaultPlayerName(guest.displayName); setRegisteredAccount(null); setStars(0);
         } finally { intentionalSignOutRef.current = false; setAuthBusy(false); }
-      })() },
-    ]);
+      })() });
   }
 
   function openRegisteredFeature(destination: "shop" | "ranked" | "friends", open: () => void) {
@@ -438,10 +437,7 @@ export default function App() {
       open();
       return;
     }
-    Alert.alert(i18n.t("account.signInRequired"), i18n.t(`account.${destination}RequiresAccount`), [
-      { text: i18n.t("validation.cancel"), style: "cancel" },
-      { text: i18n.t("account.signIn"), onPress: () => setNav("profile") },
-    ]);
+    showDialog({ title: i18n.t("account.signInRequired"), message: i18n.t(`account.${destination}RequiresAccount`), cancelLabel: i18n.t("validation.cancel"), confirmLabel: i18n.t("account.signIn"), onConfirm: () => setNav("profile") });
   }
 
   async function handleCreate(name: string, rounds: number, gameMode: "classic" | "ranked" | "damage", visibility: "private" | "public", damageWager: number) {
@@ -549,7 +545,7 @@ export default function App() {
       if (!status) {
         setDailyReward(previousReward);
         setStars(previousStars);
-        Alert.alert(i18n.t("feedback.actionFailed"), i18n.t("feedback.tryAgain"));
+        showFeedback(i18n.t("feedback.actionFailed"), i18n.t("feedback.tryAgain"));
         return;
       }
       setDailyReward(status);
@@ -557,7 +553,7 @@ export default function App() {
     } catch (error) {
       setDailyReward(previousReward);
       setStars(previousStars);
-      Alert.alert(i18n.t("feedback.actionFailed"), error instanceof Error ? error.message : i18n.t("feedback.tryAgain"));
+      showFeedback(i18n.t("feedback.actionFailed"), error instanceof Error ? error.message : i18n.t("feedback.tryAgain"));
     } finally {
       setDailyRewardClaiming(false);
     }
@@ -713,7 +709,7 @@ export default function App() {
       setIncomingChallenge(null);
       setNav("in-room");
     } catch (error) {
-      Alert.alert(i18n.t("friends.challengeFailed"), error instanceof Error ? error.message : i18n.t("feedback.tryAgain"));
+      showFeedback(i18n.t("friends.challengeFailed"), error instanceof Error ? error.message : i18n.t("feedback.tryAgain"));
     } finally {
       joiningChallengeId.current = null;
     }
@@ -767,19 +763,12 @@ export default function App() {
     <AppFrame highContrast={highContrastEnabled}>
       <AssetPreloader sources={UI_PRELOAD_IMAGES} />
       <AssetPreloader sources={COMBAT_PRELOAD_IMAGES} />
-      <StatusBar style="light" hidden={Platform.OS === "android" && nav === "in-room"} animated />
+      <StatusBar style="light" hidden={Platform.OS === "android"} animated />
       <View pointerEvents={nav === "home" ? "auto" : "none"} style={[styles.persistentScreen, nav !== "home" && styles.persistentScreenHidden]}>
         <HomeScreen
           onCreate={() => {
             if (!defaultPlayerName.trim()) {
-              Alert.alert(
-                i18n.t("validation.playerNameRequiredTitle"),
-                i18n.t("validation.playerNameRequiredMessage"),
-                [
-                  { text: i18n.t("validation.cancel"), style: "cancel" },
-                  { text: i18n.t("validation.setPlayerName"), onPress: () => setNav("settings") },
-                ],
-              );
+              showDialog({ title: i18n.t("validation.playerNameRequiredTitle"), message: i18n.t("validation.playerNameRequiredMessage"), cancelLabel: i18n.t("validation.cancel"), confirmLabel: i18n.t("validation.setPlayerName"), onConfirm: () => setNav("profile") });
               return;
             }
             setNav("create");
@@ -787,7 +776,7 @@ export default function App() {
           onJoin={() => setNav("join")}
           onProfile={() => setNav("profile")}
           onFriends={() => openRegisteredFeature("friends", () => setNav("friends"))}
-          onNews={() => setNav("news")}
+          onNews={() => setNewsOpen(true)}
           onInventory={() => openRegisteredFeature("shop", () => openShop("inventory"))}
           deviceId={deviceId}
           onRanked={() => openRegisteredFeature("ranked", () => setNav("ranked"))}
@@ -848,7 +837,6 @@ export default function App() {
             />
           )}
           {nav === "rules" && <RulesScreen onBack={() => setNav("home")} />}
-          {nav === "news" && <NewsScreen onBack={() => setNav("home")} />}
           {nav === "friends" && deviceId ? <FriendsScreen playerId={deviceId} stars={stars} onStarsChange={setStars} onChallengeSent={(playerName, damageWager) => setChallengeSentNotice({ id: Date.now(), playerName, damageWager })} onBack={() => setNav("home")} /> : null}
           {nav === "profile" && (
             <ProfileScreen
@@ -876,13 +864,14 @@ export default function App() {
           </Pressable>
         </>
       ) : null}
+      {nav === "home" && newsOpen ? <NewsScreen onBack={() => setNewsOpen(false)} /> : null}
       {incomingChallenge && deviceId ? (
         <Animated.View style={[styles.challengePopup, { opacity: challengeOpacity }]}>
           <Text style={styles.challengePopupTitle}>{i18n.t("friends.challengeIncoming", { player: incomingChallenge.challengerName })}</Text>
           <Text style={styles.challengePopupMode}>{i18n.t("friends.challengeMode", { wager: incomingChallenge.damageWager })}</Text>
           <View style={styles.challengePopupActions}>
             <Pressable onPress={() => { const challenge = incomingChallenge; setIncomingChallenge(null); void respondChallenge(deviceId, challenge.id, "decline").catch(() => undefined); }} style={[styles.challengePopupButton, styles.challengeDecline]}><Text style={styles.challengePopupButtonText}>{i18n.t("friends.decline")}</Text></Pressable>
-            <Pressable onPress={() => { const challenge = incomingChallenge; setIncomingChallenge(null); void (async () => { try { await respondChallenge(deviceId, challenge.id, "accept"); await enterChallengeLobby({ ...challenge, status: "accepted" }); } catch (error) { Alert.alert(i18n.t("friends.challengeFailed"), error instanceof Error ? error.message : i18n.t("feedback.tryAgain")); } })(); }} style={styles.challengePopupButton}><Text style={styles.challengePopupButtonText}>{i18n.t("friends.accept")}</Text></Pressable>
+            <Pressable onPress={() => { const challenge = incomingChallenge; setIncomingChallenge(null); void (async () => { try { await respondChallenge(deviceId, challenge.id, "accept"); await enterChallengeLobby({ ...challenge, status: "accepted" }); } catch (error) { showFeedback(i18n.t("friends.challengeFailed"), error instanceof Error ? error.message : i18n.t("feedback.tryAgain")); } })(); }} style={styles.challengePopupButton}><Text style={styles.challengePopupButtonText}>{i18n.t("friends.accept")}</Text></Pressable>
           </View>
         </Animated.View>
       ) : null}
@@ -892,6 +881,8 @@ export default function App() {
           <Text style={styles.challengePopupMode}>{i18n.t("friends.challengeMode", { wager: challengeSentNotice.damageWager })}</Text>
         </Animated.View>
       ) : null}
+      <FeedbackPopup notice={appNotice} onDismiss={clearFeedback} />
+      <GameDialog dialog={appDialog} onCancel={dismissDialog} onConfirm={confirmDialog} />
       <View
         pointerEvents={nav !== "in-room" ? "box-none" : "none"}
         style={[styles.starsPersistentLayer, nav === "in-room" && styles.persistentScreenHidden]}

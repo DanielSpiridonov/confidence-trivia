@@ -1,7 +1,7 @@
 import React from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
-import { ANDROID_MENU_UI_SCALE, BackIconButton, Screen, Title, theme } from "../components/ui";
+import { theme } from "../components/ui";
 import { getNews, NewsPost } from "../network/client";
 
 export function NewsScreen({ onBack }: { onBack: () => void }) {
@@ -19,21 +19,30 @@ export function NewsScreen({ onBack }: { onBack: () => void }) {
 
   React.useEffect(() => { void load(); }, [load]);
 
-  return <Screen style={styles.screen} androidScale={ANDROID_MENU_UI_SCALE * 0.9}>
-    <BackIconButton label={t("common.back")} onPress={onBack} />
-    <Title>{t("news.title")}</Title>
+  return <View style={styles.overlay}>
+    <Pressable accessibilityRole="button" accessibilityLabel={t("common.close")} onPress={onBack} style={StyleSheet.absoluteFillObject} />
     <View style={styles.panel}>
-      {loading ? <ActivityIndicator color={theme.primary} /> : null}
-      {!loading && error ? <View style={styles.center}><Text style={styles.error}>{error}</Text><Pressable onPress={() => void load()} style={styles.reload}><Text style={styles.reloadText}>{t("news.retry")}</Text></Pressable></View> : null}
-      {!loading && !error && posts.length === 0 ? <Text style={styles.empty}>{t("news.empty")}</Text> : null}
-      {!loading && !error && posts.length > 0 ? <ScrollView contentContainerStyle={styles.posts}>{posts.map((post) => <View key={post.id} style={styles.post}><View style={styles.postHeader}><Text style={styles.postTitle}>{post.title}</Text><Text style={styles.date}>{new Date(post.publishedAt).toLocaleDateString(i18n.language)}</Text></View><Text style={styles.body}>{post.body}</Text></View>)}</ScrollView> : null}
+      <View style={styles.header}><Text style={styles.title}>{t("news.title")}</Text><Pressable accessibilityRole="button" accessibilityLabel={t("common.close")} onPress={onBack} style={({ pressed }) => [styles.closeButton, pressed && styles.closePressed]}><Text style={styles.closeText}>×</Text></Pressable></View>
+      <View style={styles.content}>
+        {loading ? <ActivityIndicator color={theme.primary} /> : null}
+        {!loading && error ? <View style={styles.center}><Text style={styles.error}>{error}</Text><Pressable onPress={() => void load()} style={styles.reload}><Text style={styles.reloadText}>{t("news.retry")}</Text></Pressable></View> : null}
+        {!loading && !error && posts.length === 0 ? <Text style={styles.empty}>{t("news.empty")}</Text> : null}
+        {!loading && !error && posts.length > 0 ? <ScrollView style={styles.postList} contentContainerStyle={styles.posts}>{posts.map((post) => <View key={post.id} style={styles.post}><View style={styles.postHeader}><Text style={styles.postTitle}>{post.title}</Text><Text style={styles.date}>{new Date(post.publishedAt).toLocaleDateString(i18n.language)}</Text></View><Text style={styles.body}>{post.body}</Text></View>)}</ScrollView> : null}
+      </View>
     </View>
-  </Screen>;
+  </View>;
 }
 
 const styles = StyleSheet.create({
-  screen: { justifyContent: "flex-start", paddingTop: 12 },
-  panel: { flex: 1, minHeight: 0, width: "88%", maxWidth: 900, marginTop: 8, padding: 14, borderRadius: 16, justifyContent: "center", backgroundColor: "rgba(31,26,51,0.94)", borderWidth: 1, borderColor: "rgba(185,176,214,0.2)" },
+  overlay: { ...StyleSheet.absoluteFillObject, zIndex: 40, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(5,3,12,0.7)" },
+  panel: { width: "72%", maxWidth: 720, height: "72%", minHeight: 230, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 14, borderRadius: 18, backgroundColor: "rgba(31,26,51,0.98)", borderWidth: 2, borderColor: "rgba(185,176,214,0.38)" },
+  header: { minHeight: 42, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: "rgba(185,176,214,0.3)" },
+  title: { color: theme.text, fontSize: 22, fontWeight: "900" },
+  closeButton: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(124,92,255,0.24)" },
+  closePressed: { opacity: 0.7, transform: [{ scale: 0.94 }] },
+  closeText: { color: "#FFF", fontSize: 26, lineHeight: 28, fontWeight: "700" },
+  content: { flex: 1, minHeight: 0, justifyContent: "center", paddingTop: 10 },
+  postList: { flex: 1, minHeight: 0 },
   posts: { gap: 10, paddingBottom: 8 },
   post: { padding: 14, borderRadius: 12, backgroundColor: "rgba(12,9,23,0.72)", borderLeftWidth: 3, borderLeftColor: theme.primary },
   postHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
