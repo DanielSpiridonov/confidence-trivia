@@ -3,7 +3,7 @@ import express from "express";
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { GameRoom } from "./rooms/GameRoom";
-import { anonymizePlayerAccount, claimAllFriendGifts, claimDailyReward, claimFriendGift, createPlayerChallenge, equipFreeAvatar, equipFreeFrame, equipFreeNameColor, getAccountProfile, getDailyRewardStatus, getDatabaseStatus, getNewsPosts, getPlayerChallenges, getPlayerCustomization, getPlayerStars, getRankedLeaderboard, isAuthenticatedPlayer, linkPlayerAccount, listFriends, redeemPromoCode, respondToFriendRequest, respondToPlayerChallenge, searchFriendPlayers, sendFriendGift, sendFriendRequest, submitPlayerReport, suggestFriendPlayers, updateAccountDisplayName, updateFriendRelationship, updatePlayerPresence } from "./database";
+import { anonymizePlayerAccount, claimAllFriendGifts, claimDailyReward, claimFriendGift, createPlayerChallenge, equipFreeAvatar, equipFreeFrame, equipFreeNameColor, getAccountProfile, getDailyRewardStatus, getDatabaseStatus, getNewsPosts, getPlayerChallenges, getPlayerCustomization, getPlayerStars, getRankedLeaderboard, isAuthenticatedPlayer, linkPlayerAccount, listFriends, ownsRegisteredPlayer, redeemPromoCode, respondToFriendRequest, respondToPlayerChallenge, searchFriendPlayers, sendFriendGift, sendFriendRequest, submitPlayerReport, suggestFriendPlayers, updateAccountDisplayName, updateFriendRelationship, updatePlayerPresence } from "./database";
 import { deleteSupabaseIdentity, verifySupabaseIdentity } from "./auth";
 import { isDamageWager, isOffensivePlayerName } from "@confidence-trivia/shared";
 
@@ -80,13 +80,14 @@ app.patch("/accounts/me/name", async (req, res) => {
   if (isOffensivePlayerName(displayName)) { res.status(400).json({ error: "Offensive language is not allowed in player names" }); return; }
   const profile = await updateAccountDisplayName(playerId, identity.userId, displayName);
   if (profile === "taken") { res.status(409).json({ error: "That name is already taken" }); return; }
+  if (profile === "cooldown") { res.status(429).json({ error: "Free name changes are available once every 30 days" }); return; }
   if (!profile) { res.status(503).json({ error: "Could not update profile" }); return; }
   res.json({ ...profile, email: identity.email });
 });
 app.delete("/accounts/me", async (req, res) => {
   const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
   const identity = await verifySupabaseIdentity(req.headers.authorization);
-  if (!isDeviceId(playerId) || !identity || !await isAuthenticatedPlayer(playerId, identity.userId)) { res.status(401).json({ error: "Invalid or expired account session" }); return; }
+  if (!isDeviceId(playerId) || !identity || !await ownsRegisteredPlayer(playerId, identity.userId)) { res.status(401).json({ error: "Invalid or expired account session" }); return; }
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) { res.status(503).json({ error: "Account deletion is not configured" }); return; }
   if (!await deleteSupabaseIdentity(identity.userId)) { res.status(503).json({ error: "Could not delete the authentication account" }); return; }
   if (!await anonymizePlayerAccount(playerId)) { res.status(503).json({ error: "Authentication was deleted, but game data cleanup needs support" }); return; }

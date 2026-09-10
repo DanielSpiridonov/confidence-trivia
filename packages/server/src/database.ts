@@ -117,27 +117,41 @@ export interface AccountProfile extends PlayerAccount {
   wins: number;
   rankedLp: number;
   rankKey: string;
+  moderationStatus: "active" | "rename_required" | "suspended" | "banned";
+  suspendedUntil: string | null;
 }
 
 export async function getAccountProfile(playerId: string, authUserId: string): Promise<AccountProfile | null> {
   if (!sql) return null;
-  const [player] = await sql<{ id: string; display_name: string; auth_provider: string | null; stars: number; games_played: number; wins: number; ranked_lp: number; ranked_placement_matches: number }[]>`
-    select id, display_name, auth_provider, stars, games_played, wins, ranked_lp, ranked_placement_matches
+  const [player] = await sql<{ id: string; display_name: string; auth_provider: string | null; stars: number; games_played: number; wins: number; ranked_lp: number; ranked_placement_matches: number; moderation_status: AccountProfile["moderationStatus"]; suspended_until: Date | null }[]>`
+    select id, display_name, auth_provider, stars, games_played, wins, ranked_lp, ranked_placement_matches,
+      case when moderation_status = 'suspended' and suspended_until <= now() then 'active' else moderation_status end as moderation_status,
+      suspended_until
     from public.players where id = ${playerId} and auth_user_id = ${authUserId} and account_type = 'registered'
   `;
   if (!player) return null;
-  return { playerId: player.id, accountType: "registered", provider: player.auth_provider, displayName: player.display_name, stars: player.stars, gamesPlayed: player.games_played, wins: player.wins, rankedLp: player.ranked_lp, rankKey: player.ranked_placement_matches < RANKED_PLACEMENT_MATCHES ? "novice" : getRankedDivision(player.ranked_lp).key };
+  return { playerId: player.id, accountType: "registered", provider: player.auth_provider, displayName: player.display_name, stars: player.stars, gamesPlayed: player.games_played, wins: player.wins, rankedLp: player.ranked_lp, rankKey: player.ranked_placement_matches < RANKED_PLACEMENT_MATCHES ? "novice" : getRankedDivision(player.ranked_lp).key, moderationStatus: player.moderation_status, suspendedUntil: player.suspended_until?.toISOString() ?? null };
 }
 
-export async function updateAccountDisplayName(playerId: string, authUserId: string, displayName: string): Promise<AccountProfile | "taken" | null> {
+export async function updateAccountDisplayName(playerId: string, authUserId: string, displayName: string): Promise<AccountProfile | "taken" | "cooldown" | null> {
   if (!sql) return null;
   const normalized = displayName.toLocaleLowerCase("en-US");
   try {
     const [updated] = await sql<{ id: string }[]>`
-      update public.players set display_name = ${displayName}, normalized_display_name = ${normalized}, last_seen_at = now()
-      where id = ${playerId} and auth_user_id = ${authUserId} and account_type = 'registered' returning id
+      update public.players set
+        display_name = ${displayName}, normalized_display_name = ${normalized},
+        moderation_status = case when moderation_status = 'rename_required' then 'active' else moderation_status end,
+        last_name_changed_at = now(), last_seen_at = now()
+      where id = ${playerId} and auth_user_id = ${authUserId} and account_type = 'registered'
+        and (moderation_status = 'rename_required' or last_name_changed_at is null or last_name_changed_at <= now() - interval '30 days')
+      returning id
     `;
-    return updated ? getAccountProfile(playerId, authUserId) : null;
+    if (updated) return getAccountProfile(playerId, authUserId);
+    const [account] = await sql<{ id: string }[]>`
+      select id from public.players
+      where id = ${playerId} and auth_user_id = ${authUserId} and account_type = 'registered'
+    `;
+    return account ? "cooldown" : null;
   } catch (error) {
     if (typeof error === "object" && error && "code" in error && error.code === "23505") return "taken";
     console.error("Could not update account display name", error);
@@ -167,6 +181,8 @@ export async function anonymizePlayerAccount(playerId: string): Promise<boolean>
         update public.players set
           display_name = 'Deleted User', normalized_display_name = null,
           account_type = 'deleted', auth_user_id = null, auth_provider = null, linked_at = null,
+          last_name_changed_at = null,
+          moderation_status = 'active', suspended_until = null, moderation_note = null,
           stars = 0, total_points = 0, games_played = 0, wins = 0,
           ranked_lp = 0, ranked_placement_matches = 0, ranked_placement_points = 0,
           ranked_wins = 0, last_seen_at = now()
@@ -200,9 +216,30 @@ export async function isRegisteredPlayer(playerId: string): Promise<boolean> {
 export async function isAuthenticatedPlayer(playerId: string, authUserId: string): Promise<boolean> {
   if (!sql) return false;
   const [player] = await sql<{ id: string }[]>`
+    select id from public.players
+    where id = ${playerId} and account_type = 'registered' and auth_user_id = ${authUserId}
+      and (moderation_status = 'active' or (moderation_status = 'suspended' and suspended_until <= now()))
+  `;
+  return Boolean(player);
+}
+
+export async function ownsRegisteredPlayer(playerId: string, authUserId: string): Promise<boolean> {
+  if (!sql) return false;
+  const [player] = await sql<{ id: string }[]>`
     select id from public.players where id = ${playerId} and account_type = 'registered' and auth_user_id = ${authUserId}
   `;
   return Boolean(player);
+}
+
+export async function canPlayerEnterGame(playerId: string, authUserId: string | null): Promise<boolean> {
+  if (!sql) return true;
+  const [player] = await sql<{ account_type: string; auth_user_id: string | null; moderation_status: string; suspended_until: Date | null }[]>`
+    select account_type, auth_user_id, moderation_status, suspended_until from public.players where id = ${playerId}
+  `;
+  if (!player || player.account_type === "guest") return true;
+  if (player.account_type !== "registered" || !authUserId || player.auth_user_id !== authUserId) return false;
+  return player.moderation_status === "active"
+    || (player.moderation_status === "suspended" && Boolean(player.suspended_until && player.suspended_until <= new Date()));
 }
 
 export interface FriendSummary {

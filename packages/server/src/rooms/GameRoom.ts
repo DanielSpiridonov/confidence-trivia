@@ -32,7 +32,7 @@ import {
   RevealEntrySchema,
 } from "../state/schema";
 import { getLocalizedCorrectAnswer, getQuestionSet, localize, localizeAnswer, localizeAnswerItems } from "../content/questions";
-import { getAcceptedChallengeParticipantRole, getPlayerCustomization, isAuthenticatedPlayer, reserveDamageWager, saveCompletedMatch, settleDamageWager, upsertPlayer } from "../database";
+import { canPlayerEnterGame, getAcceptedChallengeParticipantRole, getPlayerCustomization, isAuthenticatedPlayer, reserveDamageWager, saveCompletedMatch, settleDamageWager, upsertPlayer } from "../database";
 import { verifySupabaseIdentity } from "../auth";
 
 interface JoinOptions {
@@ -164,8 +164,11 @@ export class GameRoom extends Room<RoomStateSchema> {
       && isValidDeviceId(options.deviceId)
       && ![...this.deviceIds.values()].includes(options.deviceId);
     if (!basicAdmissionAllowed) return false;
+    const identity = options.accessToken
+      ? await verifySupabaseIdentity(`Bearer ${options.accessToken}`)
+      : null;
+    if (!await canPlayerEnterGame(options.deviceId!, identity?.userId ?? null)) return false;
     if (this.challengeId) {
-      const identity = await verifySupabaseIdentity(options.accessToken ? `Bearer ${options.accessToken}` : undefined);
       if (!identity || !await isAuthenticatedPlayer(options.deviceId!, identity.userId)) return false;
       const role = await getAcceptedChallengeParticipantRole(this.challengeId, options.deviceId!);
       if (!role) return false;
@@ -174,7 +177,6 @@ export class GameRoom extends Room<RoomStateSchema> {
     }
     if (this.state.gameMode !== "ranked") return true;
     if (process.env.NODE_ENV === "test" && process.env.RANKED_TEST_AUTH_BYPASS === "true") return true;
-    const identity = await verifySupabaseIdentity(options.accessToken ? `Bearer ${options.accessToken}` : undefined);
     return Boolean(identity && await isAuthenticatedPlayer(options.deviceId!, identity.userId));
   }
 

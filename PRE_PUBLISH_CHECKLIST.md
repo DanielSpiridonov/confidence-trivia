@@ -21,8 +21,8 @@ tested on the affected platforms, and documented where applicable.
 
 - [x] Add an authenticated **Report player/name** form in Settings.
 - [x] Add basic offensive-name filtering for permanent account names.
-- [ ] Define how reports are reviewed and resolved.
-- [ ] Verify blocking removes friend access and prevents new challenges.
+- [x] Define how reports are reviewed and resolved.
+- [x] Verify blocking removes friend access and prevents new challenges.
 - [ ] Add server rate limits for authentication, names, friends, challenges,
       blessings, promo codes, and daily rewards.
 - [ ] Add protections against repeated automated requests and reward abuse.

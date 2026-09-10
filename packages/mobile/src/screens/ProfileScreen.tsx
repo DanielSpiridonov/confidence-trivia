@@ -49,6 +49,10 @@ export function ProfileScreen(props: Props) {
             <Text style={s.sectionTitle}>{t("account.unlockProfile")}</Text>
             <Text style={s.bodyText}>{t("account.guestLimits")}</Text>
           </View>}
+          {registered && profile && profile.moderationStatus !== "active" ? <View style={s.moderationNotice}>
+            <Text style={s.moderationTitle}>{t(`account.moderation.${profile.moderationStatus}.title`)}</Text>
+            <Text style={s.moderationText}>{t(`account.moderation.${profile.moderationStatus}.message`)}</Text>
+          </View> : null}
           {registered ? <View style={s.accountActions}>
             <Pressable accessibilityRole="button" disabled={busy} onPress={onSignOut} style={({ pressed }) => [s.accountAction, pressed && s.pressed]}>
               <Text numberOfLines={1} adjustsFontSizeToFit style={s.accountActionText}>{t("account.signOut")}</Text>
@@ -70,6 +74,7 @@ export function ProfileScreen(props: Props) {
               </Pressable>
             </View>
             {offensive ? <Text style={s.error}>{t("account.offensiveName")}</Text> : !structurallyValid && name.length > 0 ? <Text style={s.error}>{t("account.nameRules")}</Text> : null}
+            <Text style={s.nameChangeHint}>{t("account.nameChangeLimit")}</Text>
             <View style={s.stats}>
               <Stat label={t("account.stars")} value={profile.stars} />
               <Stat label={t("account.games")} value={profile.gamesPlayed} />
@@ -136,9 +141,10 @@ const s = StyleSheet.create({
   protectedBadge: { color: "#9FE5B1", borderColor: "rgba(124,255,160,.45)" }, emailBlock: { marginTop: 13 },
   eyebrow: { color: theme.textDim, fontSize: 9, fontWeight: "900", textTransform: "uppercase" }, email: { color: theme.text, fontSize: 11, fontWeight: "700", marginTop: 3 },
   guestIntro: { marginTop: 12 }, sectionTitle: { color: theme.text, fontSize: 15, fontWeight: "900" }, bodyText: { color: theme.textDim, fontSize: 10, lineHeight: 15, marginTop: 5 },
+  moderationNotice: { marginTop: 9, padding: 8, borderRadius: 6, borderWidth: 1, borderColor: "#FF7587", backgroundColor: "rgba(255,117,135,.09)" }, moderationTitle: { color: "#FF9B9B", fontSize: 10, fontWeight: "900" }, moderationText: { color: theme.textDim, fontSize: 8, lineHeight: 11, marginTop: 2 },
   editor: { flexDirection: "row", gap: 8, marginTop: 5 }, input: { flex: 1, minHeight: 36, borderRadius: 6, borderWidth: 1, borderColor: "#62558E", backgroundColor: "#171329", color: theme.text, paddingHorizontal: 10, paddingVertical: 5, fontSize: 12, fontWeight: "800" },
   save: { minWidth: 70, alignItems: "center", justifyContent: "center", borderRadius: 6, backgroundColor: theme.primary }, buttonText: { color: "#FFF", fontSize: 12, fontWeight: "900" },
-  error: { color: "#FF9B9B", fontSize: 9, marginTop: 4 }, stats: { minHeight: 58, flexDirection: "row", alignItems: "stretch", marginTop: 14, borderTopWidth: 1, borderBottomWidth: 1, borderColor: "rgba(185,176,214,.18)" },
+  error: { color: "#FF9B9B", fontSize: 9, marginTop: 4 }, nameChangeHint: { color: theme.textDim, fontSize: 8, marginTop: 4 }, stats: { minHeight: 58, flexDirection: "row", alignItems: "stretch", marginTop: 10, borderTopWidth: 1, borderBottomWidth: 1, borderColor: "rgba(185,176,214,.18)" },
   stat: { flex: 1, minWidth: 0, alignItems: "center", justifyContent: "center", borderRightWidth: 1, borderRightColor: "rgba(185,176,214,.18)", paddingHorizontal: 3 }, lastStat: { borderRightWidth: 0 },
   statValue: { width: "100%", color: theme.text, fontSize: 14, fontWeight: "900", textAlign: "center" }, statLabel: { color: theme.textDim, fontSize: 8, fontWeight: "800", marginTop: 2 }, protectedText: { color: theme.textDim, fontSize: 9, textAlign: "center", marginTop: 8 },
   accountActions: { flexDirection: "row", gap: 7, marginTop: "auto" },

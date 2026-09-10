@@ -285,6 +285,12 @@
     "identityLinkFailed": "Could not link sign-in method",
     "offensiveNameTitle": "Offensive language restricted",
     "offensiveName": "Offensive language is not allowed in player names.",
+    "nameChangeLimit": "One free name change every 30 days.",
+    "moderation": {
+      "rename_required": { "title": "Name change required", "message": "Change your player name before playing or using social features. This required change is free." },
+      "suspended": { "title": "Account temporarily suspended", "message": "Gameplay, social features, and the economy are unavailable during the suspension." },
+      "banned": { "title": "Account banned", "message": "Gameplay, social features, and the economy are unavailable for this account." }
+    },
     "protected": "PROTECTED", "localOnly": "LOCAL GUEST", "unlockProfile": "Make your progress yours", "benefitProgress": "Protect progress", "benefitRanked": "Play Ranked", "benefitSocial": "Friends & gifts", "transferHint": "Your current guest progress transfers automatically.", "email": "Email", "namePlaceholder": "Permanent player name", "saveName": "Save", "nameRules": "Use 3-20 letters, numbers, spaces, _ or -.", "nameUpdated": "Player name updated", "nameUpdateFailed": "Could not update name", "stars": "Stars", "games": "Games", "wins": "Wins", "rank": "Rank", "signOut": "Sign out", "signOutConfirm": "Your linked progress will stay safe. This device will return to a new guest profile.", "deleteAccount": "Delete account", "deleteForever": "Delete forever", "deleteAccountConfirm": "This permanently removes your login, profile, friends, stars, and cosmetics. Completed match and transaction records remain only as anonymized Deleted User history. This cannot be undone.", "accountDeleted": "Account deleted", "deleteFailed": "Could not delete account", "sessionExpired": "Session expired", "sessionExpiredMessage": "Please sign in again. Your linked progress remains safe."
   },
   "shop": {

@@ -15,7 +15,7 @@ export interface PlayerAccount {
   provider: string | null;
   displayName: string;
 }
-export interface AccountProfile extends PlayerAccount { email: string | null; stars: number; gamesPlayed: number; wins: number; rankedLp: number; rankKey: string; }
+export interface AccountProfile extends PlayerAccount { email: string | null; stars: number; gamesPlayed: number; wins: number; rankedLp: number; rankKey: string; moderationStatus: "active" | "rename_required" | "suspended" | "banned"; suspendedUntil: string | null; }
 
 async function accountRequest(path: string, options?: RequestInit): Promise<AccountProfile> {
   const accessToken = await getAccessToken();

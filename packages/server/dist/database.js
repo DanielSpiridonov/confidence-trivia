@@ -12,6 +12,8 @@ exports.anonymizePlayerAccount = anonymizePlayerAccount;
 exports.getDatabaseStatus = getDatabaseStatus;
 exports.isRegisteredPlayer = isRegisteredPlayer;
 exports.isAuthenticatedPlayer = isAuthenticatedPlayer;
+exports.ownsRegisteredPlayer = ownsRegisteredPlayer;
+exports.canPlayerEnterGame = canPlayerEnterGame;
 exports.updatePlayerPresence = updatePlayerPresence;
 exports.createPlayerChallenge = createPlayerChallenge;
 exports.getPlayerChallenges = getPlayerChallenges;
@@ -139,12 +141,14 @@ async function getAccountProfile(playerId, authUserId) {
     if (!sql)
         return null;
     const [player] = await sql `
-    select id, display_name, auth_provider, stars, games_played, wins, ranked_lp, ranked_placement_matches
+    select id, display_name, auth_provider, stars, games_played, wins, ranked_lp, ranked_placement_matches,
+      case when moderation_status = 'suspended' and suspended_until <= now() then 'active' else moderation_status end as moderation_status,
+      suspended_until
     from public.players where id = ${playerId} and auth_user_id = ${authUserId} and account_type = 'registered'
   `;
     if (!player)
         return null;
-    return { playerId: player.id, accountType: "registered", provider: player.auth_provider, displayName: player.display_name, stars: player.stars, gamesPlayed: player.games_played, wins: player.wins, rankedLp: player.ranked_lp, rankKey: player.ranked_placement_matches < shared_1.RANKED_PLACEMENT_MATCHES ? "novice" : (0, shared_1.getRankedDivision)(player.ranked_lp).key };
+    return { playerId: player.id, accountType: "registered", provider: player.auth_provider, displayName: player.display_name, stars: player.stars, gamesPlayed: player.games_played, wins: player.wins, rankedLp: player.ranked_lp, rankKey: player.ranked_placement_matches < shared_1.RANKED_PLACEMENT_MATCHES ? "novice" : (0, shared_1.getRankedDivision)(player.ranked_lp).key, moderationStatus: player.moderation_status, suspendedUntil: player.suspended_until?.toISOString() ?? null };
 }
 async function updateAccountDisplayName(playerId, authUserId, displayName) {
     if (!sql)
@@ -152,10 +156,21 @@ async function updateAccountDisplayName(playerId, authUserId, displayName) {
     const normalized = displayName.toLocaleLowerCase("en-US");
     try {
         const [updated] = await sql `
-      update public.players set display_name = ${displayName}, normalized_display_name = ${normalized}, last_seen_at = now()
-      where id = ${playerId} and auth_user_id = ${authUserId} and account_type = 'registered' returning id
+      update public.players set
+        display_name = ${displayName}, normalized_display_name = ${normalized},
+        moderation_status = case when moderation_status = 'rename_required' then 'active' else moderation_status end,
+        last_name_changed_at = now(), last_seen_at = now()
+      where id = ${playerId} and auth_user_id = ${authUserId} and account_type = 'registered'
+        and (moderation_status = 'rename_required' or last_name_changed_at is null or last_name_changed_at <= now() - interval '30 days')
+      returning id
     `;
-        return updated ? getAccountProfile(playerId, authUserId) : null;
+        if (updated)
+            return getAccountProfile(playerId, authUserId);
+        const [account] = await sql `
+      select id from public.players
+      where id = ${playerId} and auth_user_id = ${authUserId} and account_type = 'registered'
+    `;
+        return account ? "cooldown" : null;
     }
     catch (error) {
         if (typeof error === "object" && error && "code" in error && error.code === "23505")
@@ -187,6 +202,8 @@ async function anonymizePlayerAccount(playerId) {
         update public.players set
           display_name = 'Deleted User', normalized_display_name = null,
           account_type = 'deleted', auth_user_id = null, auth_provider = null, linked_at = null,
+          last_name_changed_at = null,
+          moderation_status = 'active', suspended_until = null, moderation_note = null,
           stars = 0, total_points = 0, games_played = 0, wins = 0,
           ranked_lp = 0, ranked_placement_matches = 0, ranked_placement_points = 0,
           ranked_wins = 0, last_seen_at = now()
@@ -222,9 +239,32 @@ async function isAuthenticatedPlayer(playerId, authUserId) {
     if (!sql)
         return false;
     const [player] = await sql `
+    select id from public.players
+    where id = ${playerId} and account_type = 'registered' and auth_user_id = ${authUserId}
+      and (moderation_status = 'active' or (moderation_status = 'suspended' and suspended_until <= now()))
+  `;
+    return Boolean(player);
+}
+async function ownsRegisteredPlayer(playerId, authUserId) {
+    if (!sql)
+        return false;
+    const [player] = await sql `
     select id from public.players where id = ${playerId} and account_type = 'registered' and auth_user_id = ${authUserId}
   `;
     return Boolean(player);
+}
+async function canPlayerEnterGame(playerId, authUserId) {
+    if (!sql)
+        return true;
+    const [player] = await sql `
+    select account_type, auth_user_id, moderation_status, suspended_until from public.players where id = ${playerId}
+  `;
+    if (!player || player.account_type === "guest")
+        return true;
+    if (player.account_type !== "registered" || !authUserId || player.auth_user_id !== authUserId)
+        return false;
+    return player.moderation_status === "active"
+        || (player.moderation_status === "suspended" && Boolean(player.suspended_until && player.suspended_until <= new Date()));
 }
 async function updatePlayerPresence(playerId, available) {
     if (!sql)

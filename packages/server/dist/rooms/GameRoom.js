@@ -118,8 +118,12 @@ class GameRoom extends colyseus_1.Room {
             && ![...this.deviceIds.values()].includes(options.deviceId);
         if (!basicAdmissionAllowed)
             return false;
+        const identity = options.accessToken
+            ? await (0, auth_1.verifySupabaseIdentity)(`Bearer ${options.accessToken}`)
+            : null;
+        if (!await (0, database_1.canPlayerEnterGame)(options.deviceId, identity?.userId ?? null))
+            return false;
         if (this.challengeId) {
-            const identity = await (0, auth_1.verifySupabaseIdentity)(options.accessToken ? `Bearer ${options.accessToken}` : undefined);
             if (!identity || !await (0, database_1.isAuthenticatedPlayer)(options.deviceId, identity.userId))
                 return false;
             const role = await (0, database_1.getAcceptedChallengeParticipantRole)(this.challengeId, options.deviceId);
@@ -132,7 +136,6 @@ class GameRoom extends colyseus_1.Room {
             return true;
         if (process.env.NODE_ENV === "test" && process.env.RANKED_TEST_AUTH_BYPASS === "true")
             return true;
-        const identity = await (0, auth_1.verifySupabaseIdentity)(options.accessToken ? `Bearer ${options.accessToken}` : undefined);
         return Boolean(identity && await (0, database_1.isAuthenticatedPlayer)(options.deviceId, identity.userId));
     }
     async onJoin(client, options = {}) {

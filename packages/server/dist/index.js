@@ -118,6 +118,10 @@ app.patch("/accounts/me/name", async (req, res) => {
         res.status(409).json({ error: "That name is already taken" });
         return;
     }
+    if (profile === "cooldown") {
+        res.status(429).json({ error: "Free name changes are available once every 30 days" });
+        return;
+    }
     if (!profile) {
         res.status(503).json({ error: "Could not update profile" });
         return;
@@ -127,7 +131,7 @@ app.patch("/accounts/me/name", async (req, res) => {
 app.delete("/accounts/me", async (req, res) => {
     const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
     const identity = await (0, auth_1.verifySupabaseIdentity)(req.headers.authorization);
-    if (!isDeviceId(playerId) || !identity || !await (0, database_1.isAuthenticatedPlayer)(playerId, identity.userId)) {
+    if (!isDeviceId(playerId) || !identity || !await (0, database_1.ownsRegisteredPlayer)(playerId, identity.userId)) {
         res.status(401).json({ error: "Invalid or expired account session" });
         return;
     }
