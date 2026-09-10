@@ -27,6 +27,15 @@ async function accountRequest(path: string, options?: RequestInit): Promise<Acco
 }
 export const getAccountProfile = (playerId: string) => accountRequest(`/accounts/me?playerId=${encodeURIComponent(playerId)}`);
 export const updateAccountName = (playerId: string, displayName: string) => accountRequest("/accounts/me/name", { method: "PATCH", body: JSON.stringify({ playerId, displayName }) });
+export async function deleteAccount(playerId: string): Promise<void> {
+  const accessToken = await getAccessToken();
+  if (!accessToken) throw new Error("Your session expired. Please sign in again.");
+  const response = await fetch(`${HTTP_SERVER_URL}/accounts/me`, { method: "DELETE", headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ playerId }) });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null) as { error?: string } | null;
+    throw new Error(payload?.error ?? `Server returned ${response.status}`);
+  }
+}
 
 export interface NewsPost { id: string; title: string; body: string; publishedAt: string; }
 export async function getNews(locale: "en" | "bg"): Promise<NewsPost[]> {

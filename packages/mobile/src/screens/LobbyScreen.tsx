@@ -107,6 +107,7 @@ export function LobbyScreen({ room, mySessionId }: { room: Room; mySessionId: st
           </View>
 
           <View style={styles.infoColumn}>
+            <View style={styles.infoColumnContent}>
             {isMatchmade ? <View style={styles.rankedQueue}><Subtitle>{t(isRanked ? "lobby.rankedSearching" : "lobby.damageSearching")}</Subtitle><Text style={styles.rankedCount}>{players.length}/{requiredPlayers}</Text><Text style={styles.copyHint}>{t(isRanked ? "lobby.rankedAutoStart" : "lobby.damageAutoStart")}</Text></View> : isChallenge ? <View style={styles.rankedQueue}><Subtitle>{t("lobby.challengeLobby")}</Subtitle><Text style={styles.rankedCount}>{players.length}/{requiredPlayers}</Text><Text style={styles.copyHint}>{t("lobby.challengeManualStart")}</Text></View> : <><Subtitle>{t("lobby.roomCode")}</Subtitle><Pressable onPress={() => void handleCopyCode()} style={styles.codeWrap}><Title>{state.code}</Title><Text style={styles.copyHint}>{copied ? t("lobby.copied") : t("lobby.tapToCopy")}</Text></Pressable></>}
             {state.gameMode === "damage" ? <View style={styles.wagerBanner}>
               <Text style={styles.wagerStake}>{t("lobby.wagerStake", { count: state.damageWager })}</Text>
@@ -119,6 +120,7 @@ export function LobbyScreen({ room, mySessionId }: { room: Room; mySessionId: st
             <View style={styles.actionArea}>
               {!isMatchmade && !isStarting && (isHost ? <BigButton label={t("lobby.start")} onPress={() => { setStartError(null); room.send("startGame"); }} disabled={!canStart} /> : <BigButton label={me?.ready ? t("lobby.notReady") : t("lobby.ready")} onPress={() => room.send("toggleReady")} variant="secondary" />)}
               {!isStarting && startError ? <Text style={styles.startError}>{startError}</Text> : null}
+            </View>
             </View>
           </View>
         </View>
@@ -145,6 +147,13 @@ const styles = StyleSheet.create({
   lobbyColumns: { flex: 1, minHeight: 0, width: "100%", flexDirection: "row", alignItems: "stretch", justifyContent: "space-between", gap: 24 },
   playersColumn: { width: "52%", minWidth: 0, backgroundColor: "rgba(31, 26, 51, 0.55)", borderRadius: 14, padding: 12 },
   infoColumn: { flex: 1, minWidth: 0, alignItems: "center", justifyContent: "center", paddingHorizontal: 10 },
+  infoColumnContent: {
+    width: Platform.OS === "android" ? "90.91%" : "100%",
+    height: Platform.OS === "android" ? "90.91%" : "100%",
+    alignItems: "center",
+    justifyContent: "center",
+    ...(Platform.OS === "android" ? { transform: [{ scale: 1.1 }] } : {}),
+  },
   columnTitle: { color: theme.text, fontSize: 18, fontWeight: "900", marginBottom: 9, textAlign: "center" },
   codeWrap: {
     alignSelf: "center",

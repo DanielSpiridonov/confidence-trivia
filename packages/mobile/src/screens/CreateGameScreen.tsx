@@ -78,7 +78,7 @@ export function CreateGameScreen({
   }
 
   return (
-    <Screen androidScale={ANDROID_COMPACT_MENU_UI_SCALE * 0.9}>
+    <Screen androidScale={ANDROID_COMPACT_MENU_UI_SCALE * 0.99}>
       <BackIconButton label={t("common.back")} onPress={onBack} disabled={submitting} />
       <Title>{t("home.createGame")}</Title>
       <View style={styles.titleGap} />

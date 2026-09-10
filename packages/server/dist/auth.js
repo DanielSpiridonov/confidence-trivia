@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.verifySupabaseIdentity = verifySupabaseIdentity;
+exports.deleteSupabaseIdentity = deleteSupabaseIdentity;
 async function verifySupabaseIdentity(authorization) {
     const accessToken = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
     const supabaseUrl = process.env.SUPABASE_URL;
@@ -20,5 +21,21 @@ async function verifySupabaseIdentity(authorization) {
     }
     catch {
         return null;
+    }
+}
+async function deleteSupabaseIdentity(userId) {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !serviceRoleKey)
+        return false;
+    try {
+        const response = await fetch(`${supabaseUrl.replace(/\/$/, "")}/auth/v1/admin/users/${encodeURIComponent(userId)}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${serviceRoleKey}`, apikey: serviceRoleKey },
+        });
+        return response.ok || response.status === 404;
+    }
+    catch {
+        return false;
     }
 }

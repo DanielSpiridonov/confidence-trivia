@@ -270,7 +270,7 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
           ))}
         </View>
 
-        <View style={[styles.catalogue, tab !== "inventory" && styles.catalogueWithTabRail, tab !== "inventory" && Platform.OS === "ios" && styles.catalogueWithTabRailIos]}>
+        <View style={[styles.catalogue, Platform.OS === "ios" && styles.catalogueIosWide, tab !== "inventory" && styles.catalogueWithTabRail, tab !== "inventory" && Platform.OS === "ios" && styles.catalogueWithTabRailIos]}>
           <View style={styles.catalogueHeader}>
             <Text style={styles.sectionTitle}>{t(`shop.tabs.${tab}`)}</Text>
             <Text style={styles.previewBadge}>{tab === "inventory" ? t("shop.ownedItems") : tab === "stars" ? t("shop.previewOnly") : tab === "frames" ? t("shop.playerBordersPreview") : t("shop.starPricedCosmetics")}</Text>
@@ -389,6 +389,7 @@ const styles = StyleSheet.create({
   tabText: { flex: 1, color: theme.textDim, fontSize: 11, fontWeight: "800" },
   tabTextSelected: { color: theme.text },
   catalogue: { flex: 1, minWidth: 0, borderRadius: 14, backgroundColor: "rgba(31,26,51,0.88)", padding: 11 },
+  catalogueIosWide: { marginRight: -10 },
   catalogueWithTabRail: { marginLeft: 136 },
   catalogueWithTabRailIos: { marginLeft: 150 },
   persistentAvatarCatalogue: { ...StyleSheet.absoluteFillObject, top: 43, paddingHorizontal: 11, paddingBottom: 11, opacity: 1 },

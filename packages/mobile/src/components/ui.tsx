@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { LayoutChangeEvent, View, Text, Pressable, StyleSheet, TextStyle, ViewStyle, StyleProp, Keyboard, Platform } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { playSound, SoundEffect } from "../audio/sounds";
 
 const CONTROL_WIDTH = "100%";
@@ -15,13 +15,24 @@ export const ANDROID_MENU_UI_SCALE = ANDROID_UI_SCALE * 0.95;
 export const ANDROID_COMPACT_MENU_UI_SCALE = ANDROID_MENU_UI_SCALE * 0.95;
 export const ANDROID_GAME_UI_SCALE = 0.982278;
 
-function AndroidDesignCanvas({ children, style, uiScale }: { children: React.ReactNode; style?: ViewStyle; uiScale: number }) {
+function AndroidDesignCanvas({ children, style, uiScale, overflowScale }: { children: React.ReactNode; style?: ViewStyle; uiScale: number; overflowScale: number }) {
+  const insets = useSafeAreaInsets();
   const [viewport, setViewport] = useState({ width: ANDROID_DESIGN_WIDTH, height: ANDROID_DESIGN_HEIGHT });
-  const scale = Math.min(
-    1,
+  const viewportFitScale = Math.min(
     viewport.width / ANDROID_DESIGN_WIDTH,
     viewport.height / ANDROID_DESIGN_HEIGHT,
-  ) * uiScale;
+  );
+  const baseScale = Math.min(
+    1,
+    viewportFitScale,
+  );
+  // Never let a platform adjustment enlarge the fixed canvas past the real
+  // viewport. Android edge-to-edge reports the entire display, so overflowing
+  // a transformed canvas here also makes otherwise centered screens look
+  // shifted or clipped.
+  const scale = Math.min(baseScale * uiScale, viewportFitScale * overflowScale);
+  const horizontalInset = Math.max(insets.left, insets.right, 8);
+  const verticalInset = Math.max(insets.top, insets.bottom, 4);
 
   function measureViewport(event: LayoutChangeEvent) {
     const { width, height } = event.nativeEvent.layout;
@@ -29,17 +40,17 @@ function AndroidDesignCanvas({ children, style, uiScale }: { children: React.Rea
   }
 
   return (
-    <SafeAreaView style={styles.androidSafeArea}>
+    <View style={[styles.androidSafeArea, { paddingHorizontal: horizontalInset, paddingVertical: verticalInset }]}>
       <View style={styles.androidViewport} onLayout={measureViewport}>
         <View style={[styles.androidCanvas, { transform: [{ scale }] }]}>
           <View style={[styles.content, style]}>{children}</View>
         </View>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
-export function Screen({ children, style, androidScale = ANDROID_UI_SCALE }: { children: React.ReactNode; style?: ViewStyle; androidScale?: number }) {
+export function Screen({ children, style, androidScale = ANDROID_UI_SCALE, androidOverflowScale = 1 }: { children: React.ReactNode; style?: ViewStyle; androidScale?: number; androidOverflowScale?: number }) {
   const iosContent = (
     <SafeAreaView style={styles.safeArea}>
       <View style={[styles.content, style]}>
@@ -56,7 +67,7 @@ export function Screen({ children, style, androidScale = ANDROID_UI_SCALE }: { c
     >
       {Platform.OS === "android" ? (
         <View style={styles.background}>
-          <AndroidDesignCanvas style={style} uiScale={androidScale}>{children}</AndroidDesignCanvas>
+          <AndroidDesignCanvas style={style} uiScale={androidScale} overflowScale={androidOverflowScale}>{children}</AndroidDesignCanvas>
         </View>
       ) : (
         <View style={styles.background}>{iosContent}</View>
@@ -170,13 +181,13 @@ const styles = StyleSheet.create({
   androidViewport: {
     flex: 1,
     alignItems: "center",
-    justifyContent: "flex-start",
+    justifyContent: "center",
     overflow: "hidden",
   },
   androidCanvas: {
     width: ANDROID_DESIGN_WIDTH,
     height: ANDROID_DESIGN_HEIGHT,
-    transformOrigin: "top center",
+    transformOrigin: "center",
   },
   content: {
     flex: 1,

@@ -197,7 +197,7 @@ export function RevealScreen({ room, active = true }: { room: Room; active?: boo
   }
 
   return (
-    <Screen style={styles.screen} androidScale={ANDROID_GAME_UI_SCALE}>
+    <Screen style={styles.screen} androidScale={ANDROID_GAME_UI_SCALE * 1.1}>
       <PhaseTimer phaseEndsAt={state.phaseEndsAt} />
       <DamageHud state={state} myPlayerId={room.sessionId} />
       <Subtitle>{t("reveal.correctAnswer")}</Subtitle>
@@ -429,7 +429,7 @@ const styles = StyleSheet.create({
   revealBody: {
     flex: 1,
     minHeight: 0,
-    width: Platform.OS === "android" ? "110%" : "100%",
+    width: "100%",
     alignSelf: "center",
     flexDirection: "row",
     gap: 12,

@@ -7,11 +7,11 @@ import { ANDROID_MENU_UI_SCALE, BackIconButton, Screen, Title, theme } from "../
 interface Props {
   displayName: string; registered: boolean; provider: string | null; profile: AccountProfile | null;
   busy: boolean; authAvailable: boolean; onGoogle: () => void; onSaveName: (name: string) => void;
-  onSignOut: () => void; onBack: () => void;
+  onSignOut: () => void; onDeleteAccount: () => void; onBack: () => void;
 }
 
 export function ProfileScreen(props: Props) {
-  const { displayName, registered, provider, profile, busy, authAvailable, onGoogle, onSaveName, onSignOut, onBack } = props;
+  const { displayName, registered, provider, profile, busy, authAvailable, onGoogle, onSaveName, onSignOut, onDeleteAccount, onBack } = props;
   const { t } = useTranslation();
   const [name, setName] = React.useState(displayName);
   const trimmedName = name.trim();
@@ -42,6 +42,9 @@ export function ProfileScreen(props: Props) {
           </View>}
           {registered ? <Pressable accessibilityRole="button" disabled={busy} onPress={onSignOut} style={({ pressed }) => [s.signOut, pressed && s.pressed]}>
             <Text style={s.signOutText}>{t("account.signOut")}</Text>
+          </Pressable> : null}
+          {registered ? <Pressable accessibilityRole="button" disabled={busy} onPress={onDeleteAccount} style={({ pressed }) => [s.deleteAccount, pressed && s.pressed]}>
+            <Text style={s.deleteAccountText}>{t("account.deleteAccount")}</Text>
           </Pressable> : null}
         </View>
 
@@ -111,6 +114,7 @@ const s = StyleSheet.create({
   stat: { flex: 1, minWidth: 0, alignItems: "center", justifyContent: "center", borderRightWidth: 1, borderRightColor: "rgba(185,176,214,.18)", paddingHorizontal: 3 }, lastStat: { borderRightWidth: 0 },
   statValue: { width: "100%", color: theme.text, fontSize: 14, fontWeight: "900", textAlign: "center" }, statLabel: { color: theme.textDim, fontSize: 8, fontWeight: "800", marginTop: 2 }, protectedText: { color: theme.textDim, fontSize: 9, textAlign: "center", marginTop: 8 },
   signOut: { alignSelf: "flex-start", marginTop: "auto", paddingHorizontal: 13, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: "#D96E79" }, signOutText: { color: "#FF9B9B", fontSize: 10, fontWeight: "900" },
+  deleteAccount: { alignSelf: "flex-start", marginTop: 6, paddingHorizontal: 13, paddingVertical: 5 }, deleteAccountText: { color: "#FF7D8B", fontSize: 9, fontWeight: "800", textDecorationLine: "underline" },
   benefits: { gap: 2 }, benefit: { minHeight: 27, flexDirection: "row", alignItems: "center" }, check: { width: 20, height: 20, borderRadius: 10, color: "#171329", backgroundColor: "#9FE5B1", textAlign: "center", lineHeight: 20, fontSize: 14, fontWeight: "900", marginRight: 8 }, benefitText: { flex: 1, color: theme.text, fontSize: 11, fontWeight: "800" },
   transferHint: { color: theme.textDim, fontSize: 9, marginTop: 5 }, warning: { color: "#F7D85B", fontSize: 9, lineHeight: 12, marginTop: 5 },
   google: { minHeight: 36, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 6, backgroundColor: "#4285F4", marginTop: 9 },

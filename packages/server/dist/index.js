@@ -97,6 +97,27 @@ app.patch("/accounts/me/name", async (req, res) => {
     }
     res.json({ ...profile, email: identity.email });
 });
+app.delete("/accounts/me", async (req, res) => {
+    const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
+    const identity = await (0, auth_1.verifySupabaseIdentity)(req.headers.authorization);
+    if (!isDeviceId(playerId) || !identity || !await (0, database_1.isAuthenticatedPlayer)(playerId, identity.userId)) {
+        res.status(401).json({ error: "Invalid or expired account session" });
+        return;
+    }
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        res.status(503).json({ error: "Account deletion is not configured" });
+        return;
+    }
+    if (!await (0, auth_1.deleteSupabaseIdentity)(identity.userId)) {
+        res.status(503).json({ error: "Could not delete the authentication account" });
+        return;
+    }
+    if (!await (0, database_1.anonymizePlayerAccount)(playerId)) {
+        res.status(503).json({ error: "Authentication was deleted, but game data cleanup needs support" });
+        return;
+    }
+    res.status(204).end();
+});
 app.get("/players/:deviceId/stars", async (req, res) => {
     const deviceId = req.params.deviceId;
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(deviceId)) {

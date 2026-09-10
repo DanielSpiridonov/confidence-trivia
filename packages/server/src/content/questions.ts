@@ -284,10 +284,10 @@ const SEED_QUESTIONS: QuestionRecord[] = [
   },
   {
     id: "q22", type: "multiple_choice", category: "geography", difficulty: "easy", basePoints: 1,
-    correctAnswer: 0,
+    correctAnswer: 2,
     translations: {
-      en: { text: "What is the capital of Australia?", options: ["Canberra", "Sydney", "Melbourne", "Perth"] },
-      bg: { text: "Коя е столицата на Австралия?", options: ["Канбера", "Сидни", "Мелбърн", "Пърт"] },
+      en: { text: "Which continent is the Sahara Desert located on?", options: ["Asia", "South America", "Africa", "Australia"] },
+      bg: { text: "На кой континент се намира пустинята Сахара?", options: ["Азия", "Южна Америка", "Африка", "Австралия"] },
     },
   },
   {
@@ -380,10 +380,10 @@ const SEED_QUESTIONS: QuestionRecord[] = [
   },
   {
     id: "q34", type: "ordering", category: "space", difficulty: "easy", basePoints: 1,
-    correctAnswer: [2, 0, 3, 1],
+    correctAnswer: [2, 0, 1, 3],
     translations: {
-      en: { text: "Order these planets from closest to farthest from the Sun.", options: ["Earth", "Neptune", "Mercury", "Jupiter"] },
-      bg: { text: "Подредете планетите от най-близката до най-далечната от Слънцето.", options: ["Земя", "Нептун", "Меркурий", "Юпитер"] },
+      en: { text: "Order these planets from smallest to largest by diameter.", options: ["Earth", "Neptune", "Mercury", "Jupiter"] },
+      bg: { text: "Подреди тези планети от най-малък към най-голям диаметър.", options: ["Земя", "Нептун", "Меркурий", "Юпитер"] },
     },
   },
   {
@@ -428,7 +428,53 @@ const SEED_QUESTIONS: QuestionRecord[] = [
   },
 ];
 
-const QUESTIONS: QuestionRecord[] = [...SEED_QUESTIONS, ...GENERATED_QUESTIONS];
+export const QUESTIONS: QuestionRecord[] = [...SEED_QUESTIONS, ...GENERATED_QUESTIONS].map((question) => ({
+  ...question,
+  basePoints: DIFFICULTY_REWARDS[question.difficulty],
+}));
+
+export function validateQuestionBank(questions: QuestionRecord[] = QUESTIONS): void {
+  const ids = new Set<string>();
+  const localizedQuestions = new Set<string>();
+
+  for (const question of questions) {
+    if (ids.has(question.id)) throw new Error(`Duplicate question id: ${question.id}`);
+    ids.add(question.id);
+
+    if (question.basePoints !== DIFFICULTY_REWARDS[question.difficulty]) {
+      throw new Error(`Wrong base points for ${question.id}`);
+    }
+
+    for (const locale of ["en", "bg"] as const) {
+      const translation = question.translations[locale];
+      if (!translation?.text.trim()) throw new Error(`Missing ${locale} text for ${question.id}`);
+      const fingerprint = `${locale}:${translation.text.trim().toLocaleLowerCase(locale)}:${(translation.options ?? []).join("|").toLocaleLowerCase(locale)}`;
+      if (localizedQuestions.has(fingerprint)) throw new Error(`Duplicate ${locale} question: ${question.id}`);
+      localizedQuestions.add(fingerprint);
+    }
+
+    const enOptions = question.translations.en.options;
+    const bgOptions = question.translations.bg.options;
+    if ((enOptions?.length ?? 0) !== (bgOptions?.length ?? 0)) {
+      throw new Error(`Option count differs between languages for ${question.id}`);
+    }
+
+    if (question.type === "multiple_choice" || question.type === "true_false") {
+      if (!enOptions?.length || !Number.isInteger(question.correctAnswer) || Number(question.correctAnswer) < 0 || Number(question.correctAnswer) >= enOptions.length) {
+        throw new Error(`Invalid answer index for ${question.id}`);
+      }
+    }
+
+    if (question.type === "ordering") {
+      const answer = question.correctAnswer;
+      if (!enOptions?.length || !Array.isArray(answer) || answer.length !== enOptions.length || new Set(answer).size !== enOptions.length || answer.some((value) => !Number.isInteger(value) || value < 0 || value >= enOptions.length)) {
+        throw new Error(`Invalid ordering answer for ${question.id}`);
+      }
+    }
+  }
+}
+
+validateQuestionBank();
 
 /**
  * Selects `count` non-repeating questions for a room. `excludeIds` lets a

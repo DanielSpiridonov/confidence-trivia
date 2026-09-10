@@ -20,13 +20,19 @@
   },
   "rules": {
     "title": "How to Play",
-    "intro": "Answer well, judge your confidence, and outscore the room.",
-    "loop": { "title": "Each round", "body": "Answer before time runs out. When everyone finishes, the countdown shortens and the game moves on." },
-    "confidence": { "title": "Confidence", "body": "After answering, choose your risk. No Confidence is +0 / -0; higher confidence offers a larger reward but a larger penalty." },
-    "classic": { "title": "Classic", "body": "Earn 1 point for Easy, 2 for Medium, and 3 for Hard questions, adjusted by confidence. The highest final score wins." },
-    "damage": { "title": "1v1 Damage", "body": "Correct answers damage your opponent. If both answer correctly, damage is stored in a pot for the next decisive hit. Reduce the opponent to 0 HP." },
-    "ranked": { "title": "Ranked", "body": "Four-player matchmaking. LP is awarded by final placement, not round points. Your first 3 matches determine your starting rank." },
-    "stars": { "title": "Stars", "body": "Stars are currency, separate from match points. Eligible games, daily rewards, and future gifts grant stars for cosmetics and wagers." }
+    "intro": "Everything you need to answer, compete, earn, and play with friends.",
+    "loop": { "title": "Each round", "body": "Answer before time runs out, choose confidence, place an optional side bet, then see the result. When everyone finishes a step, its timer drops to 3 seconds." },
+    "questions": { "title": "Question types", "body": "Rounds can use multiple choice, true or false, written answers, ordering, estimates, or closest-answer questions. Closest Answer ranks guesses by distance from the result." },
+    "confidence": { "title": "Confidence", "body": "Choose your risk after answering: None +0/-0, 1 gives +1/-1, 3 gives +2/-2, 5 gives +3/-4, and 6 gives +4/-5." },
+    "sideBets": { "title": "Side bets", "body": "Optionally predict whether another player's answer is correct or wrong. A right prediction gives +1 point and a wrong one gives -1. You can change or remove it before it locks." },
+    "classic": { "title": "Classic", "body": "Correct Easy, Medium, and Hard questions are worth 1, 2, and 3 points before confidence is applied. The player with the highest score after the final round wins." },
+    "damage": { "title": "1v1 Damage", "body": "Correct answers damage your opponent. If both players are correct, no hit occurs and the damage pot grows for the next decisive round. Reduce the opponent to 0 HP to win." },
+    "ranked": { "title": "Ranked", "body": "Four players compete over 10 rounds. LP depends only on final place: 1st +30, 2nd +15, 3rd +0, 4th -15. Your first 3 matches determine your starting rank." },
+    "stars": { "title": "Stars and wagers", "body": "Stars are account currency, separate from match points. In 1v1, both players stake the selected wager and the winner receives the full pot; a drawn game refunds both stakes." },
+    "dailyRewards": { "title": "Earning stars", "body": "Your first 5 eligible completed games each day award 10 stars. Claim the daily reward to build a 5-day streak worth 10, 20, 30, 50, then 75 stars." },
+    "cosmetics": { "title": "Shop and inventory", "body": "Spend stars on name colors, avatars, and solid or animated frames. Owned items stay in your inventory, and your equipped look appears in rooms and results." },
+    "accounts": { "title": "Accounts and guests", "body": "Guests can play unranked games. Sign in to keep account progress and unlock Ranked, Friends, the Shop, and Inventory. Account names must be unique." },
+    "friends": { "title": "Friends", "body": "Add up to 25 friends. Bless each friend once per UTC day; each claimed blessing gives them 2 stars. Online friends can be challenged to a wagered 1v1 match." }
   },
   "feedback": {
     "actionFailed": "Something went wrong",
@@ -270,7 +276,7 @@
     "signInFailed": "Could not sign in",
     "linkFailed": "Your account signed in, but the guest progress could not be linked.",
     "progressProtected": "Your stars, cosmetics, and game progress are linked to this account.",
-    "protected": "PROTECTED", "localOnly": "LOCAL GUEST", "unlockProfile": "Make your progress yours", "benefitProgress": "Protect progress", "benefitRanked": "Play Ranked", "benefitSocial": "Friends & gifts", "transferHint": "Your current guest progress transfers automatically.", "email": "Email", "namePlaceholder": "Permanent player name", "saveName": "Save", "nameRules": "Use 3-20 letters, numbers, spaces, _ or -.", "nameUpdated": "Player name updated", "nameUpdateFailed": "Could not update name", "stars": "Stars", "games": "Games", "wins": "Wins", "rank": "Rank", "signOut": "Sign out", "signOutConfirm": "Your linked progress will stay safe. This device will return to a new guest profile.", "sessionExpired": "Session expired", "sessionExpiredMessage": "Please sign in again. Your linked progress remains safe."
+    "protected": "PROTECTED", "localOnly": "LOCAL GUEST", "unlockProfile": "Make your progress yours", "benefitProgress": "Protect progress", "benefitRanked": "Play Ranked", "benefitSocial": "Friends & gifts", "transferHint": "Your current guest progress transfers automatically.", "email": "Email", "namePlaceholder": "Permanent player name", "saveName": "Save", "nameRules": "Use 3-20 letters, numbers, spaces, _ or -.", "nameUpdated": "Player name updated", "nameUpdateFailed": "Could not update name", "stars": "Stars", "games": "Games", "wins": "Wins", "rank": "Rank", "signOut": "Sign out", "signOutConfirm": "Your linked progress will stay safe. This device will return to a new guest profile.", "deleteAccount": "Delete account", "deleteForever": "Delete forever", "deleteAccountConfirm": "This permanently removes your login, profile, friends, stars, and cosmetics. Completed match and transaction records remain only as anonymized Deleted User history. This cannot be undone.", "accountDeleted": "Account deleted", "deleteFailed": "Could not delete account", "sessionExpired": "Session expired", "sessionExpiredMessage": "Please sign in again. Your linked progress remains safe."
   },
   "shop": {
     "title": "Customization Shop",

@@ -16,3 +16,18 @@ export async function verifySupabaseIdentity(authorization: string | undefined):
     return null;
   }
 }
+
+export async function deleteSupabaseIdentity(userId: string): Promise<boolean> {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceRoleKey) return false;
+  try {
+    const response = await fetch(`${supabaseUrl.replace(/\/$/, "")}/auth/v1/admin/users/${encodeURIComponent(userId)}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${serviceRoleKey}`, apikey: serviceRoleKey },
+    });
+    return response.ok || response.status === 404;
+  } catch {
+    return false;
+  }
+}

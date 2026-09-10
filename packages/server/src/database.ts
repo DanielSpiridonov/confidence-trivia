@@ -109,6 +109,39 @@ export async function updateAccountDisplayName(playerId: string, authUserId: str
   }
 }
 
+export async function anonymizePlayerAccount(playerId: string): Promise<boolean> {
+  if (!sql) return false;
+  try {
+    return await sql.begin(async (transaction) => {
+      const [player] = await transaction<{ id: string }[]>`
+        select id from public.players
+        where id = ${playerId} and account_type = 'registered'
+        for update
+      `;
+      if (!player) return false;
+
+      await transaction`update public.match_players set display_name = 'Deleted User' where player_id = ${playerId}`;
+      await transaction`delete from public.friendships where ${playerId} in (player_low_id, player_high_id)`;
+      await transaction`delete from public.player_challenges where ${playerId} in (challenger_id, challenged_id)`;
+      await transaction`delete from public.player_presence where player_id = ${playerId}`;
+      await transaction`delete from public.player_cosmetics where player_id = ${playerId}`;
+      await transaction`
+        update public.players set
+          display_name = 'Deleted User', normalized_display_name = null,
+          account_type = 'deleted', auth_user_id = null, auth_provider = null, linked_at = null,
+          stars = 0, total_points = 0, games_played = 0, wins = 0,
+          ranked_lp = 0, ranked_placement_matches = 0, ranked_placement_points = 0,
+          ranked_wins = 0, last_seen_at = now()
+        where id = ${playerId}
+      `;
+      return true;
+    });
+  } catch (error) {
+    console.error("Could not anonymize deleted account", error);
+    return false;
+  }
+}
+
 export async function getDatabaseStatus(): Promise<DatabaseStatus> {
   if (!sql) return "not_configured";
   try {

@@ -10,6 +10,9 @@ const DAILY_REWARD_PRESENT_IMAGE: number = require("../../assets/stars-gift.png"
 const CLAIMED_REWARD_PRESENT_IMAGE: number = require("../../assets/ui-thumbnails/gift-opened.png");
 const RANKED_TROPHY_IMAGE: number = require("../../assets/ui-thumbnails/trophy.png");
 const SHOP_IMAGE: number = require("../../assets/ui-thumbnails/shop.png");
+const INVENTORY_MENU_IMAGE: number = require("../../assets/inventory-icon.png");
+const FRIENDS_MENU_IMAGE: number = require("../../assets/friends-icon.png");
+const NEWS_MENU_IMAGE: number = require("../../assets/news-icon.png");
 const DEFAULT_AVATAR_HEAD_IMAGE: number = require("../../assets/avatar-heads/smart-owl.png");
 const AVATAR_HEAD_IMAGES: Record<string, number> = {
   smart_owl: DEFAULT_AVATAR_HEAD_IMAGE,
@@ -168,7 +171,7 @@ export function HomeScreen({
     remainingSeconds % 60,
   ].map((value) => String(value).padStart(2, "0")).join(":");
   return (
-    <Screen androidScale={ANDROID_MENU_UI_SCALE}>
+    <Screen androidScale={ANDROID_MENU_UI_SCALE * 1.21} androidOverflowScale={1.1}>
       <View style={styles.popupRail}>
         {dailyReward ? (
           <HomePopup
@@ -217,9 +220,9 @@ export function HomeScreen({
       </View>
       <View style={styles.homeMenuDock}>
         <Animated.View pointerEvents={menuOpen ? "auto" : "none"} style={[styles.homeMenuItems, { opacity: menuProgress, transform: [{ translateX: menuProgress.interpolate({ inputRange: [0, 1], outputRange: [44, 0] }) }, { scale: menuProgress.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] }) }] }]}>
-          <Pressable accessibilityRole="button" accessibilityLabel={t("news.title")} onPress={() => openFromMenu(onNews)} style={({ pressed }) => [styles.menuItemButton, pressed && styles.profileButtonPressed]}><View style={styles.menuNewsIcon}><Text style={styles.menuNewsMark}>!</Text></View><Text numberOfLines={1} style={styles.profileLabel}>{t("news.shortTitle")}</Text></Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel={t("home.friends")} onPress={() => openFromMenu(onFriends)} style={({ pressed }) => [styles.menuItemButton, pressed && styles.profileButtonPressed]}><Text style={styles.friendsIcon}>●●</Text><Text numberOfLines={1} style={styles.profileLabel}>{t("home.friends")}</Text></Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel={t("shop.tabs.inventory")} onPress={() => openFromMenu(onInventory)} style={({ pressed }) => [styles.menuItemButton, pressed && styles.profileButtonPressed]}><Text style={styles.inventoryIcon}>▤</Text><Text numberOfLines={1} style={styles.profileLabel}>{t("shop.tabs.inventory")}</Text></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel={t("news.title")} onPress={() => openFromMenu(onNews)} style={({ pressed }) => [styles.menuItemButton, pressed && styles.profileButtonPressed]}><Image source={NEWS_MENU_IMAGE} defaultSource={NEWS_MENU_IMAGE} fadeDuration={0} resizeMode="contain" style={styles.menuItemIcon} /><Text numberOfLines={1} style={styles.profileLabel}>{t("news.shortTitle")}</Text></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel={t("home.friends")} onPress={() => openFromMenu(onFriends)} style={({ pressed }) => [styles.menuItemButton, pressed && styles.profileButtonPressed]}><Image source={FRIENDS_MENU_IMAGE} defaultSource={FRIENDS_MENU_IMAGE} fadeDuration={0} resizeMode="contain" style={styles.menuItemIcon} /><Text numberOfLines={1} style={styles.profileLabel}>{t("home.friends")}</Text></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel={t("shop.tabs.inventory")} onPress={() => openFromMenu(onInventory)} style={({ pressed }) => [styles.menuItemButton, pressed && styles.profileButtonPressed]}><Image source={INVENTORY_MENU_IMAGE} defaultSource={INVENTORY_MENU_IMAGE} fadeDuration={0} resizeMode="contain" style={styles.menuItemIcon} /><Text numberOfLines={1} style={styles.profileLabel}>{t("shop.tabs.inventory")}</Text></Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel={t("home.profile")} onPress={() => openFromMenu(onProfile)} style={({ pressed }) => [styles.menuItemButton, pressed && styles.profileButtonPressed]}><Image source={avatarHead} defaultSource={avatarHead} fadeDuration={0} resizeMode="contain" style={styles.profileAvatar} /><Text numberOfLines={1} style={styles.profileLabel}>{t("home.profile")}</Text></Pressable>
         </Animated.View>
         <Pressable accessibilityRole="button" accessibilityLabel={t("home.menu")} accessibilityState={{ expanded: menuOpen }} onPress={toggleMenu} style={({ pressed }) => [styles.hamburgerButton, pressed && styles.profileButtonPressed]}>
@@ -268,17 +271,14 @@ const styles = StyleSheet.create({
   homePlayButton: Platform.OS === "android" ? { maxWidth: 430, minHeight: 52, paddingVertical: 12, marginTop: 7 } : {},
   homePlayButtonText: Platform.OS === "android" ? { paddingHorizontal: 5, fontSize: 16 } : {},
   homeMenuDock: { position: "absolute", right: 8, bottom: Platform.OS === "android" ? 26 : 4, height: 44, zIndex: 12 },
-  homeMenuItems: { position: "absolute", right: 52, bottom: 0, height: 44, flexDirection: "row", gap: 6 },
-  menuItemButton: { width: 106, height: 44, paddingHorizontal: 7, borderRadius: 14, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, borderWidth: 2, borderColor: "#7C5CFF", backgroundColor: "rgba(12,9,23,0.94)" },
+  homeMenuItems: { position: "absolute", right: 72, bottom: 0, height: 44, flexDirection: "row", gap: 6 },
+  menuItemButton: { minWidth: 106, height: 44, paddingHorizontal: 10, borderRadius: 14, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, borderWidth: 2, borderColor: "#A982FF", backgroundColor: "rgba(42,25,72,0.97)", shadowColor: "#7C5CFF", shadowOpacity: 0.42, shadowRadius: 5, shadowOffset: { width: 0, height: 2 }, elevation: 5 },
   hamburgerButton: { width: 44, height: 44, borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#7C5CFF", backgroundColor: "rgba(12,9,23,0.96)" },
   hamburgerIcon: { color: "#B9AAFF", fontSize: 27, lineHeight: 30, fontWeight: "900" },
-  inventoryIcon: { width: 30, color: "#7C5CFF", fontSize: 27, lineHeight: 31, fontWeight: "900", textAlign: "center" },
-  friendsIcon: { width: 31, color: "#7C5CFF", fontSize: 13, letterSpacing: -2, fontWeight: "900", textAlign: "center" },
+  menuItemIcon: { width: 32, height: 32 },
   profileButtonPressed: { opacity: 0.72, transform: [{ scale: 0.97 }] },
   profileAvatar: { width: 34, height: 34 },
-  profileLabel: { color: "#7C5CFF", fontSize: 14, fontWeight: "800", flexShrink: 1 },
-  menuNewsIcon: { width: 27, height: 27, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: "#7C5CFF" },
-  menuNewsMark: { color: "#FFF", fontSize: 19, lineHeight: 21, fontWeight: "900" },
+  profileLabel: { color: "#7C5CFF", fontSize: 14, fontWeight: "800", flexShrink: 0 },
   popupRail: { position: "absolute", left: Platform.OS === "android" ? 24 : 1, top: 38, bottom: 12, width: SIDEBAR_ITEM_WIDTH, justifyContent: "flex-start", gap: 3, zIndex: 5 },
   popup: { width: SIDEBAR_ITEM_WIDTH, height: SIDEBAR_ITEM_HEIGHT, alignItems: "center", justifyContent: "flex-end", paddingBottom: 2 },
   popupDisabled: { opacity: 0.55 },

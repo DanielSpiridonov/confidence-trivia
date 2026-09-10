@@ -28,7 +28,7 @@ import { ProfileScreen } from "./src/screens/ProfileScreen";
 import { RulesScreen } from "./src/screens/RulesScreen";
 import { FriendsScreen } from "./src/screens/FriendsScreen";
 import { NewsScreen } from "./src/screens/NewsScreen";
-import { AccountProfile, claimDailyReward, createRoom, DailyRewardStatus, getAccountProfile, getChallenges, getDailyRewardStatus, getPlayerStars, joinPublicRoom, joinRoom, linkPlayerAccount, PlayerChallenge, reconnectRoom, respondChallenge, updateAccountName, updatePresence, useRoomState } from "./src/network/client";
+import { AccountProfile, claimDailyReward, createRoom, DailyRewardStatus, deleteAccount, getAccountProfile, getChallenges, getDailyRewardStatus, getPlayerStars, joinPublicRoom, joinRoom, linkPlayerAccount, PlayerChallenge, reconnectRoom, respondChallenge, updateAccountName, updatePresence, useRoomState } from "./src/network/client";
 import { prepareSoundEffects, setSoundEffectsVolume, stopAllSoundEffects } from "./src/audio/sounds";
 import { pauseMusicForBackground, prepareMusic, setMusicVolume as applyMusicVolume, startMenuMusic, stopMenuMusic } from "./src/audio/music";
 import { createFreshGuestIdentity, getOrCreateDeviceId, getOrCreateGuestName } from "./src/utils/deviceId";
@@ -55,6 +55,16 @@ const UI_PRELOAD_IMAGES = [
   require("./assets/avatar-thumbnails/trivia-wizard.png"),
   require("./assets/avatar-thumbnails/detective.png"),
   require("./assets/avatar-thumbnails/globe.png"),
+  require("./assets/avatar-heads/smart-owl.png"),
+  require("./assets/avatar-heads/fox.png"),
+  require("./assets/avatar-heads/quiz-bot.png"),
+  require("./assets/avatar-heads/omniscient.png"),
+  require("./assets/avatar-heads/trivia-wizard.png"),
+  require("./assets/avatar-heads/detective.png"),
+  require("./assets/avatar-heads/globe.png"),
+  require("./assets/inventory-icon.png"),
+  require("./assets/friends-icon.png"),
+  require("./assets/news-icon.png"),
   require("./assets/popup-platform.png"),
   require("./assets/stars-gift.png"),
   require("./assets/ui-thumbnails/gift-opened.png"),
@@ -259,7 +269,6 @@ export default function App() {
 
     const applyAndroidSystemBars = () => {
       void (async () => {
-        await NavigationBar.setBehaviorAsync("overlay-swipe");
         await NavigationBar.setVisibilityAsync("hidden");
       })().catch(() => {
         // Some Android gesture-navigation modes do not expose bar visibility.
@@ -430,6 +439,23 @@ export default function App() {
           setGuestPlayerId(guest.deviceId); setDeviceId(guest.deviceId); setDefaultPlayerName(guest.displayName); setRegisteredAccount(null); setStars(0);
         } finally { intentionalSignOutRef.current = false; setAuthBusy(false); }
       })() });
+  }
+
+  function handleDeleteAccount() {
+    if (!registeredAccount) return;
+    showDialog({ title: i18n.t("account.deleteAccount"), message: i18n.t("account.deleteAccountConfirm"), cancelLabel: i18n.t("validation.cancel"), confirmLabel: i18n.t("account.deleteForever"), destructive: true, onConfirm: () => void (async () => {
+      setAuthBusy(true);
+      try {
+        await deleteAccount(registeredAccount.playerId);
+        intentionalSignOutRef.current = true;
+        await signOutAccount();
+        const guest = await createFreshGuestIdentity();
+        setGuestPlayerId(guest.deviceId); setDeviceId(guest.deviceId); setDefaultPlayerName(guest.displayName); setRegisteredAccount(null); setStars(0); setNav("home");
+        showFeedback(i18n.t("account.accountDeleted"), undefined, "success");
+      } catch (error) {
+        showFeedback(i18n.t("account.deleteFailed"), error instanceof Error ? error.message : i18n.t("feedback.tryAgain"));
+      } finally { intentionalSignOutRef.current = false; setAuthBusy(false); }
+    })() });
   }
 
   function openRegisteredFeature(destination: "shop" | "ranked" | "friends", open: () => void) {
@@ -849,6 +875,7 @@ export default function App() {
               onGoogle={() => void handleSocialSignIn("google")}
               onSaveName={(name) => void handleAccountName(name)}
               onSignOut={handleSignOut}
+              onDeleteAccount={handleDeleteAccount}
               onBack={() => setNav("home")}
             />
           )}
