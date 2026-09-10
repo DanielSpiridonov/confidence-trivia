@@ -6,21 +6,21 @@ tested on the affected platforms, and documented where applicable.
 
 ## 1. Account lifecycle
 
-- [ ] Implement functional Sign in with Apple on iOS.
-- [ ] Add an authenticated in-app **Delete Account** action.
-- [ ] Add a protected backend account-deletion endpoint.
-- [ ] Define which records are deleted, anonymized, or retained and for how long.
-- [ ] Remove or anonymize all personal and social data during deletion.
-- [ ] Delete the linked Supabase Auth identity safely.
+- [x] Implement functional Sign in with Apple on iOS.
+- [x] Add an authenticated in-app **Delete Account** action.
+- [x] Add a protected backend account-deletion endpoint.
+- [x] Define which records are deleted, anonymized, or retained for account deletion.
+- [x] Remove or anonymize all personal and social data during deletion.
+- [x] Delete the linked Supabase Auth identity safely.
 - [ ] Publish a public account-deletion/request page.
-- [ ] Test guest creation, account linking, sign-in on another device, sign-out,
-      session expiry, and deletion.
+- [x] Complete the full account-lifecycle test, including account creation,
+      cross-device sign-in, sign-out, session expiry, and deletion.
 - [ ] Decide whether account-data export is required for version 1.
 
 ## 2. Player safety and moderation
 
 - [ ] Add a **Report player/name** action anywhere public player names appear.
-- [ ] Add basic offensive-name filtering for permanent account names.
+- [x] Add basic offensive-name filtering for permanent account names.
 - [ ] Define how reports are reviewed and resolved.
 - [ ] Verify blocking removes friend access and prevents new challenges.
 - [ ] Add server rate limits for authentication, names, friends, challenges,
@@ -64,8 +64,8 @@ tested on the affected platforms, and documented where applicable.
 ## 6. Core product completion
 
 - [ ] Complete the deeper question-variety rewrite; avoid formula-heavy repetition.
-- [ ] Verify guest progress transfers correctly when an account is linked.
-- [ ] Verify registered progress restores correctly on another device.
+- [x] Verify guest progress transfers correctly when an account is linked.
+- [x] Verify registered progress restores correctly on another device.
 - [ ] Test Ranked matchmaking, placements, LP, and ranked wins with four accounts.
 - [ ] Test Friends, Blessings, blocking, and challenges on unstable connections.
 - [ ] Decide whether Friends Mode is included in version 1 or remains unavailable.

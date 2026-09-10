@@ -1,23 +1,32 @@
 import React from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import * as AppleAuthentication from "expo-apple-authentication";
+import { isOffensivePlayerName } from "@confidence-trivia/shared";
 import { useTranslation } from "react-i18next";
 import { AccountProfile } from "../network/client";
 import { ANDROID_MENU_UI_SCALE, BackIconButton, Screen, Title, theme } from "../components/ui";
 
 interface Props {
   displayName: string; registered: boolean; provider: string | null; profile: AccountProfile | null;
-  busy: boolean; authAvailable: boolean; onGoogle: () => void; onSaveName: (name: string) => void;
+  linkedProviders: string[];
+  busy: boolean; authAvailable: boolean; onGoogle: () => void; onApple: () => void; onSaveName: (name: string) => void;
+  onLinkGoogle: () => void; onLinkApple: () => void;
   onSignOut: () => void; onDeleteAccount: () => void; onBack: () => void;
 }
 
 export function ProfileScreen(props: Props) {
-  const { displayName, registered, provider, profile, busy, authAvailable, onGoogle, onSaveName, onSignOut, onDeleteAccount, onBack } = props;
+  const { displayName, registered, provider, profile, linkedProviders, busy, authAvailable, onGoogle, onApple, onLinkGoogle, onLinkApple, onSaveName, onSignOut, onDeleteAccount, onBack } = props;
   const { t } = useTranslation();
   const [name, setName] = React.useState(displayName);
+  const [appleAvailable, setAppleAvailable] = React.useState(false);
   const trimmedName = name.trim();
-  const valid = /^[\p{L}\p{N} _-]{3,20}$/u.test(trimmedName);
+  const structurallyValid = /^[\p{L}\p{N} _-]{3,20}$/u.test(trimmedName);
+  const offensive = structurallyValid && isOffensivePlayerName(trimmedName);
+  const valid = structurallyValid && !offensive;
+  const emailDisplay = profile?.email?.toLowerCase().endsWith("@privaterelay.appleid.com") ? t("account.hiddenEmail") : profile?.email ?? "-";
   const initials = displayName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "?";
   React.useEffect(() => setName(displayName), [displayName]);
+  React.useEffect(() => { void AppleAuthentication.isAvailableAsync().then(setAppleAvailable).catch(() => setAppleAvailable(false)); }, []);
 
   return <Screen style={s.screen} androidScale={ANDROID_MENU_UI_SCALE}>
     <BackIconButton label={t("common.back")} onPress={onBack} disabled={busy} />
@@ -35,17 +44,19 @@ export function ProfileScreen(props: Props) {
           <Text style={[s.badge, registered && s.protectedBadge]}>{registered ? t("account.protected") : t("account.localOnly")}</Text>
           {registered && profile ? <View style={s.emailBlock}>
             <Text style={s.eyebrow}>{t("account.email")}</Text>
-            <Text numberOfLines={1} style={s.email}>{profile.email ?? "-"}</Text>
+            <Text numberOfLines={1} style={s.email}>{emailDisplay}</Text>
           </View> : <View style={s.guestIntro}>
             <Text style={s.sectionTitle}>{t("account.unlockProfile")}</Text>
             <Text style={s.bodyText}>{t("account.guestLimits")}</Text>
           </View>}
-          {registered ? <Pressable accessibilityRole="button" disabled={busy} onPress={onSignOut} style={({ pressed }) => [s.signOut, pressed && s.pressed]}>
-            <Text style={s.signOutText}>{t("account.signOut")}</Text>
-          </Pressable> : null}
-          {registered ? <Pressable accessibilityRole="button" disabled={busy} onPress={onDeleteAccount} style={({ pressed }) => [s.deleteAccount, pressed && s.pressed]}>
-            <Text style={s.deleteAccountText}>{t("account.deleteAccount")}</Text>
-          </Pressable> : null}
+          {registered ? <View style={s.accountActions}>
+            <Pressable accessibilityRole="button" disabled={busy} onPress={onSignOut} style={({ pressed }) => [s.accountAction, pressed && s.pressed]}>
+              <Text numberOfLines={1} adjustsFontSizeToFit style={s.accountActionText}>{t("account.signOut")}</Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" disabled={busy} onPress={onDeleteAccount} style={({ pressed }) => [s.accountAction, pressed && s.pressed]}>
+              <Text numberOfLines={1} adjustsFontSizeToFit style={s.accountActionText}>{t("account.deleteAccount")}</Text>
+            </Pressable>
+          </View> : null}
         </View>
 
         <View style={s.divider} />
@@ -54,11 +65,11 @@ export function ProfileScreen(props: Props) {
             <Text style={s.eyebrow}>{t("account.namePlaceholder")}</Text>
             <View style={s.editor}>
               <TextInput value={name} onChangeText={setName} maxLength={20} style={s.input} placeholder={t("account.namePlaceholder")} placeholderTextColor={theme.textDim} returnKeyType="done" onSubmitEditing={() => valid && trimmedName !== displayName && onSaveName(trimmedName)} />
-              <Pressable accessibilityRole="button" disabled={busy || !valid || trimmedName === displayName} onPress={() => onSaveName(trimmedName)} style={({ pressed }) => [s.save, (!valid || trimmedName === displayName) && s.disabled, pressed && s.pressed]}>
+              <Pressable accessibilityRole="button" disabled={busy || !structurallyValid || trimmedName === displayName} onPress={() => onSaveName(trimmedName)} style={({ pressed }) => [s.save, (!structurallyValid || trimmedName === displayName) && s.disabled, pressed && s.pressed]}>
                 <Text style={s.buttonText}>{t("account.saveName")}</Text>
               </Pressable>
             </View>
-            {!valid && name.length > 0 ? <Text style={s.error}>{t("account.nameRules")}</Text> : null}
+            {offensive ? <Text style={s.error}>{t("account.offensiveName")}</Text> : !structurallyValid && name.length > 0 ? <Text style={s.error}>{t("account.nameRules")}</Text> : null}
             <View style={s.stats}>
               <Stat label={t("account.stars")} value={profile.stars} />
               <Stat label={t("account.games")} value={profile.gamesPlayed} />
@@ -67,6 +78,14 @@ export function ProfileScreen(props: Props) {
               <Stat label="LP" value={profile.rankedLp} last />
             </View>
             <Text style={s.protectedText}>{t("account.progressProtected")}</Text>
+            <View style={s.linkedMethods}>
+              <Text style={s.eyebrow}>{t("account.signInMethods")}</Text>
+              <View style={s.providerRow}>
+                <ProviderButton label="Google" linked={linkedProviders.includes("google")} disabled={busy} onPress={onLinkGoogle} />
+                {appleAvailable ? <ProviderButton label="Apple" linked={linkedProviders.includes("apple")} disabled={busy} onPress={onLinkApple} /> : null}
+              </View>
+              <Text style={s.linkHint}>{t("account.linkIdentityHint")}</Text>
+            </View>
           </> : <>
             <View style={s.benefits}>
               <Benefit text={t("account.benefitProgress")} />
@@ -78,7 +97,9 @@ export function ProfileScreen(props: Props) {
             <Pressable accessibilityRole="button" disabled={busy || !authAvailable} onPress={onGoogle} style={({ pressed }) => [s.google, (!authAvailable || busy) && s.disabled, pressed && s.pressed]}>
               <View style={s.googleIcon}><Text style={s.googleLetter}>G</Text></View><Text style={s.buttonText}>{t("account.google")}</Text>
             </Pressable>
-            <View style={s.apple}><Text style={s.appleMark}>A</Text><Text style={s.appleText}>{t("account.appleComingSoon")}</Text></View>
+            {appleAvailable ? <View pointerEvents={busy || !authAvailable ? "none" : "auto"} style={[s.appleWrap, (busy || !authAvailable) && s.disabled]}>
+              <AppleAuthentication.AppleAuthenticationButton buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE} buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE} cornerRadius={6} style={s.appleButton} onPress={onApple} />
+            </View> : null}
           </>}
         </View>
         {busy ? <View style={s.loader} pointerEvents="none"><ActivityIndicator color={theme.primary} /></View> : null}
@@ -93,6 +114,13 @@ function Stat({ label, value, last = false }: { label: string; value: string | n
 
 function Benefit({ text }: { text: string }) {
   return <View style={s.benefit}><Text style={s.check}>+</Text><Text numberOfLines={1} adjustsFontSizeToFit style={s.benefitText}>{text}</Text></View>;
+}
+
+function ProviderButton({ label, linked, disabled, onPress }: { label: string; linked: boolean; disabled: boolean; onPress: () => void }) {
+  const { t } = useTranslation();
+  return <Pressable accessibilityRole="button" disabled={disabled || linked} onPress={onPress} style={({ pressed }) => [s.providerButton, linked && s.providerLinked, disabled && s.disabled, pressed && s.pressed]}>
+    <Text numberOfLines={1} style={s.providerText}>{linked ? `\u2713 ${label}` : t("account.linkProvider", { provider: label })}</Text>
+  </Pressable>;
 }
 
 const s = StyleSheet.create({
@@ -113,12 +141,17 @@ const s = StyleSheet.create({
   error: { color: "#FF9B9B", fontSize: 9, marginTop: 4 }, stats: { minHeight: 58, flexDirection: "row", alignItems: "stretch", marginTop: 14, borderTopWidth: 1, borderBottomWidth: 1, borderColor: "rgba(185,176,214,.18)" },
   stat: { flex: 1, minWidth: 0, alignItems: "center", justifyContent: "center", borderRightWidth: 1, borderRightColor: "rgba(185,176,214,.18)", paddingHorizontal: 3 }, lastStat: { borderRightWidth: 0 },
   statValue: { width: "100%", color: theme.text, fontSize: 14, fontWeight: "900", textAlign: "center" }, statLabel: { color: theme.textDim, fontSize: 8, fontWeight: "800", marginTop: 2 }, protectedText: { color: theme.textDim, fontSize: 9, textAlign: "center", marginTop: 8 },
-  signOut: { alignSelf: "flex-start", marginTop: "auto", paddingHorizontal: 13, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: "#D96E79" }, signOutText: { color: "#FF9B9B", fontSize: 10, fontWeight: "900" },
-  deleteAccount: { alignSelf: "flex-start", marginTop: 6, paddingHorizontal: 13, paddingVertical: 5 }, deleteAccountText: { color: "#FF7D8B", fontSize: 9, fontWeight: "800", textDecorationLine: "underline" },
+  accountActions: { flexDirection: "row", gap: 7, marginTop: "auto" },
+  accountAction: { flex: 1, minWidth: 0, alignItems: "center", justifyContent: "center", paddingHorizontal: 8, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: "#D96E79" },
+  accountActionText: { width: "100%", color: "#FF9B9B", fontSize: 10, fontWeight: "900", textAlign: "center" },
   benefits: { gap: 2 }, benefit: { minHeight: 27, flexDirection: "row", alignItems: "center" }, check: { width: 20, height: 20, borderRadius: 10, color: "#171329", backgroundColor: "#9FE5B1", textAlign: "center", lineHeight: 20, fontSize: 14, fontWeight: "900", marginRight: 8 }, benefitText: { flex: 1, color: theme.text, fontSize: 11, fontWeight: "800" },
   transferHint: { color: theme.textDim, fontSize: 9, marginTop: 5 }, warning: { color: "#F7D85B", fontSize: 9, lineHeight: 12, marginTop: 5 },
+  linkedMethods: { marginTop: 9 }, providerRow: { flexDirection: "row", gap: 7, marginTop: 5 },
+  providerButton: { flex: 1, minHeight: 29, alignItems: "center", justifyContent: "center", borderRadius: 6, borderWidth: 1, borderColor: "#7C5CFF", backgroundColor: "rgba(124,92,255,.16)", paddingHorizontal: 5 },
+  providerLinked: { borderColor: "rgba(124,255,160,.45)", backgroundColor: "rgba(124,255,160,.10)" }, providerText: { color: theme.text, fontSize: 9, fontWeight: "900" },
+  linkHint: { color: theme.textDim, fontSize: 8, lineHeight: 11, marginTop: 4 },
   google: { minHeight: 36, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 6, backgroundColor: "#4285F4", marginTop: 9 },
   googleIcon: { width: 21, height: 21, borderRadius: 11, alignItems: "center", justifyContent: "center", backgroundColor: "#FFF" }, googleLetter: { color: "#4285F4", fontSize: 12, fontWeight: "900" },
-  apple: { minHeight: 32, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, borderRadius: 6, borderWidth: 1, borderColor: "rgba(255,255,255,.22)", marginTop: 5, opacity: .5 }, appleMark: { color: "#FFF", fontSize: 10, fontWeight: "900" }, appleText: { color: "#FFF", fontSize: 10, fontWeight: "800" },
+  appleWrap: { width: "100%", height: 36, marginTop: 5 }, appleButton: { width: "100%", height: 36 },
   disabled: { opacity: .4 }, pressed: { opacity: .75 }, loader: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(23,19,41,.35)" },
 });

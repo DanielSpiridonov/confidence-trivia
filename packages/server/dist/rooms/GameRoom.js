@@ -14,7 +14,7 @@ function isValidPlayerName(name) {
     if (typeof name !== "string")
         return false;
     const trimmed = name.trim();
-    return trimmed.length > 0 && trimmed.length <= 20 && PLAYER_NAME_PATTERN.test(trimmed);
+    return trimmed.length > 0 && trimmed.length <= 20 && PLAYER_NAME_PATTERN.test(trimmed) && !(0, shared_1.isOffensivePlayerName)(trimmed);
 }
 function isValidDeviceId(deviceId) {
     return typeof deviceId === "string" && DEVICE_ID_PATTERN.test(deviceId);

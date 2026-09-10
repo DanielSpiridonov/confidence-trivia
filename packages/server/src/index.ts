@@ -5,7 +5,7 @@ import { WebSocketTransport } from "@colyseus/ws-transport";
 import { GameRoom } from "./rooms/GameRoom";
 import { anonymizePlayerAccount, claimAllFriendGifts, claimDailyReward, claimFriendGift, createPlayerChallenge, equipFreeAvatar, equipFreeFrame, equipFreeNameColor, getAccountProfile, getDailyRewardStatus, getDatabaseStatus, getNewsPosts, getPlayerChallenges, getPlayerCustomization, getPlayerStars, getRankedLeaderboard, isAuthenticatedPlayer, linkPlayerAccount, listFriends, redeemPromoCode, respondToFriendRequest, respondToPlayerChallenge, searchFriendPlayers, sendFriendGift, sendFriendRequest, suggestFriendPlayers, updateAccountDisplayName, updateFriendRelationship, updatePlayerPresence } from "./database";
 import { deleteSupabaseIdentity, verifySupabaseIdentity } from "./auth";
-import { isDamageWager } from "@confidence-trivia/shared";
+import { isDamageWager, isOffensivePlayerName } from "@confidence-trivia/shared";
 
 const port = Number(process.env.PORT ?? 2567);
 const app = express();
@@ -65,6 +65,7 @@ app.patch("/accounts/me/name", async (req, res) => {
   const identity = await verifySupabaseIdentity(req.headers.authorization);
   if (!isDeviceId(playerId) || !identity) { res.status(401).json({ error: "Invalid or expired account session" }); return; }
   if (!/^[\p{L}\p{N} _-]{3,20}$/u.test(displayName)) { res.status(400).json({ error: "Name must be 3-20 characters using letters, numbers, spaces, _ or -" }); return; }
+  if (isOffensivePlayerName(displayName)) { res.status(400).json({ error: "Offensive language is not allowed in player names" }); return; }
   const profile = await updateAccountDisplayName(playerId, identity.userId, displayName);
   if (profile === "taken") { res.status(409).json({ error: "That name is already taken" }); return; }
   if (!profile) { res.status(503).json({ error: "Could not update profile" }); return; }

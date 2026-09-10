@@ -23,6 +23,7 @@ import {
   RANKED_PLAYER_COUNT,
   DEFAULT_DAMAGE_WAGER,
   isDamageWager,
+  isOffensivePlayerName,
 } from "@confidence-trivia/shared";
 import {
   RoomStateSchema,
@@ -56,7 +57,7 @@ const DEVICE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{
 function isValidPlayerName(name: unknown): name is string {
   if (typeof name !== "string") return false;
   const trimmed = name.trim();
-  return trimmed.length > 0 && trimmed.length <= 20 && PLAYER_NAME_PATTERN.test(trimmed);
+  return trimmed.length > 0 && trimmed.length <= 20 && PLAYER_NAME_PATTERN.test(trimmed) && !isOffensivePlayerName(trimmed);
 }
 
 function isValidDeviceId(deviceId: unknown): deviceId is string {

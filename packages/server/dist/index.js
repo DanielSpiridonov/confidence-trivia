@@ -86,6 +86,10 @@ app.patch("/accounts/me/name", async (req, res) => {
         res.status(400).json({ error: "Name must be 3-20 characters using letters, numbers, spaces, _ or -" });
         return;
     }
+    if ((0, shared_1.isOffensivePlayerName)(displayName)) {
+        res.status(400).json({ error: "Offensive language is not allowed in player names" });
+        return;
+    }
     const profile = await (0, database_1.updateAccountDisplayName)(playerId, identity.userId, displayName);
     if (profile === "taken") {
         res.status(409).json({ error: "That name is already taken" });

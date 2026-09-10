@@ -4,6 +4,7 @@ import { StatusBar } from "expo-status-bar";
 import * as NavigationBar from "expo-navigation-bar";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Room } from "colyseus.js";
+import { isOffensivePlayerName } from "@confidence-trivia/shared";
 import "./src/i18n";
 import i18n from "./src/i18n";
 import { BigButton, GAME_BACKGROUND, theme } from "./src/components/ui";
@@ -32,7 +33,7 @@ import { AccountProfile, claimDailyReward, createRoom, DailyRewardStatus, delete
 import { prepareSoundEffects, setSoundEffectsVolume, stopAllSoundEffects } from "./src/audio/sounds";
 import { pauseMusicForBackground, prepareMusic, setMusicVolume as applyMusicVolume, startMenuMusic, stopMenuMusic } from "./src/audio/music";
 import { createFreshGuestIdentity, getOrCreateDeviceId, getOrCreateGuestName } from "./src/utils/deviceId";
-import { authConfigured, getStoredSession, signInWithSocialProvider, signOutAccount, subscribeToAuthChanges } from "./src/auth/supabase";
+import { authConfigured, getLinkedProviders, getStoredSession, linkAppleIdentity, linkGoogleIdentity, signInWithApple, signInWithSocialProvider, signOutAccount, subscribeToAuthChanges } from "./src/auth/supabase";
 
 type Nav = "home" | "create" | "join" | "ranked" | "shop" | "settings" | "profile" | "friends" | "rules" | "in-room";
 type RoomRecoveryState = "reconnecting" | "failed";
@@ -245,6 +246,7 @@ export default function App() {
   const [guestPlayerId, setGuestPlayerId] = useState<string | null>(null);
   const [registeredAccount, setRegisteredAccount] = useState<AccountProfile | null>(null);
   const [authBusy, setAuthBusy] = useState(false);
+  const [linkedProviders, setLinkedProviders] = useState<string[]>([]);
   const [stars, setStars] = useState(0);
   const [starGain, setStarGain] = useState<{ id: number; amount: number } | null>(null);
   const [incomingChallenge, setIncomingChallenge] = useState<PlayerChallenge | null>(null);
@@ -397,7 +399,7 @@ export default function App() {
     if (!guestPlayerId || authBusy) return;
     setAuthBusy(true);
     try {
-      const session = await signInWithSocialProvider(provider);
+      const session = provider === "apple" ? await signInWithApple() : await signInWithSocialProvider(provider);
       await applyAuthenticatedSession(guestPlayerId, session.access_token);
     } catch (error) {
       if (error instanceof Error && error.message === "auth_cancelled") return;
@@ -407,8 +409,42 @@ export default function App() {
     }
   }
 
+  const refreshLinkedProviders = React.useCallback(async () => {
+    if (!registeredAccount) {
+      setLinkedProviders([]);
+      return;
+    }
+    try {
+      setLinkedProviders(await getLinkedProviders());
+    } catch {
+      setLinkedProviders(registeredAccount.provider ? [registeredAccount.provider] : []);
+    }
+  }, [registeredAccount]);
+
+  useEffect(() => { void refreshLinkedProviders(); }, [refreshLinkedProviders]);
+
+  async function handleLinkIdentity(provider: "google" | "apple") {
+    if (!registeredAccount || authBusy || linkedProviders.includes(provider)) return;
+    setAuthBusy(true);
+    try {
+      if (provider === "apple") await linkAppleIdentity();
+      else await linkGoogleIdentity();
+      await refreshLinkedProviders();
+      showFeedback(i18n.t("account.identityLinkedTitle"), i18n.t("account.identityLinked", { provider: provider === "apple" ? "Apple" : "Google" }), "success");
+    } catch (error) {
+      if (error instanceof Error && error.message === "auth_cancelled") return;
+      showFeedback(i18n.t("account.identityLinkFailed"), error instanceof Error ? error.message : i18n.t("network.unknownError"));
+    } finally {
+      setAuthBusy(false);
+    }
+  }
+
   async function handleAccountName(displayName: string) {
     if (!registeredAccount || authBusy) return;
+    if (isOffensivePlayerName(displayName)) {
+      showFeedback(i18n.t("account.offensiveNameTitle"), i18n.t("account.offensiveName"));
+      return;
+    }
     const previousAccount = registeredAccount;
     const previousName = defaultPlayerName;
     setAuthBusy(true);
@@ -869,10 +905,14 @@ export default function App() {
               displayName={defaultPlayerName}
               registered={Boolean(registeredAccount)}
               provider={registeredAccount?.provider ?? null}
+              linkedProviders={linkedProviders}
               profile={registeredAccount}
               busy={authBusy}
               authAvailable={authConfigured}
               onGoogle={() => void handleSocialSignIn("google")}
+              onApple={() => void handleSocialSignIn("apple")}
+              onLinkGoogle={() => void handleLinkIdentity("google")}
+              onLinkApple={() => void handleLinkIdentity("apple")}
               onSaveName={(name) => void handleAccountName(name)}
               onSignOut={handleSignOut}
               onDeleteAccount={handleDeleteAccount}

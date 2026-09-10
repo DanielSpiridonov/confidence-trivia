@@ -25,3 +25,4 @@ __exportStar(require("./config/damageWager"), exports);
 __exportStar(require("./config/cosmetics"), exports);
 __exportStar(require("./scoring/computeRoundResults"), exports);
 __exportStar(require("./scoring/isAnswerCorrect"), exports);
+__exportStar(require("./moderation/playerName"), exports);
