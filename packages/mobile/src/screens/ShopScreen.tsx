@@ -294,7 +294,10 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
                 {item.bonus ? <Text style={styles.packBonus}>{item.bonus}</Text> : null}
                 <Image source={STAR_PACK_IMAGES[item.name]} defaultSource={STAR_PACK_IMAGES[item.name]} fadeDuration={0} resizeMode="contain" style={[styles.packImage, { width: 79 + index * 4, height: 79 + index * 4 }]} />
                 <Text style={styles.packAmount}>{item.stars}</Text>
-                <Pressable disabled style={[styles.buyButton, item.rewardedAd && styles.watchAdButton]}><Text style={styles.buyText}>{item.rewardedAd ? t("shop.watchAd") : item.price}</Text></Pressable>
+                <Pressable disabled style={[styles.buyButton, item.rewardedAd && styles.watchAdButton]}>
+                  <Text style={styles.buyText}>{item.rewardedAd ? t("shop.watchAd") : item.price}</Text>
+                  {item.rewardedAd ? <Text style={styles.comingSoonText}>{t("shop.comingSoon")}</Text> : null}
+                </Pressable>
               </View>
             )} />
           </View>
@@ -442,5 +445,6 @@ const styles = StyleSheet.create({
   packAmount: { color: "#F7D85B", fontSize: 18, fontWeight: "900", marginTop: 1 },
   buyButton: { width: "100%", marginTop: 8, paddingVertical: 5, alignItems: "center", borderRadius: 7, backgroundColor: "rgba(124,92,255,0.7)" },
   watchAdButton: { backgroundColor: "rgba(52,164,103,0.78)" },
+  comingSoonText: { color: "rgba(255,255,255,.72)", fontSize: 8, fontWeight: "800", marginTop: 1 },
   buyText: { color: theme.text, fontSize: 11, fontWeight: "900" },
 });

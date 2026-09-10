@@ -23,21 +23,21 @@ tested on the affected platforms, and documented where applicable.
 - [x] Add basic offensive-name filtering for permanent account names.
 - [x] Define how reports are reviewed and resolved.
 - [x] Verify blocking removes friend access and prevents new challenges.
-- [ ] Add server rate limits for authentication, names, friends, challenges,
+- [x] Add server rate limits for authentication, names, friends, challenges,
       blessings, promo codes, and daily rewards.
-- [ ] Add protections against repeated automated requests and reward abuse.
+- [x] Add protections against repeated automated requests and reward abuse.
 
 ## 3. Privacy and data handling
 
-- [ ] Maintain a verified inventory of collected, transmitted, and stored data.
-- [ ] Define retention periods for guests, accounts, matches, ranked history,
+- [x] Maintain a verified inventory of collected, transmitted, and stored data.
+- [x] Define retention periods for guests, accounts, matches, ranked history,
       currency ledgers, friendships, challenges, presence, and server logs.
-- [ ] Verify that every production API and WebSocket connection uses HTTPS/WSS.
-- [ ] Review public endpoints and require authentication wherever data does not
+- [x] Enforce HTTPS/WSS for production API and WebSocket connections.
+- [x] Review public endpoints and require authentication wherever data does not
       need to be public.
 - [ ] Document Supabase and Render regions, subprocessors, and retention settings.
-- [ ] Remove unused Android microphone/audio-recording permissions.
-- [ ] Ensure production logs never expose access tokens or unnecessary personal data.
+- [x] Remove unused Android microphone/audio-recording permissions.
+- [x] Ensure production logs never expose access tokens or unnecessary personal data.
 
 ## 4. Legal documents and owner information
 
@@ -69,7 +69,7 @@ tested on the affected platforms, and documented where applicable.
 - [ ] Test Ranked matchmaking, placements, LP, and ranked wins with four accounts.
 - [ ] Test Friends, Blessings, blocking, and challenges on unstable connections.
 - [ ] Decide whether Friends Mode is included in version 1 or remains unavailable.
-- [ ] Ensure unavailable/future features cannot be mistaken for working purchases.
+- [x] Ensure unavailable/future features cannot be mistaken for working purchases.
 
 ## 7. Reliability and security
 
@@ -77,8 +77,8 @@ tested on the affected platforms, and documented where applicable.
 - [ ] Test representative small, medium, large, notched, and cutout screen sizes.
 - [ ] Stress-test concurrent public rooms, private rooms, Damage games, and Ranked queues.
 - [ ] Test reconnection, intentional leaving, timeouts, and server restarts.
-- [ ] Verify wagers are reserved and settled exactly once.
-- [ ] Verify stars, daily rewards, Blessings, and promo codes cannot be duplicated.
+- [x] Verify wagers are reserved and settled exactly once.
+- [x] Verify stars, daily rewards, Blessings, and promo codes cannot be duplicated.
 - [ ] Add production monitoring and actionable error reporting.
 - [ ] Configure and test database backups and restoration.
 - [ ] Audit production dependencies and resolve material vulnerabilities.

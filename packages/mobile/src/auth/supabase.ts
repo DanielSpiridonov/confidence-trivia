@@ -10,7 +10,7 @@ WebBrowser.maybeCompleteAuthSession();
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "";
 const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "";
-export const authConfigured = Boolean(supabaseUrl && supabaseKey);
+export const authConfigured = Boolean(supabaseUrl && supabaseKey && /^https:\/\//i.test(supabaseUrl));
 
 const secureStorage = {
   getItem: (key: string) => SecureStore.getItemAsync(key),

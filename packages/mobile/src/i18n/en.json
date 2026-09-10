@@ -312,6 +312,7 @@
     "confirmPurchaseMessage": "Buy {{item}} for {{price}} stars?",
     "buy": "Buy",
     "watchAd": "Watch Ad",
+    "comingSoon": "Coming soon",
     "ownedItems": "Owned cosmetics",
     "noOwnedAvatars": "No owned avatars yet.",
     "noOwnedFrames": "No owned player borders yet.",

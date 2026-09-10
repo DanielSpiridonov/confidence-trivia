@@ -4,8 +4,10 @@ import { getAccessToken } from "../auth/supabase";
 
 // Set this through EXPO_PUBLIC_SERVER_URL. Use the Docker host's LAN IP when
 // testing on a physical device; localhost only reaches the device itself.
-export const SERVER_URL =
-  process.env.EXPO_PUBLIC_SERVER_URL ?? "ws://localhost:2567";
+export const SERVER_URL = process.env.EXPO_PUBLIC_SERVER_URL ?? "ws://localhost:2567";
+if (!__DEV__ && !/^wss:\/\//i.test(SERVER_URL)) {
+  throw new Error("Production EXPO_PUBLIC_SERVER_URL must use wss://");
+}
 const HTTP_SERVER_URL = SERVER_URL.replace(/^ws/, "http").replace(/\/$/, "");
 const ROOM_REQUEST_TIMEOUT_MS = 10_000;
 
@@ -96,7 +98,8 @@ export function getClient(): Client {
 
 export async function getPlayerStars(deviceId: string): Promise<number | null> {
   try {
-    const response = await fetch(`${HTTP_SERVER_URL}/players/${encodeURIComponent(deviceId)}/stars`);
+    const accessToken = await getAccessToken();
+    const response = await fetch(`${HTTP_SERVER_URL}/players/${encodeURIComponent(deviceId)}/stars`, { headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {} });
     if (!response.ok) return null;
     const payload = await response.json() as { stars?: unknown };
     return typeof payload.stars === "number" ? payload.stars : null;
@@ -147,7 +150,8 @@ export async function equipFrame(deviceId: string, displayName: string, cosmetic
 
 export async function getPlayerCustomization(deviceId: string): Promise<PlayerCustomization | null> {
   try {
-    const response = await fetch(`${HTTP_SERVER_URL}/players/${encodeURIComponent(deviceId)}/customization`);
+    const accessToken = await getAccessToken();
+    const response = await fetch(`${HTTP_SERVER_URL}/players/${encodeURIComponent(deviceId)}/customization`, { headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {} });
     if (!response.ok) return null;
     return await response.json() as PlayerCustomization;
   } catch {
@@ -180,7 +184,8 @@ export interface DailyRewardStatus {
 
 export async function getDailyRewardStatus(deviceId: string): Promise<DailyRewardStatus | null> {
   try {
-    const response = await fetch(`${HTTP_SERVER_URL}/players/${encodeURIComponent(deviceId)}/daily-reward`);
+    const accessToken = await getAccessToken();
+    const response = await fetch(`${HTTP_SERVER_URL}/players/${encodeURIComponent(deviceId)}/daily-reward`, { headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {} });
     if (!response.ok) return null;
     return await response.json() as DailyRewardStatus;
   } catch {
@@ -190,9 +195,10 @@ export async function getDailyRewardStatus(deviceId: string): Promise<DailyRewar
 
 export async function claimDailyReward(deviceId: string, displayName: string): Promise<DailyRewardStatus | null> {
   try {
+    const accessToken = await getAccessToken();
     const response = await fetch(`${HTTP_SERVER_URL}/players/${encodeURIComponent(deviceId)}/daily-reward/claim`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
       body: JSON.stringify({ displayName }),
     });
     if (!response.ok) return null;

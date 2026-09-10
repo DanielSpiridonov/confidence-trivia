@@ -3,18 +3,32 @@ import express from "express";
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { GameRoom } from "./rooms/GameRoom";
-import { anonymizePlayerAccount, claimAllFriendGifts, claimDailyReward, claimFriendGift, createPlayerChallenge, equipFreeAvatar, equipFreeFrame, equipFreeNameColor, getAccountProfile, getDailyRewardStatus, getDatabaseStatus, getNewsPosts, getPlayerChallenges, getPlayerCustomization, getPlayerStars, getRankedLeaderboard, isAuthenticatedPlayer, linkPlayerAccount, listFriends, ownsRegisteredPlayer, redeemPromoCode, respondToFriendRequest, respondToPlayerChallenge, searchFriendPlayers, sendFriendGift, sendFriendRequest, submitPlayerReport, suggestFriendPlayers, updateAccountDisplayName, updateFriendRelationship, updatePlayerPresence } from "./database";
+import { canAccessPlayerData } from "./database";
+import { anonymizePlayerAccount, canPlayerEnterGame, claimAllFriendGifts, claimDailyReward, claimFriendGift, createPlayerChallenge, equipFreeAvatar, equipFreeFrame, equipFreeNameColor, getAccountProfile, getDailyRewardStatus, getDatabaseStatus, getNewsPosts, getPlayerChallenges, getPlayerCustomization, getPlayerStars, getRankedLeaderboard, isAuthenticatedPlayer, linkPlayerAccount, listFriends, ownsRegisteredPlayer, redeemPromoCode, respondToFriendRequest, respondToPlayerChallenge, searchFriendPlayers, sendFriendGift, sendFriendRequest, submitPlayerReport, suggestFriendPlayers, updateAccountDisplayName, updateFriendRelationship, updatePlayerPresence } from "./database";
 import { deleteSupabaseIdentity, verifySupabaseIdentity } from "./auth";
 import { isDamageWager, isOffensivePlayerName } from "@confidence-trivia/shared";
+import { authenticatedActorOrIpKey, createRateLimiter } from "./rateLimit";
 
 const port = Number(process.env.PORT ?? 2567);
 const app = express();
+app.set("trust proxy", 1);
 app.use(express.json());
+
+const generalLimit = createRateLimiter({ windowMs: 60_000, max: 180, message: "Too many requests. Please wait a moment." });
+const accountLimit = createRateLimiter({ windowMs: 15 * 60_000, max: 10, message: "Too many account attempts. Please try again later." });
+const promoLimit = createRateLimiter({ windowMs: 60 * 60_000, max: 10, message: "Too many promo-code attempts. Please try again later.", key: authenticatedActorOrIpKey });
+const reportLimit = createRateLimiter({ windowMs: 60 * 60_000, max: 10, message: "Too many reports. Please try again later.", key: authenticatedActorOrIpKey });
+const friendRequestLimit = createRateLimiter({ windowMs: 60 * 60_000, max: 10, message: "Too many friend requests. Please try again later.", key: authenticatedActorOrIpKey });
+const socialActionLimit = createRateLimiter({ windowMs: 10 * 60_000, max: 30, message: "Too many social actions. Please wait a few minutes.", key: authenticatedActorOrIpKey });
+const challengeLimit = createRateLimiter({ windowMs: 10 * 60_000, max: 10, message: "Too many challenges. Please try again later.", key: authenticatedActorOrIpKey });
+const rewardLimit = createRateLimiter({ windowMs: 60 * 60_000, max: 10, message: "Too many reward attempts. Please try again later.", key: authenticatedActorOrIpKey });
 
 app.get("/health", async (_req, res) => {
   const database = await getDatabaseStatus();
   res.json({ ok: true, database });
 });
+
+app.use(generalLimit);
 
 app.get("/news", async (req, res) => {
   const locale = req.query.locale === "bg" ? "bg" : "en";
@@ -23,7 +37,7 @@ app.get("/news", async (req, res) => {
   res.json(posts);
 });
 
-app.post("/promo-codes/redeem", async (req, res) => {
+app.post("/promo-codes/redeem", promoLimit, async (req, res) => {
   const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
   const code = typeof req.body?.code === "string" ? req.body.code : "";
   if (!isDeviceId(playerId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) { res.status(403).json({ error: "Sign in to redeem codes" }); return; }
@@ -32,7 +46,7 @@ app.post("/promo-codes/redeem", async (req, res) => {
   res.json(result);
 });
 
-app.post("/player-reports", async (req, res) => {
+app.post("/player-reports", reportLimit, async (req, res) => {
   const reporterId = typeof req.body?.reporterId === "string" ? req.body.reporterId : "";
   const reportedName = typeof req.body?.reportedName === "string" ? req.body.reportedName.trim() : "";
   const description = typeof req.body?.description === "string" ? req.body.description.trim() : "";
@@ -44,7 +58,7 @@ app.post("/player-reports", async (req, res) => {
   res.status(201).json({ ok: true });
 });
 
-app.post("/accounts/link", async (req, res) => {
+app.post("/accounts/link", accountLimit, async (req, res) => {
   const guestPlayerId = typeof req.body?.guestPlayerId === "string" ? req.body.guestPlayerId : "";
   const displayName = typeof req.body?.displayName === "string" ? req.body.displayName.trim().slice(0, 20) : "Guest";
   if (!isDeviceId(guestPlayerId)) {
@@ -71,7 +85,7 @@ app.get("/accounts/me", async (req, res) => {
   if (!profile) { res.status(404).json({ error: "Account profile not found" }); return; }
   res.json({ ...profile, email: identity.email });
 });
-app.patch("/accounts/me/name", async (req, res) => {
+app.patch("/accounts/me/name", accountLimit, async (req, res) => {
   const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
   const displayName = typeof req.body?.displayName === "string" ? req.body.displayName.trim() : "";
   const identity = await verifySupabaseIdentity(req.headers.authorization);
@@ -99,6 +113,7 @@ app.get("/players/:deviceId/stars", async (req, res) => {
     res.status(400).json({ error: "Invalid device ID" });
     return;
   }
+  if (!await requestCanAccessPlayerData(req.params.deviceId, req.headers.authorization)) { res.status(403).json({ error: "Player data is private" }); return; }
 
   const stars = await getPlayerStars(deviceId);
   if (stars === null) {
@@ -113,6 +128,7 @@ app.get("/players/:deviceId/customization", async (req, res) => {
     res.status(400).json({ error: "Invalid device ID" });
     return;
   }
+  if (!await requestCanAccessPlayerData(req.params.deviceId, req.headers.authorization)) { res.status(403).json({ error: "Player data is private" }); return; }
   const customization = await getPlayerCustomization(req.params.deviceId);
   if (!customization) {
     res.status(503).json({ error: "Customization is temporarily unavailable" });
@@ -187,6 +203,7 @@ app.get("/players/:deviceId/daily-reward", async (req, res) => {
     res.status(400).json({ error: "Invalid device ID" });
     return;
   }
+  if (!await requestCanAccessPlayerData(req.params.deviceId, req.headers.authorization)) { res.status(403).json({ error: "Player data is private" }); return; }
   const status = await getDailyRewardStatus(req.params.deviceId);
   if (!status) {
     res.status(503).json({ error: "Daily reward is temporarily unavailable" });
@@ -195,11 +212,13 @@ app.get("/players/:deviceId/daily-reward", async (req, res) => {
   res.json(status);
 });
 
-app.post("/players/:deviceId/daily-reward/claim", async (req, res) => {
+app.post("/players/:deviceId/daily-reward/claim", rewardLimit, async (req, res) => {
   if (!isDeviceId(req.params.deviceId)) {
     res.status(400).json({ error: "Invalid device ID" });
     return;
   }
+  const identity = await verifySupabaseIdentity(req.headers.authorization);
+  if (!await canPlayerEnterGame(req.params.deviceId, identity?.userId ?? null)) { res.status(403).json({ error: "This account cannot claim rewards" }); return; }
   const displayName = typeof req.body?.displayName === "string" ? req.body.displayName.trim().slice(0, 20) : "";
   const status = await claimDailyReward(req.params.deviceId, displayName);
   if (!status) {
@@ -253,40 +272,40 @@ app.get("/friends/suggestions", async (req, res) => {
   res.json(results);
 });
 
-app.post("/friends/requests", async (req, res) => {
+app.post("/friends/requests", friendRequestLimit, async (req, res) => {
   const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
   const targetPlayerId = typeof req.body?.targetPlayerId === "string" ? req.body.targetPlayerId : "";
   if (!isDeviceId(playerId) || !isDeviceId(targetPlayerId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) { res.status(403).json({ error: "Sign in to access Friends" }); return; }
   sendFriendActionResponse(res, await sendFriendRequest(playerId, targetPlayerId));
 });
 
-app.patch("/friends/requests/:friendshipId", async (req, res) => {
+app.patch("/friends/requests/:friendshipId", socialActionLimit, async (req, res) => {
   const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
   const action = req.body?.action;
   if (!isDeviceId(playerId) || !isDeviceId(req.params.friendshipId) || !["accept", "reject"].includes(action) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) { res.status(403).json({ error: "Invalid friend request" }); return; }
   sendFriendActionResponse(res, await respondToFriendRequest(playerId, req.params.friendshipId, action === "accept"));
 });
 
-app.patch("/friends/:friendshipId", async (req, res) => {
+app.patch("/friends/:friendshipId", socialActionLimit, async (req, res) => {
   const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
   const action = req.body?.action;
   if (!isDeviceId(playerId) || !isDeviceId(req.params.friendshipId) || !["remove", "block", "unblock"].includes(action) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) { res.status(403).json({ error: "Invalid friendship action" }); return; }
   sendFriendActionResponse(res, await updateFriendRelationship(playerId, req.params.friendshipId, action));
 });
 
-app.post("/friends/:friendshipId/gifts", async (req, res) => {
+app.post("/friends/:friendshipId/gifts", socialActionLimit, async (req, res) => {
   const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
   if (!isDeviceId(playerId) || !isDeviceId(req.params.friendshipId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) { res.status(403).json({ error: "Invalid gift action" }); return; }
   sendFriendActionResponse(res, await sendFriendGift(playerId, req.params.friendshipId));
 });
 
-app.post("/friends/gifts/claim-all", async (req, res) => {
+app.post("/friends/gifts/claim-all", socialActionLimit, async (req, res) => {
   const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
   if (!isDeviceId(playerId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) { res.status(403).json({ error: "Invalid blessing claim" }); return; }
   sendFriendActionResponse(res, await claimAllFriendGifts(playerId));
 });
 
-app.post("/friends/gifts/:giftId/claim", async (req, res) => {
+app.post("/friends/gifts/:giftId/claim", socialActionLimit, async (req, res) => {
   const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
   if (!isDeviceId(playerId) || !isDeviceId(req.params.giftId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) { res.status(403).json({ error: "Invalid gift claim" }); return; }
   sendFriendActionResponse(res, await claimFriendGift(playerId, req.params.giftId));
@@ -308,7 +327,7 @@ app.get("/challenges", async (req, res) => {
   res.json(challenges);
 });
 
-app.post("/challenges", async (req, res) => {
+app.post("/challenges", challengeLimit, async (req, res) => {
   const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
   const challengedId = typeof req.body?.challengedId === "string" ? req.body.challengedId : "";
   const damageWager = Number(req.body?.damageWager);
@@ -316,7 +335,7 @@ app.post("/challenges", async (req, res) => {
   sendFriendActionResponse(res, await createPlayerChallenge(playerId, challengedId, damageWager));
 });
 
-app.patch("/challenges/:challengeId", async (req, res) => {
+app.patch("/challenges/:challengeId", socialActionLimit, async (req, res) => {
   const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
   const action = req.body?.action;
   if (!isDeviceId(playerId) || !isDeviceId(req.params.challengeId) || !["accept", "decline"].includes(action) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) { res.status(403).json({ error: "Invalid challenge response" }); return; }
@@ -331,6 +350,11 @@ function sendFriendActionResponse(res: express.Response, result: { ok: boolean; 
 async function requestOwnsRegisteredPlayer(playerId: string, authorization: string | undefined): Promise<boolean> {
   const identity = await verifySupabaseIdentity(authorization);
   return Boolean(identity && await isAuthenticatedPlayer(playerId, identity.userId));
+}
+
+async function requestCanAccessPlayerData(playerId: string, authorization: string | undefined): Promise<boolean> {
+  const identity = await verifySupabaseIdentity(authorization);
+  return canAccessPlayerData(playerId, identity?.userId ?? null);
 }
 
 const httpServer = http.createServer(app);

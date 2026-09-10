@@ -18,6 +18,7 @@ import {
   isAvatarCosmeticId,
   isFrameCosmeticId,
 } from "@confidence-trivia/shared";
+import { logServerError } from "./logging";
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -63,7 +64,7 @@ export async function submitPlayerReport(reporterId: string, rawReportedName: st
       return { ok: true } as PlayerReportResult;
     });
   } catch (error) {
-    console.error("Could not submit player report", error);
+    logServerError("Could not submit player report", error);
     return { ok: false, error: "Could not submit this report" };
   }
 }
@@ -77,7 +78,7 @@ export async function getNewsPosts(locale: "en" | "bg"): Promise<NewsPost[] | nu
       order by published_at desc limit 30
     `;
     return rows.map((row) => ({ id: row.id, title: row.title, body: row.body, publishedAt: row.published_at.toISOString() }));
-  } catch (error) { console.error("Could not load news", error); return null; }
+  } catch (error) { logServerError("Could not load news", error); return null; }
 }
 
 export async function redeemPromoCode(playerId: string, rawCode: string): Promise<RedeemCodeResult> {
@@ -101,7 +102,7 @@ export async function redeemPromoCode(playerId: string, rawCode: string): Promis
       await transaction`insert into public.star_transactions (id, player_id, amount, reason) values (${randomUUID()}, ${playerId}, ${promo.star_reward}, ${`promo_code:${promo.id}`})`;
       return { ok: true, stars: player.stars, reward: promo.star_reward } as RedeemCodeResult;
     });
-  } catch (error) { console.error("Could not redeem promo code", error); return { ok: false, error: "Could not redeem this code" }; }
+  } catch (error) { logServerError("Could not redeem promo code", error); return { ok: false, error: "Could not redeem this code" }; }
 }
 
 export interface PlayerAccount {
@@ -154,7 +155,7 @@ export async function updateAccountDisplayName(playerId: string, authUserId: str
     return account ? "cooldown" : null;
   } catch (error) {
     if (typeof error === "object" && error && "code" in error && error.code === "23505") return "taken";
-    console.error("Could not update account display name", error);
+    logServerError("Could not update account display name", error);
     return null;
   }
 }
@@ -191,7 +192,7 @@ export async function anonymizePlayerAccount(playerId: string): Promise<boolean>
       return true;
     });
   } catch (error) {
-    console.error("Could not anonymize deleted account", error);
+    logServerError("Could not anonymize deleted account", error);
     return false;
   }
 }
@@ -202,7 +203,7 @@ export async function getDatabaseStatus(): Promise<DatabaseStatus> {
     await sql`select 1`;
     return "connected";
   } catch (error) {
-    console.error("Database health check failed", error);
+    logServerError("Database health check failed", error);
     return "unavailable";
   }
 }
@@ -229,6 +230,15 @@ export async function ownsRegisteredPlayer(playerId: string, authUserId: string)
     select id from public.players where id = ${playerId} and account_type = 'registered' and auth_user_id = ${authUserId}
   `;
   return Boolean(player);
+}
+
+export async function canAccessPlayerData(playerId: string, authUserId: string | null): Promise<boolean> {
+  if (!sql) return true;
+  const [player] = await sql<{ account_type: string; auth_user_id: string | null }[]>`
+    select account_type, auth_user_id from public.players where id = ${playerId}
+  `;
+  if (!player || player.account_type === "guest") return true;
+  return player.account_type === "registered" && Boolean(authUserId && player.auth_user_id === authUserId);
 }
 
 export async function canPlayerEnterGame(playerId: string, authUserId: string | null): Promise<boolean> {
@@ -283,7 +293,7 @@ export async function updatePlayerPresence(playerId: string, available: boolean)
   try {
     await sql`insert into public.player_presence (player_id, available, last_seen_at) values (${playerId}, ${available}, now()) on conflict (player_id) do update set available = excluded.available, last_seen_at = now()`;
     return true;
-  } catch (error) { console.error("Could not update player presence", error); return false; }
+  } catch (error) { logServerError("Could not update player presence", error); return false; }
 }
 
 export async function createPlayerChallenge(challengerId: string, challengedId: string, damageWager: number): Promise<FriendActionResult & { challengeId?: string }> {
@@ -306,7 +316,7 @@ export async function createPlayerChallenge(challengerId: string, challengedId: 
       values (${challengerId}, ${challengedId}, ${damageWager}) returning id
     `;
     return { ok: true, challengeId: challenge.id };
-  } catch (error) { console.error("Could not create challenge", error); return { ok: false, error: "Could not send challenge" }; }
+  } catch (error) { logServerError("Could not create challenge", error); return { ok: false, error: "Could not send challenge" }; }
 }
 
 export async function getPlayerChallenges(playerId: string): Promise<PlayerChallenge[] | null> {
@@ -323,7 +333,7 @@ export async function getPlayerChallenges(playerId: string): Promise<PlayerChall
       order by challenge.created_at desc limit 5
     `;
     return rows.map((row) => ({ id: row.id, challengerId: row.challenger_id, challengerName: row.challenger_name, challengedId: row.challenged_id, gameMode: "damage", status: row.status, damageWager: row.damage_wager, expiresAt: row.expires_at.toISOString() }));
-  } catch (error) { console.error("Could not load challenges", error); return null; }
+  } catch (error) { logServerError("Could not load challenges", error); return null; }
 }
 
 export async function respondToPlayerChallenge(playerId: string, challengeId: string, accept: boolean): Promise<FriendActionResult> {
@@ -335,7 +345,7 @@ export async function respondToPlayerChallenge(playerId: string, challengeId: st
       returning id
     `;
     return updated ? { ok: true } : { ok: false, error: "Challenge has expired" };
-  } catch (error) { console.error("Could not respond to challenge", error); return { ok: false, error: "Could not respond to challenge" }; }
+  } catch (error) { logServerError("Could not respond to challenge", error); return { ok: false, error: "Could not respond to challenge" }; }
 }
 
 export async function isAcceptedChallengeParticipant(challengeId: string, playerId: string): Promise<boolean> {
@@ -407,7 +417,7 @@ export async function listFriends(playerId: string): Promise<FriendsResponse | n
     }
     return response;
   } catch (error) {
-    console.error("Could not load friends", error);
+    logServerError("Could not load friends", error);
     return null;
   }
 }
@@ -436,7 +446,7 @@ export async function searchFriendPlayers(playerId: string, query: string): Prom
         : "none",
     }));
   } catch (error) {
-    console.error("Could not search friend players", error);
+    logServerError("Could not search friend players", error);
     return null;
   }
 }
@@ -458,7 +468,7 @@ export async function suggestFriendPlayers(playerId: string): Promise<FriendSear
     `;
     return rows.map((row) => ({ playerId: row.id, displayName: row.display_name, relationship: "none" }));
   } catch (error) {
-    console.error("Could not suggest friend players", error);
+    logServerError("Could not suggest friend players", error);
     return null;
   }
 }
@@ -483,7 +493,7 @@ export async function sendFriendRequest(playerId: string, targetPlayerId: string
       return { ok: true } as FriendActionResult;
     });
   } catch (error) {
-    console.error("Could not send friend request", error);
+    logServerError("Could not send friend request", error);
     return { ok: false, error: "Could not send friend request" };
   }
 }
@@ -513,7 +523,7 @@ export async function respondToFriendRequest(playerId: string, friendshipId: str
       return { ok: true } as FriendActionResult;
     });
   } catch (error) {
-    console.error("Could not respond to friend request", error);
+    logServerError("Could not respond to friend request", error);
     return { ok: false, error: "Could not update friend request" };
   }
 }
@@ -528,7 +538,7 @@ export async function updateFriendRelationship(playerId: string, friendshipId: s
         : await sql`delete from public.friendships where id = ${friendshipId} and ${playerId} in (player_low_id, player_high_id) and status <> 'blocked' returning id`;
     return rows.length ? { ok: true } : { ok: false, error: "Friendship is no longer available" };
   } catch (error) {
-    console.error("Could not remove or block friend", error);
+    logServerError("Could not remove or block friend", error);
     return { ok: false, error: "Could not update friendship" };
   }
 }
@@ -552,7 +562,7 @@ export async function sendFriendGift(playerId: string, friendshipId: string): Pr
       return inserted.length ? { ok: true } as FriendActionResult : { ok: false, error: "Gift already sent today" } as FriendActionResult;
     });
   } catch (error) {
-    console.error("Could not send friend gift", error);
+    logServerError("Could not send friend gift", error);
     return { ok: false, error: "Could not send gift" };
   }
 }
@@ -577,7 +587,7 @@ export async function claimFriendGift(playerId: string, giftId: string): Promise
       return { ok: true, stars: updated.stars } as FriendActionResult;
     });
   } catch (error) {
-    console.error("Could not claim friend gift", error);
+    logServerError("Could not claim friend gift", error);
     return { ok: false, error: "Could not claim gift" };
   }
 }
@@ -604,7 +614,7 @@ export async function claimAllFriendGifts(playerId: string): Promise<FriendActio
       return { ok: true, stars: updated.stars, claimedCount: gifts.length } as FriendActionResult;
     });
   } catch (error) {
-    console.error("Could not claim all friend gifts", error);
+    logServerError("Could not claim all friend gifts", error);
     return { ok: false, error: "Could not claim blessings" };
   }
 }
@@ -637,7 +647,7 @@ export async function linkPlayerAccount(guestPlayerId: string, displayName: stri
       return linked ? { playerId: linked.id, accountType: "registered", provider, displayName: linked.display_name } : null;
     });
   } catch (error) {
-    console.error("Could not link player account", error);
+    logServerError("Could not link player account", error);
     return null;
   }
 }
@@ -697,7 +707,7 @@ export async function getPlayerCustomization(deviceId: string): Promise<PlayerCu
     const validAvatarId = isAvatarCosmeticId(avatarId) && (avatarId !== "omniscient_avatar" || rankKey === "omniscient") ? avatarId : DEFAULT_AVATAR_ID;
     return { nameColorId: cosmetic.id, nameColor: cosmetic.color, avatarId: validAvatarId, frameId: isFrameCosmeticId(frameId) ? frameId : DEFAULT_FRAME_ID, stars: player?.stars ?? 0, rankKey, ownedCosmeticIds };
   } catch (error) {
-    console.error("Could not load player customization", error);
+    logServerError("Could not load player customization", error);
     return null;
   }
 }
@@ -760,7 +770,7 @@ async function acquireAndEquipCosmetic(deviceId: string, cosmeticId: string, cos
     });
     return await getPlayerCustomization(deviceId);
   } catch (error) {
-    console.error("Could not acquire or equip cosmetic", error);
+    logServerError("Could not acquire or equip cosmetic", error);
     return null;
   }
 }
@@ -800,7 +810,7 @@ export async function reserveDamageWager(matchId: string, playerIds: string[], s
       return { ok: true, balances: new Map(players.map((player) => [player.id, player.stars - stake])), insufficientPlayerIds: [] };
     });
   } catch (error) {
-    console.error("Could not reserve Damage wager", error);
+    logServerError("Could not reserve Damage wager", error);
     return failed;
   }
 }
@@ -834,7 +844,7 @@ export async function settleDamageWager(matchId: string, winnerId: string | null
       updated.forEach((player) => balances.set(player.id, player.stars));
     });
   } catch (error) {
-    console.error("Could not settle Damage wager", error);
+    logServerError("Could not settle Damage wager", error);
   }
   return balances;
 }
@@ -933,7 +943,7 @@ export async function getRankedLeaderboard(deviceId: string): Promise<RankedLead
 
     return { top, currentPlayer };
   } catch (error) {
-    console.error("Could not load ranked leaderboard", error);
+    logServerError("Could not load ranked leaderboard", error);
     return null;
   }
 }
@@ -959,7 +969,7 @@ export async function upsertPlayer(deviceId: string, displayName: string): Promi
     return player?.stars ?? 0;
   } catch (error) {
     // Persistence must never prevent a player from joining a live game.
-    console.error("Could not persist player profile", error);
+    logServerError("Could not persist player profile", error);
     return null;
   }
 }
@@ -975,7 +985,7 @@ export async function getPlayerStars(deviceId: string): Promise<number | null> {
     `;
     return player?.stars ?? 0;
   } catch (error) {
-    console.error("Could not load player stars", error);
+    logServerError("Could not load player stars", error);
     return null;
   }
 }
@@ -1020,7 +1030,7 @@ export async function getDailyRewardStatus(deviceId: string): Promise<DailyRewar
       nextClaimAt: nextUtcDayIso(),
     };
   } catch (error) {
-    console.error("Could not load daily reward status", error);
+    logServerError("Could not load daily reward status", error);
     return null;
   }
 }
@@ -1101,7 +1111,7 @@ export async function claimDailyReward(deviceId: string, displayName: string): P
       };
     });
   } catch (error) {
-    console.error("Could not claim daily reward", error);
+    logServerError("Could not claim daily reward", error);
     return null;
   }
 }
@@ -1250,7 +1260,7 @@ export async function saveCompletedMatch(match: CompletedMatch): Promise<Map<str
     });
   } catch (error) {
     // Final results remain valid in-room even when persistence is unavailable.
-    console.error("Could not persist completed match", error);
+    logServerError("Could not persist completed match", error);
   }
 
   return progressUpdates;

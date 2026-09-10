@@ -103,10 +103,16 @@ export function HomeScreen({
   const celebrationOpacity = React.useRef(new Animated.Value(0)).current;
   const celebrationScale = React.useRef(new Animated.Value(0.94)).current;
   const menuProgress = React.useRef(new Animated.Value(0)).current;
+  const isAndroid = Platform.OS === "android";
 
   function toggleMenu() {
     const nextOpen = !menuOpen;
     setMenuOpen(nextOpen);
+    menuProgress.stopAnimation();
+    if (isAndroid) {
+      Animated.timing(menuProgress, { toValue: nextOpen ? 1 : 0, duration: 120, useNativeDriver: true }).start();
+      return;
+    }
     Animated.spring(menuProgress, { toValue: nextOpen ? 1 : 0, damping: 18, stiffness: 220, mass: 0.7, useNativeDriver: true }).start();
   }
 
@@ -219,14 +225,17 @@ export function HomeScreen({
         </View>
       </View>
       <View style={styles.homeMenuDock}>
-        <Animated.View pointerEvents={menuOpen ? "auto" : "none"} style={[styles.homeMenuItems, { opacity: menuProgress, transform: [{ translateX: menuProgress.interpolate({ inputRange: [0, 1], outputRange: [44, 0] }) }, { scale: menuProgress.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] }) }] }]}>
+        <Animated.View pointerEvents={menuOpen ? "auto" : "none"} style={[styles.homeMenuItems, { opacity: menuProgress, transform: isAndroid
+          ? [{ translateX: menuProgress.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }) }]
+          : [{ translateX: menuProgress.interpolate({ inputRange: [0, 1], outputRange: [44, 0] }) }, { scale: menuProgress.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] }) }]
+        }]}>
           <Pressable accessibilityRole="button" accessibilityLabel={t("news.title")} onPress={() => openFromMenu(onNews)} style={({ pressed }) => [styles.menuItemButton, pressed && styles.profileButtonPressed]}><Image source={NEWS_MENU_IMAGE} defaultSource={NEWS_MENU_IMAGE} fadeDuration={0} resizeMode="contain" style={styles.menuItemIcon} /><Text numberOfLines={1} style={styles.profileLabel}>{t("news.shortTitle")}</Text></Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel={t("home.friends")} onPress={() => openFromMenu(onFriends)} style={({ pressed }) => [styles.menuItemButton, pressed && styles.profileButtonPressed]}><Image source={FRIENDS_MENU_IMAGE} defaultSource={FRIENDS_MENU_IMAGE} fadeDuration={0} resizeMode="contain" style={styles.menuItemIcon} /><Text numberOfLines={1} style={styles.profileLabel}>{t("home.friends")}</Text></Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel={t("shop.tabs.inventory")} onPress={() => openFromMenu(onInventory)} style={({ pressed }) => [styles.menuItemButton, pressed && styles.profileButtonPressed]}><Image source={INVENTORY_MENU_IMAGE} defaultSource={INVENTORY_MENU_IMAGE} fadeDuration={0} resizeMode="contain" style={styles.menuItemIcon} /><Text numberOfLines={1} style={styles.profileLabel}>{t("shop.tabs.inventory")}</Text></Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel={t("home.profile")} onPress={() => openFromMenu(onProfile)} style={({ pressed }) => [styles.menuItemButton, pressed && styles.profileButtonPressed]}><Image source={avatarHead} defaultSource={avatarHead} fadeDuration={0} resizeMode="contain" style={styles.profileAvatar} /><Text numberOfLines={1} style={styles.profileLabel}>{t("home.profile")}</Text></Pressable>
         </Animated.View>
         <Pressable accessibilityRole="button" accessibilityLabel={t("home.menu")} accessibilityState={{ expanded: menuOpen }} onPress={toggleMenu} style={({ pressed }) => [styles.hamburgerButton, pressed && styles.profileButtonPressed]}>
-          <Animated.View style={{ transform: [{ rotate: menuProgress.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "90deg"] }) }] }}><Text style={styles.hamburgerIcon}>{menuOpen ? "×" : "☰"}</Text></Animated.View>
+          <Animated.View style={isAndroid ? undefined : { transform: [{ rotate: menuProgress.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "90deg"] }) }] }}><Text style={styles.hamburgerIcon}>{menuOpen ? "×" : "☰"}</Text></Animated.View>
         </Pressable>
       </View>
       {showCelebration && activeCelebration ? (
@@ -270,7 +279,7 @@ const styles = StyleSheet.create({
   },
   homePlayButton: Platform.OS === "android" ? { maxWidth: 430, minHeight: 52, paddingVertical: 12, marginTop: 7 } : {},
   homePlayButtonText: Platform.OS === "android" ? { paddingHorizontal: 5, fontSize: 16 } : {},
-  homeMenuDock: { position: "absolute", right: 8, bottom: Platform.OS === "android" ? 26 : 4, height: 44, zIndex: 12 },
+  homeMenuDock: { position: "absolute", right: Platform.OS === "android" ? 34 : 8, bottom: Platform.OS === "android" ? 26 : 4, height: 44, zIndex: 12 },
   homeMenuItems: { position: "absolute", right: 72, bottom: 0, height: 44, flexDirection: "row", gap: 6 },
   menuItemButton: { minWidth: 106, height: 44, paddingHorizontal: 10, borderRadius: 14, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, borderWidth: 2, borderColor: "#A982FF", backgroundColor: "rgba(42,25,72,0.97)", shadowColor: "#7C5CFF", shadowOpacity: 0.42, shadowRadius: 5, shadowOffset: { width: 0, height: 2 }, elevation: 5 },
   hamburgerButton: { width: 44, height: 44, borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#7C5CFF", backgroundColor: "rgba(12,9,23,0.96)" },
@@ -279,7 +288,7 @@ const styles = StyleSheet.create({
   profileButtonPressed: { opacity: 0.72, transform: [{ scale: 0.97 }] },
   profileAvatar: { width: 34, height: 34 },
   profileLabel: { color: "#7C5CFF", fontSize: 14, fontWeight: "800", flexShrink: 0 },
-  popupRail: { position: "absolute", left: Platform.OS === "android" ? 24 : 1, top: 38, bottom: 12, width: SIDEBAR_ITEM_WIDTH, justifyContent: "flex-start", gap: 3, zIndex: 5 },
+  popupRail: { position: "absolute", left: Platform.OS === "android" ? 24 : 1, top: Platform.OS === "android" ? 20 : 38, bottom: Platform.OS === "android" ? 20 : 12, width: SIDEBAR_ITEM_WIDTH, justifyContent: Platform.OS === "android" ? "center" : "flex-start", gap: 3, zIndex: 5 },
   popup: { width: SIDEBAR_ITEM_WIDTH, height: SIDEBAR_ITEM_HEIGHT, alignItems: "center", justifyContent: "flex-end", paddingBottom: 2 },
   popupDisabled: { opacity: 0.55 },
   popupPressed: { transform: [{ scale: 0.96 }] },

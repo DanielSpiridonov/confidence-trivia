@@ -9,39 +9,51 @@ const colyseus_1 = require("colyseus");
 const ws_transport_1 = require("@colyseus/ws-transport");
 const GameRoom_1 = require("./rooms/GameRoom");
 const database_1 = require("./database");
+const database_2 = require("./database");
 const auth_1 = require("./auth");
 const shared_1 = require("@confidence-trivia/shared");
+const rateLimit_1 = require("./rateLimit");
 const port = Number(process.env.PORT ?? 2567);
 const app = (0, express_1.default)();
+app.set("trust proxy", 1);
 app.use(express_1.default.json());
+const generalLimit = (0, rateLimit_1.createRateLimiter)({ windowMs: 60000, max: 180, message: "Too many requests. Please wait a moment." });
+const accountLimit = (0, rateLimit_1.createRateLimiter)({ windowMs: 15 * 60000, max: 10, message: "Too many account attempts. Please try again later." });
+const promoLimit = (0, rateLimit_1.createRateLimiter)({ windowMs: 60 * 60000, max: 10, message: "Too many promo-code attempts. Please try again later.", key: rateLimit_1.authenticatedActorOrIpKey });
+const reportLimit = (0, rateLimit_1.createRateLimiter)({ windowMs: 60 * 60000, max: 10, message: "Too many reports. Please try again later.", key: rateLimit_1.authenticatedActorOrIpKey });
+const friendRequestLimit = (0, rateLimit_1.createRateLimiter)({ windowMs: 60 * 60000, max: 10, message: "Too many friend requests. Please try again later.", key: rateLimit_1.authenticatedActorOrIpKey });
+const socialActionLimit = (0, rateLimit_1.createRateLimiter)({ windowMs: 10 * 60000, max: 30, message: "Too many social actions. Please wait a few minutes.", key: rateLimit_1.authenticatedActorOrIpKey });
+const challengeLimit = (0, rateLimit_1.createRateLimiter)({ windowMs: 10 * 60000, max: 10, message: "Too many challenges. Please try again later.", key: rateLimit_1.authenticatedActorOrIpKey });
+const rewardLimit = (0, rateLimit_1.createRateLimiter)({ windowMs: 60 * 60000, max: 10, message: "Too many reward attempts. Please try again later.", key: rateLimit_1.authenticatedActorOrIpKey });
 app.get("/health", async (_req, res) => {
-    const database = await (0, database_1.getDatabaseStatus)();
+    const database = await (0, database_2.getDatabaseStatus)();
     res.json({ ok: true, database });
 });
+app.use(generalLimit);
 app.get("/news", async (req, res) => {
     const locale = req.query.locale === "bg" ? "bg" : "en";
-    const posts = await (0, database_1.getNewsPosts)(locale);
+    const posts = await (0, database_2.getNewsPosts)(locale);
     if (!posts) {
         res.status(503).json({ error: "News is temporarily unavailable" });
         return;
     }
     res.json(posts);
 });
-app.post("/promo-codes/redeem", async (req, res) => {
+app.post("/promo-codes/redeem", promoLimit, async (req, res) => {
     const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
     const code = typeof req.body?.code === "string" ? req.body.code : "";
     if (!isDeviceId(playerId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
         res.status(403).json({ error: "Sign in to redeem codes" });
         return;
     }
-    const result = await (0, database_1.redeemPromoCode)(playerId, code);
+    const result = await (0, database_2.redeemPromoCode)(playerId, code);
     if (!result.ok) {
         res.status(409).json({ error: result.error });
         return;
     }
     res.json(result);
 });
-app.post("/player-reports", async (req, res) => {
+app.post("/player-reports", reportLimit, async (req, res) => {
     const reporterId = typeof req.body?.reporterId === "string" ? req.body.reporterId : "";
     const reportedName = typeof req.body?.reportedName === "string" ? req.body.reportedName.trim() : "";
     const description = typeof req.body?.description === "string" ? req.body.description.trim() : "";
@@ -57,14 +69,14 @@ app.post("/player-reports", async (req, res) => {
         res.status(400).json({ error: "Description must be between 10 and 500 characters" });
         return;
     }
-    const result = await (0, database_1.submitPlayerReport)(reporterId, reportedName, description);
+    const result = await (0, database_2.submitPlayerReport)(reporterId, reportedName, description);
     if (!result.ok) {
         res.status(409).json({ error: result.error });
         return;
     }
     res.status(201).json({ ok: true });
 });
-app.post("/accounts/link", async (req, res) => {
+app.post("/accounts/link", accountLimit, async (req, res) => {
     const guestPlayerId = typeof req.body?.guestPlayerId === "string" ? req.body.guestPlayerId : "";
     const displayName = typeof req.body?.displayName === "string" ? req.body.displayName.trim().slice(0, 20) : "Guest";
     if (!isDeviceId(guestPlayerId)) {
@@ -76,7 +88,7 @@ app.post("/accounts/link", async (req, res) => {
         res.status(401).json({ error: "Invalid or expired account session" });
         return;
     }
-    const account = await (0, database_1.linkPlayerAccount)(guestPlayerId, displayName, identity.userId, identity.provider);
+    const account = await (0, database_2.linkPlayerAccount)(guestPlayerId, displayName, identity.userId, identity.provider);
     if (!account) {
         res.status(503).json({ error: "Account linking is temporarily unavailable" });
         return;
@@ -90,14 +102,14 @@ app.get("/accounts/me", async (req, res) => {
         res.status(401).json({ error: "Invalid or expired account session" });
         return;
     }
-    const profile = await (0, database_1.getAccountProfile)(playerId, identity.userId);
+    const profile = await (0, database_2.getAccountProfile)(playerId, identity.userId);
     if (!profile) {
         res.status(404).json({ error: "Account profile not found" });
         return;
     }
     res.json({ ...profile, email: identity.email });
 });
-app.patch("/accounts/me/name", async (req, res) => {
+app.patch("/accounts/me/name", accountLimit, async (req, res) => {
     const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
     const displayName = typeof req.body?.displayName === "string" ? req.body.displayName.trim() : "";
     const identity = await (0, auth_1.verifySupabaseIdentity)(req.headers.authorization);
@@ -113,7 +125,7 @@ app.patch("/accounts/me/name", async (req, res) => {
         res.status(400).json({ error: "Offensive language is not allowed in player names" });
         return;
     }
-    const profile = await (0, database_1.updateAccountDisplayName)(playerId, identity.userId, displayName);
+    const profile = await (0, database_2.updateAccountDisplayName)(playerId, identity.userId, displayName);
     if (profile === "taken") {
         res.status(409).json({ error: "That name is already taken" });
         return;
@@ -131,7 +143,7 @@ app.patch("/accounts/me/name", async (req, res) => {
 app.delete("/accounts/me", async (req, res) => {
     const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
     const identity = await (0, auth_1.verifySupabaseIdentity)(req.headers.authorization);
-    if (!isDeviceId(playerId) || !identity || !await (0, database_1.ownsRegisteredPlayer)(playerId, identity.userId)) {
+    if (!isDeviceId(playerId) || !identity || !await (0, database_2.ownsRegisteredPlayer)(playerId, identity.userId)) {
         res.status(401).json({ error: "Invalid or expired account session" });
         return;
     }
@@ -143,7 +155,7 @@ app.delete("/accounts/me", async (req, res) => {
         res.status(503).json({ error: "Could not delete the authentication account" });
         return;
     }
-    if (!await (0, database_1.anonymizePlayerAccount)(playerId)) {
+    if (!await (0, database_2.anonymizePlayerAccount)(playerId)) {
         res.status(503).json({ error: "Authentication was deleted, but game data cleanup needs support" });
         return;
     }
@@ -155,7 +167,11 @@ app.get("/players/:deviceId/stars", async (req, res) => {
         res.status(400).json({ error: "Invalid device ID" });
         return;
     }
-    const stars = await (0, database_1.getPlayerStars)(deviceId);
+    if (!await requestCanAccessPlayerData(req.params.deviceId, req.headers.authorization)) {
+        res.status(403).json({ error: "Player data is private" });
+        return;
+    }
+    const stars = await (0, database_2.getPlayerStars)(deviceId);
     if (stars === null) {
         res.status(503).json({ error: "Stars are temporarily unavailable" });
         return;
@@ -167,7 +183,11 @@ app.get("/players/:deviceId/customization", async (req, res) => {
         res.status(400).json({ error: "Invalid device ID" });
         return;
     }
-    const customization = await (0, database_1.getPlayerCustomization)(req.params.deviceId);
+    if (!await requestCanAccessPlayerData(req.params.deviceId, req.headers.authorization)) {
+        res.status(403).json({ error: "Player data is private" });
+        return;
+    }
+    const customization = await (0, database_2.getPlayerCustomization)(req.params.deviceId);
     if (!customization) {
         res.status(503).json({ error: "Customization is temporarily unavailable" });
         return;
@@ -185,7 +205,7 @@ app.post("/players/:deviceId/customization/name-color", async (req, res) => {
     }
     const cosmeticId = typeof req.body?.cosmeticId === "string" ? req.body.cosmeticId : "";
     const displayName = typeof req.body?.displayName === "string" ? req.body.displayName.trim().slice(0, 20) : "Player";
-    const customization = await (0, database_1.equipFreeNameColor)(req.params.deviceId, cosmeticId, displayName);
+    const customization = await (0, database_2.equipFreeNameColor)(req.params.deviceId, cosmeticId, displayName);
     if (!customization) {
         res.status(400).json({ error: "Could not equip that name color" });
         return;
@@ -203,7 +223,7 @@ app.post("/players/:deviceId/customization/avatar", async (req, res) => {
     }
     const cosmeticId = typeof req.body?.cosmeticId === "string" ? req.body.cosmeticId : "";
     const displayName = typeof req.body?.displayName === "string" ? req.body.displayName.trim().slice(0, 20) : "Player";
-    const customization = await (0, database_1.equipFreeAvatar)(req.params.deviceId, cosmeticId, displayName);
+    const customization = await (0, database_2.equipFreeAvatar)(req.params.deviceId, cosmeticId, displayName);
     if (!customization) {
         res.status(400).json({ error: "Could not equip that avatar" });
         return;
@@ -221,7 +241,7 @@ app.post("/players/:deviceId/customization/frame", async (req, res) => {
     }
     const cosmeticId = typeof req.body?.cosmeticId === "string" ? req.body.cosmeticId : "";
     const displayName = typeof req.body?.displayName === "string" ? req.body.displayName.trim().slice(0, 20) : "Player";
-    const customization = await (0, database_1.equipFreeFrame)(req.params.deviceId, cosmeticId, displayName);
+    const customization = await (0, database_2.equipFreeFrame)(req.params.deviceId, cosmeticId, displayName);
     if (!customization) {
         res.status(400).json({ error: "Could not equip that frame" });
         return;
@@ -236,20 +256,29 @@ app.get("/players/:deviceId/daily-reward", async (req, res) => {
         res.status(400).json({ error: "Invalid device ID" });
         return;
     }
-    const status = await (0, database_1.getDailyRewardStatus)(req.params.deviceId);
+    if (!await requestCanAccessPlayerData(req.params.deviceId, req.headers.authorization)) {
+        res.status(403).json({ error: "Player data is private" });
+        return;
+    }
+    const status = await (0, database_2.getDailyRewardStatus)(req.params.deviceId);
     if (!status) {
         res.status(503).json({ error: "Daily reward is temporarily unavailable" });
         return;
     }
     res.json(status);
 });
-app.post("/players/:deviceId/daily-reward/claim", async (req, res) => {
+app.post("/players/:deviceId/daily-reward/claim", rewardLimit, async (req, res) => {
     if (!isDeviceId(req.params.deviceId)) {
         res.status(400).json({ error: "Invalid device ID" });
         return;
     }
+    const identity = await (0, auth_1.verifySupabaseIdentity)(req.headers.authorization);
+    if (!await (0, database_2.canPlayerEnterGame)(req.params.deviceId, identity?.userId ?? null)) {
+        res.status(403).json({ error: "This account cannot claim rewards" });
+        return;
+    }
     const displayName = typeof req.body?.displayName === "string" ? req.body.displayName.trim().slice(0, 20) : "";
-    const status = await (0, database_1.claimDailyReward)(req.params.deviceId, displayName);
+    const status = await (0, database_2.claimDailyReward)(req.params.deviceId, displayName);
     if (!status) {
         res.status(503).json({ error: "Daily reward is temporarily unavailable" });
         return;
@@ -266,7 +295,7 @@ app.get("/ranked/leaderboard", async (req, res) => {
         res.status(403).json({ error: "Sign in to access Ranked" });
         return;
     }
-    const leaderboard = await (0, database_1.getRankedLeaderboard)(deviceId);
+    const leaderboard = await (0, database_2.getRankedLeaderboard)(deviceId);
     if (!leaderboard) {
         res.status(503).json({ error: "Ranked leaderboard is temporarily unavailable" });
         return;
@@ -279,7 +308,7 @@ app.get("/friends", async (req, res) => {
         res.status(403).json({ error: "Sign in to access Friends" });
         return;
     }
-    const friends = await (0, database_1.listFriends)(playerId);
+    const friends = await (0, database_2.listFriends)(playerId);
     if (!friends) {
         res.status(503).json({ error: "Friends are temporarily unavailable" });
         return;
@@ -297,7 +326,7 @@ app.get("/friends/search", async (req, res) => {
         res.json([]);
         return;
     }
-    const results = await (0, database_1.searchFriendPlayers)(playerId, query);
+    const results = await (0, database_2.searchFriendPlayers)(playerId, query);
     if (!results) {
         res.status(503).json({ error: "Player search is temporarily unavailable" });
         return;
@@ -310,63 +339,63 @@ app.get("/friends/suggestions", async (req, res) => {
         res.status(403).json({ error: "Sign in to access Friends" });
         return;
     }
-    const results = await (0, database_1.suggestFriendPlayers)(playerId);
+    const results = await (0, database_2.suggestFriendPlayers)(playerId);
     if (!results) {
         res.status(503).json({ error: "Friend suggestions are temporarily unavailable" });
         return;
     }
     res.json(results);
 });
-app.post("/friends/requests", async (req, res) => {
+app.post("/friends/requests", friendRequestLimit, async (req, res) => {
     const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
     const targetPlayerId = typeof req.body?.targetPlayerId === "string" ? req.body.targetPlayerId : "";
     if (!isDeviceId(playerId) || !isDeviceId(targetPlayerId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
         res.status(403).json({ error: "Sign in to access Friends" });
         return;
     }
-    sendFriendActionResponse(res, await (0, database_1.sendFriendRequest)(playerId, targetPlayerId));
+    sendFriendActionResponse(res, await (0, database_2.sendFriendRequest)(playerId, targetPlayerId));
 });
-app.patch("/friends/requests/:friendshipId", async (req, res) => {
+app.patch("/friends/requests/:friendshipId", socialActionLimit, async (req, res) => {
     const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
     const action = req.body?.action;
     if (!isDeviceId(playerId) || !isDeviceId(req.params.friendshipId) || !["accept", "reject"].includes(action) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
         res.status(403).json({ error: "Invalid friend request" });
         return;
     }
-    sendFriendActionResponse(res, await (0, database_1.respondToFriendRequest)(playerId, req.params.friendshipId, action === "accept"));
+    sendFriendActionResponse(res, await (0, database_2.respondToFriendRequest)(playerId, req.params.friendshipId, action === "accept"));
 });
-app.patch("/friends/:friendshipId", async (req, res) => {
+app.patch("/friends/:friendshipId", socialActionLimit, async (req, res) => {
     const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
     const action = req.body?.action;
     if (!isDeviceId(playerId) || !isDeviceId(req.params.friendshipId) || !["remove", "block", "unblock"].includes(action) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
         res.status(403).json({ error: "Invalid friendship action" });
         return;
     }
-    sendFriendActionResponse(res, await (0, database_1.updateFriendRelationship)(playerId, req.params.friendshipId, action));
+    sendFriendActionResponse(res, await (0, database_2.updateFriendRelationship)(playerId, req.params.friendshipId, action));
 });
-app.post("/friends/:friendshipId/gifts", async (req, res) => {
+app.post("/friends/:friendshipId/gifts", socialActionLimit, async (req, res) => {
     const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
     if (!isDeviceId(playerId) || !isDeviceId(req.params.friendshipId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
         res.status(403).json({ error: "Invalid gift action" });
         return;
     }
-    sendFriendActionResponse(res, await (0, database_1.sendFriendGift)(playerId, req.params.friendshipId));
+    sendFriendActionResponse(res, await (0, database_2.sendFriendGift)(playerId, req.params.friendshipId));
 });
-app.post("/friends/gifts/claim-all", async (req, res) => {
+app.post("/friends/gifts/claim-all", socialActionLimit, async (req, res) => {
     const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
     if (!isDeviceId(playerId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
         res.status(403).json({ error: "Invalid blessing claim" });
         return;
     }
-    sendFriendActionResponse(res, await (0, database_1.claimAllFriendGifts)(playerId));
+    sendFriendActionResponse(res, await (0, database_2.claimAllFriendGifts)(playerId));
 });
-app.post("/friends/gifts/:giftId/claim", async (req, res) => {
+app.post("/friends/gifts/:giftId/claim", socialActionLimit, async (req, res) => {
     const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
     if (!isDeviceId(playerId) || !isDeviceId(req.params.giftId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
         res.status(403).json({ error: "Invalid gift claim" });
         return;
     }
-    sendFriendActionResponse(res, await (0, database_1.claimFriendGift)(playerId, req.params.giftId));
+    sendFriendActionResponse(res, await (0, database_2.claimFriendGift)(playerId, req.params.giftId));
 });
 app.post("/presence", async (req, res) => {
     const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
@@ -375,7 +404,7 @@ app.post("/presence", async (req, res) => {
         res.status(403).json({ error: "Invalid presence update" });
         return;
     }
-    if (!await (0, database_1.updatePlayerPresence)(playerId, available)) {
+    if (!await (0, database_2.updatePlayerPresence)(playerId, available)) {
         res.status(503).json({ error: "Presence is temporarily unavailable" });
         return;
     }
@@ -387,14 +416,14 @@ app.get("/challenges", async (req, res) => {
         res.status(403).json({ error: "Invalid challenge request" });
         return;
     }
-    const challenges = await (0, database_1.getPlayerChallenges)(playerId);
+    const challenges = await (0, database_2.getPlayerChallenges)(playerId);
     if (!challenges) {
         res.status(503).json({ error: "Challenges are temporarily unavailable" });
         return;
     }
     res.json(challenges);
 });
-app.post("/challenges", async (req, res) => {
+app.post("/challenges", challengeLimit, async (req, res) => {
     const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
     const challengedId = typeof req.body?.challengedId === "string" ? req.body.challengedId : "";
     const damageWager = Number(req.body?.damageWager);
@@ -402,16 +431,16 @@ app.post("/challenges", async (req, res) => {
         res.status(403).json({ error: "Invalid challenge" });
         return;
     }
-    sendFriendActionResponse(res, await (0, database_1.createPlayerChallenge)(playerId, challengedId, damageWager));
+    sendFriendActionResponse(res, await (0, database_2.createPlayerChallenge)(playerId, challengedId, damageWager));
 });
-app.patch("/challenges/:challengeId", async (req, res) => {
+app.patch("/challenges/:challengeId", socialActionLimit, async (req, res) => {
     const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
     const action = req.body?.action;
     if (!isDeviceId(playerId) || !isDeviceId(req.params.challengeId) || !["accept", "decline"].includes(action) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
         res.status(403).json({ error: "Invalid challenge response" });
         return;
     }
-    sendFriendActionResponse(res, await (0, database_1.respondToPlayerChallenge)(playerId, req.params.challengeId, action === "accept"));
+    sendFriendActionResponse(res, await (0, database_2.respondToPlayerChallenge)(playerId, req.params.challengeId, action === "accept"));
 });
 function sendFriendActionResponse(res, result) {
     if (!result.ok) {
@@ -422,7 +451,11 @@ function sendFriendActionResponse(res, result) {
 }
 async function requestOwnsRegisteredPlayer(playerId, authorization) {
     const identity = await (0, auth_1.verifySupabaseIdentity)(authorization);
-    return Boolean(identity && await (0, database_1.isAuthenticatedPlayer)(playerId, identity.userId));
+    return Boolean(identity && await (0, database_2.isAuthenticatedPlayer)(playerId, identity.userId));
+}
+async function requestCanAccessPlayerData(playerId, authorization) {
+    const identity = await (0, auth_1.verifySupabaseIdentity)(authorization);
+    return (0, database_1.canAccessPlayerData)(playerId, identity?.userId ?? null);
 }
 const httpServer = http_1.default.createServer(app);
 const gameServer = new colyseus_1.Server({
