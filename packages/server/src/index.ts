@@ -3,7 +3,7 @@ import express from "express";
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { GameRoom } from "./rooms/GameRoom";
-import { anonymizePlayerAccount, claimAllFriendGifts, claimDailyReward, claimFriendGift, createPlayerChallenge, equipFreeAvatar, equipFreeFrame, equipFreeNameColor, getAccountProfile, getDailyRewardStatus, getDatabaseStatus, getNewsPosts, getPlayerChallenges, getPlayerCustomization, getPlayerStars, getRankedLeaderboard, isAuthenticatedPlayer, linkPlayerAccount, listFriends, redeemPromoCode, respondToFriendRequest, respondToPlayerChallenge, searchFriendPlayers, sendFriendGift, sendFriendRequest, suggestFriendPlayers, updateAccountDisplayName, updateFriendRelationship, updatePlayerPresence } from "./database";
+import { anonymizePlayerAccount, claimAllFriendGifts, claimDailyReward, claimFriendGift, createPlayerChallenge, equipFreeAvatar, equipFreeFrame, equipFreeNameColor, getAccountProfile, getDailyRewardStatus, getDatabaseStatus, getNewsPosts, getPlayerChallenges, getPlayerCustomization, getPlayerStars, getRankedLeaderboard, isAuthenticatedPlayer, linkPlayerAccount, listFriends, redeemPromoCode, respondToFriendRequest, respondToPlayerChallenge, searchFriendPlayers, sendFriendGift, sendFriendRequest, submitPlayerReport, suggestFriendPlayers, updateAccountDisplayName, updateFriendRelationship, updatePlayerPresence } from "./database";
 import { deleteSupabaseIdentity, verifySupabaseIdentity } from "./auth";
 import { isDamageWager, isOffensivePlayerName } from "@confidence-trivia/shared";
 
@@ -30,6 +30,18 @@ app.post("/promo-codes/redeem", async (req, res) => {
   const result = await redeemPromoCode(playerId, code);
   if (!result.ok) { res.status(409).json({ error: result.error }); return; }
   res.json(result);
+});
+
+app.post("/player-reports", async (req, res) => {
+  const reporterId = typeof req.body?.reporterId === "string" ? req.body.reporterId : "";
+  const reportedName = typeof req.body?.reportedName === "string" ? req.body.reportedName.trim() : "";
+  const description = typeof req.body?.description === "string" ? req.body.description.trim() : "";
+  if (!isDeviceId(reporterId) || !await requestOwnsRegisteredPlayer(reporterId, req.headers.authorization)) { res.status(403).json({ error: "Sign in to report a player" }); return; }
+  if (!/^[\p{L}\p{N} _-]{3,20}$/u.test(reportedName)) { res.status(400).json({ error: "Enter the player's exact name" }); return; }
+  if (description.length < 10 || description.length > 500) { res.status(400).json({ error: "Description must be between 10 and 500 characters" }); return; }
+  const result = await submitPlayerReport(reporterId, reportedName, description);
+  if (!result.ok) { res.status(409).json({ error: result.error }); return; }
+  res.status(201).json({ ok: true });
 });
 
 app.post("/accounts/link", async (req, res) => {

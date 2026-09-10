@@ -3,6 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.submitPlayerReport = submitPlayerReport;
 exports.getNewsPosts = getNewsPosts;
 exports.redeemPromoCode = redeemPromoCode;
 exports.getAccountProfile = getAccountProfile;
@@ -48,6 +49,43 @@ const databaseUrl = process.env.DATABASE_URL;
 const sql = databaseUrl
     ? (0, postgres_1.default)(databaseUrl, { max: 3, idle_timeout: 20 })
     : null;
+async function submitPlayerReport(reporterId, rawReportedName, rawDescription) {
+    if (!sql)
+        return { ok: false, error: "Player reports are temporarily unavailable" };
+    const reportedName = rawReportedName.trim();
+    const normalizedName = reportedName.toLocaleLowerCase("en-US");
+    const description = rawDescription.trim();
+    try {
+        return await sql.begin(async (transaction) => {
+            const [reported] = await transaction `
+        select id, display_name from public.players
+        where account_type = 'registered' and normalized_display_name = ${normalizedName}
+        limit 1
+      `;
+            if (!reported)
+                return { ok: false, error: "No player with that exact name was found" };
+            if (reported.id === reporterId)
+                return { ok: false, error: "You cannot report yourself" };
+            const [recent] = await transaction `
+        select id from public.player_reports
+        where reporter_id = ${reporterId} and reported_player_id = ${reported.id}
+          and created_at > now() - interval '24 hours'
+        limit 1
+      `;
+            if (recent)
+                return { ok: false, error: "You already reported this player recently" };
+            await transaction `
+        insert into public.player_reports (reporter_id, reported_player_id, reported_name, description)
+        values (${reporterId}, ${reported.id}, ${reported.display_name}, ${description})
+      `;
+            return { ok: true };
+        });
+    }
+    catch (error) {
+        console.error("Could not submit player report", error);
+        return { ok: false, error: "Could not submit this report" };
+    }
+}
 async function getNewsPosts(locale) {
     if (!sql)
         return null;
@@ -139,6 +177,8 @@ async function anonymizePlayerAccount(playerId) {
             if (!player)
                 return false;
             await transaction `update public.match_players set display_name = 'Deleted User' where player_id = ${playerId}`;
+            await transaction `delete from public.player_reports where reporter_id = ${playerId}`;
+            await transaction `update public.player_reports set reported_name = 'Deleted User' where reported_player_id = ${playerId}`;
             await transaction `delete from public.friendships where ${playerId} in (player_low_id, player_high_id)`;
             await transaction `delete from public.player_challenges where ${playerId} in (challenger_id, challenged_id)`;
             await transaction `delete from public.player_presence where player_id = ${playerId}`;

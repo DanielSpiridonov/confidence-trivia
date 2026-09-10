@@ -19,7 +19,7 @@ tested on the affected platforms, and documented where applicable.
 
 ## 2. Player safety and moderation
 
-- [ ] Add a **Report player/name** action anywhere public player names appear.
+- [x] Add an authenticated **Report player/name** form in Settings.
 - [x] Add basic offensive-name filtering for permanent account names.
 - [ ] Define how reports are reviewed and resolved.
 - [ ] Verify blocking removes friend access and prevents new challenges.

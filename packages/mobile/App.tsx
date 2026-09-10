@@ -895,6 +895,7 @@ export default function App() {
               playerId={deviceId}
               registered={Boolean(registeredAccount)}
               onStarsChange={setStars}
+              onFeedback={showFeedback}
               onBack={() => setNav("home")}
             />
           )}

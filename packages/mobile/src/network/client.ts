@@ -55,6 +55,20 @@ export async function redeemPromoCode(playerId: string, code: string): Promise<{
   return { stars: payload.stars, reward: payload.reward };
 }
 
+export async function submitPlayerReport(reporterId: string, reportedName: string, description: string): Promise<void> {
+  const accessToken = await getAccessToken();
+  if (!accessToken) throw new Error("Sign in to report a player");
+  const response = await fetch(`${HTTP_SERVER_URL}/player-reports`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify({ reporterId, reportedName, description }),
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null) as { error?: string } | null;
+    throw new Error(payload?.error ?? `Server returned ${response.status}`);
+  }
+}
+
 export async function linkPlayerAccount(guestPlayerId: string, displayName: string, accessToken: string): Promise<PlayerAccount> {
   try {
     const response = await fetch(`${HTTP_SERVER_URL}/accounts/link`, {

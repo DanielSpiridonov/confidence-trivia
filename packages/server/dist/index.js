@@ -41,6 +41,29 @@ app.post("/promo-codes/redeem", async (req, res) => {
     }
     res.json(result);
 });
+app.post("/player-reports", async (req, res) => {
+    const reporterId = typeof req.body?.reporterId === "string" ? req.body.reporterId : "";
+    const reportedName = typeof req.body?.reportedName === "string" ? req.body.reportedName.trim() : "";
+    const description = typeof req.body?.description === "string" ? req.body.description.trim() : "";
+    if (!isDeviceId(reporterId) || !await requestOwnsRegisteredPlayer(reporterId, req.headers.authorization)) {
+        res.status(403).json({ error: "Sign in to report a player" });
+        return;
+    }
+    if (!/^[\p{L}\p{N} _-]{3,20}$/u.test(reportedName)) {
+        res.status(400).json({ error: "Enter the player's exact name" });
+        return;
+    }
+    if (description.length < 10 || description.length > 500) {
+        res.status(400).json({ error: "Description must be between 10 and 500 characters" });
+        return;
+    }
+    const result = await (0, database_1.submitPlayerReport)(reporterId, reportedName, description);
+    if (!result.ok) {
+        res.status(409).json({ error: result.error });
+        return;
+    }
+    res.status(201).json({ ok: true });
+});
 app.post("/accounts/link", async (req, res) => {
     const guestPlayerId = typeof req.body?.guestPlayerId === "string" ? req.body.guestPlayerId : "";
     const displayName = typeof req.body?.displayName === "string" ? req.body.displayName.trim().slice(0, 20) : "Guest";

@@ -31,6 +31,42 @@ export type DatabaseStatus = "connected" | "not_configured" | "unavailable";
 
 export interface NewsPost { id: string; title: string; body: string; publishedAt: string; }
 export type RedeemCodeResult = { ok: true; stars: number; reward: number } | { ok: false; error: string };
+export type PlayerReportResult = { ok: true } | { ok: false; error: string };
+
+export async function submitPlayerReport(reporterId: string, rawReportedName: string, rawDescription: string): Promise<PlayerReportResult> {
+  if (!sql) return { ok: false, error: "Player reports are temporarily unavailable" };
+  const reportedName = rawReportedName.trim();
+  const normalizedName = reportedName.toLocaleLowerCase("en-US");
+  const description = rawDescription.trim();
+  try {
+    return await sql.begin(async (transaction) => {
+      const [reported] = await transaction<{ id: string; display_name: string }[]>`
+        select id, display_name from public.players
+        where account_type = 'registered' and normalized_display_name = ${normalizedName}
+        limit 1
+      `;
+      if (!reported) return { ok: false, error: "No player with that exact name was found" } as PlayerReportResult;
+      if (reported.id === reporterId) return { ok: false, error: "You cannot report yourself" } as PlayerReportResult;
+
+      const [recent] = await transaction<{ id: string }[]>`
+        select id from public.player_reports
+        where reporter_id = ${reporterId} and reported_player_id = ${reported.id}
+          and created_at > now() - interval '24 hours'
+        limit 1
+      `;
+      if (recent) return { ok: false, error: "You already reported this player recently" } as PlayerReportResult;
+
+      await transaction`
+        insert into public.player_reports (reporter_id, reported_player_id, reported_name, description)
+        values (${reporterId}, ${reported.id}, ${reported.display_name}, ${description})
+      `;
+      return { ok: true } as PlayerReportResult;
+    });
+  } catch (error) {
+    console.error("Could not submit player report", error);
+    return { ok: false, error: "Could not submit this report" };
+  }
+}
 
 export async function getNewsPosts(locale: "en" | "bg"): Promise<NewsPost[] | null> {
   if (!sql) return null;
@@ -121,6 +157,8 @@ export async function anonymizePlayerAccount(playerId: string): Promise<boolean>
       if (!player) return false;
 
       await transaction`update public.match_players set display_name = 'Deleted User' where player_id = ${playerId}`;
+      await transaction`delete from public.player_reports where reporter_id = ${playerId}`;
+      await transaction`update public.player_reports set reported_name = 'Deleted User' where reported_player_id = ${playerId}`;
       await transaction`delete from public.friendships where ${playerId} in (player_low_id, player_high_id)`;
       await transaction`delete from public.player_challenges where ${playerId} in (challenger_id, challenged_id)`;
       await transaction`delete from public.player_presence where player_id = ${playerId}`;
