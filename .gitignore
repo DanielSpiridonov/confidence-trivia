@@ -9,3 +9,6 @@ packages/mobile/.env.local
 packages/mobile/.env.*.local
 packages/server/.env
 packages/server/.env.local
+
+# Standalone website is maintained separately from the game.
+/website/

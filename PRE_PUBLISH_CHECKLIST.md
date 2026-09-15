@@ -67,6 +67,8 @@ tested on the affected platforms, and documented where applicable.
 - [x] Verify guest progress transfers correctly when an account is linked.
 - [x] Verify registered progress restores correctly on another device.
 - [ ] Test Ranked matchmaking, placements, LP, and ranked wins with four accounts.
+- [x] Fix Ranked and 1v1 matchmaking so players using different language packs
+      can enter the same queue and be matched together.
 - [ ] Test Friends, Blessings, blocking, and challenges on unstable connections.
 - [ ] Decide whether Friends Mode is included in version 1 or remains unavailable.
 - [x] Ensure unavailable/future features cannot be mistaken for working purchases.
@@ -81,7 +83,8 @@ tested on the affected platforms, and documented where applicable.
 - [x] Verify stars, daily rewards, Blessings, and promo codes cannot be duplicated.
 - [ ] Add production monitoring and actionable error reporting.
 - [ ] Configure and test database backups and restoration.
-- [ ] Audit production dependencies and resolve material vulnerabilities.
+- [x] Audit production dependencies, apply compatible fixes, and document the
+      major-version findings that require controlled Expo and Colyseus migrations.
 
 ## 8. Accessibility and user experience
 

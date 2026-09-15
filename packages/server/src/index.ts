@@ -3,6 +3,7 @@ import express from "express";
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { GameRoom } from "./rooms/GameRoom";
+import { MATCHMAKING_FILTERS } from "./rooms/matchmaking";
 import { canAccessPlayerData } from "./database";
 import { anonymizePlayerAccount, canPlayerEnterGame, claimAllFriendGifts, claimDailyReward, claimFriendGift, createPlayerChallenge, equipFreeAvatar, equipFreeFrame, equipFreeNameColor, getAccountProfile, getDailyRewardStatus, getDatabaseStatus, getNewsPosts, getPlayerChallenges, getPlayerCustomization, getPlayerStars, getRankedLeaderboard, isAuthenticatedPlayer, linkPlayerAccount, listFriends, ownsRegisteredPlayer, redeemPromoCode, respondToFriendRequest, respondToPlayerChallenge, searchFriendPlayers, sendFriendGift, sendFriendRequest, submitPlayerReport, suggestFriendPlayers, updateAccountDisplayName, updateFriendRelationship, updatePlayerPresence } from "./database";
 import { deleteSupabaseIdentity, verifySupabaseIdentity } from "./auth";
@@ -365,7 +366,7 @@ const gameServer = new Server({
 // "confidence_trivia" is the room type name the client requests by;
 // each call to joinOrCreate/create spins up a new authoritative GameRoom
 // instance with its own room code.
-gameServer.define("confidence_trivia", GameRoom).filterBy(["gameMode", "damageWager", "locale", "challengeId"]);
+gameServer.define("confidence_trivia", GameRoom).filterBy([...MATCHMAKING_FILTERS]);
 
 httpServer.listen(port, () => {
   console.log(`Confidence Trivia server listening on ws://0.0.0.0:${port}`);

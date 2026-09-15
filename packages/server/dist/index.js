@@ -8,6 +8,7 @@ const express_1 = __importDefault(require("express"));
 const colyseus_1 = require("colyseus");
 const ws_transport_1 = require("@colyseus/ws-transport");
 const GameRoom_1 = require("./rooms/GameRoom");
+const matchmaking_1 = require("./rooms/matchmaking");
 const database_1 = require("./database");
 const database_2 = require("./database");
 const auth_1 = require("./auth");
@@ -464,7 +465,7 @@ const gameServer = new colyseus_1.Server({
 // "confidence_trivia" is the room type name the client requests by;
 // each call to joinOrCreate/create spins up a new authoritative GameRoom
 // instance with its own room code.
-gameServer.define("confidence_trivia", GameRoom_1.GameRoom).filterBy(["gameMode", "damageWager", "locale", "challengeId"]);
+gameServer.define("confidence_trivia", GameRoom_1.GameRoom).filterBy([...matchmaking_1.MATCHMAKING_FILTERS]);
 httpServer.listen(port, () => {
     console.log(`Confidence Trivia server listening on ws://0.0.0.0:${port}`);
 });

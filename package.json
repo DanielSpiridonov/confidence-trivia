@@ -20,5 +20,8 @@
   "dependencies": {
     "@types/react": "~19.1.10",
     "expo": "^54.0.0"
+  },
+  "overrides": {
+    "qs": "6.16.0"
   }
 }
