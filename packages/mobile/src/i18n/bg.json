@@ -7,6 +7,16 @@
     "settings": "Настройки",
     "profile": "Профил",
     "friends": "Приятели",
+    "friendsPlayers": "Всеки за себе си или двойки",
+    "teamFormat": "Отборен формат",
+    "ffa": "Всеки за себе си",
+    "duos": "Двойки",
+    "categories": "Категории въпроси",
+    "customQuestions": "Персонализирани въпроси",
+    "addQuestion": "Добави въпрос",
+    "questionPlaceholder": "Въпрос",
+    "answerPlaceholder": "Отговор",
+    "customPrivateNote": "Стаите с персонализирани въпроси са частни.",
     "menu": "Меню",
     "ruleBook": "Правила",
     "dailyReward": "Дневна награда",
@@ -124,6 +134,7 @@
   "lobby": {
     "roomCode": "КОД НА СТАЯТА",
     "players": "Играчи",
+    "team": "Отбор {{team}}",
     "wagerStake": "★ {{count}} на играч",
     "wagerPot": "Награда: ★ {{count}}",
     "insufficientWagerStars": "{{names}} се нуждае от поне {{stake}} звезди.",
@@ -256,6 +267,22 @@
       "master": "Майстор",
       "omniscient": "Всезнаещ"
     }
+  },
+  "startup": {
+    "start": "Старт",
+    "loading": "Зареждане...",
+    "loadingAssets": "Зареждане на ресурси...",
+    "connecting": "Свързване с играта...",
+    "repair": "Поправи клиента",
+    "repairConfirmTitle": "Поправяне на клиента?",
+    "repairConfirmMessage": "Това нулира временните данни за стаи и въпроси, свързва се отново с услугите на играта и презарежда профила. Акаунтът, звездите, покупките и прогресът ти се запазват.",
+    "repairConfirm": "Поправи",
+    "community": "Общност",
+    "account": "Акаунт",
+    "connectedAs": "Свързан като {{name}}",
+    "accountRequired": "Необходим е свързан акаунт",
+    "connectHint": "Отвори Акаунт и се свържи преди стартиране.",
+    "serverUnavailable": "Услугите на играта не са достъпни. Опитай Поправи клиента."
   },
   "account": {
     "title": "Профил",

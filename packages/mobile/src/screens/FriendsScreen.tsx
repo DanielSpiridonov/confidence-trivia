@@ -11,7 +11,7 @@ import { GameDialog, useGameDialog } from "../components/GameDialog";
 type FriendsTab = "friends" | "requests" | "blocked";
 const BLESSING_GIFT_IMAGE = require("../../assets/stars-gift.png");
 
-export function FriendsScreen({ playerId, stars, onStarsChange, onChallengeSent, onBack }: { playerId: string; stars: number; onStarsChange: (stars: number) => void; onChallengeSent: (playerName: string, damageWager: number) => void; onBack: () => void }) {
+export function FriendsScreen({ playerId, stars, onStarsChange, onRequestCountChange, onChallengeSent, onBack }: { playerId: string; stars: number; onStarsChange: (stars: number) => void; onRequestCountChange: (count: number) => void; onChallengeSent: (playerName: string, damageWager: number) => void; onBack: () => void }) {
   const { t } = useTranslation();
   const [tab, setTab] = React.useState<FriendsTab>("friends");
   const [data, setData] = React.useState<Awaited<ReturnType<typeof getFriends>> | null>(null);
@@ -33,19 +33,19 @@ export function FriendsScreen({ playerId, stars, onStarsChange, onChallengeSent,
   const refresh = React.useCallback(async () => {
     try {
       const [friends, suggested] = await Promise.all([getFriends(playerId), getFriendSuggestions(playerId)]);
-      setData(friends); setSuggestions(suggested);
+      setData(friends); setSuggestions(suggested); onRequestCountChange(friends.incoming.length);
     } catch (error) { showError(error); }
     finally { setLoading(false); }
-  }, [playerId, showError]);
+  }, [onRequestCountChange, playerId, showError]);
 
   React.useEffect(() => { void refresh(); }, [refresh]);
 
   React.useEffect(() => {
     const interval = setInterval(() => {
-      void getFriends(playerId).then(setData).catch(() => undefined);
+      void getFriends(playerId).then((friends) => { setData(friends); onRequestCountChange(friends.incoming.length); }).catch(() => undefined);
     }, 5_000);
     return () => clearInterval(interval);
-  }, [playerId]);
+  }, [onRequestCountChange, playerId]);
 
   async function handleManualRefresh() {
     if (refreshing) return;

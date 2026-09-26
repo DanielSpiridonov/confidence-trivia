@@ -5,7 +5,6 @@ import { useTranslation } from "react-i18next";
 import { Room } from "colyseus.js";
 import { FRAME_COSMETIC_COLORS, MIN_PLAYERS_TO_START, RANKED_PLAYER_COUNT } from "@confidence-trivia/shared";
 import { ANDROID_GAME_UI_SCALE, Screen, Title, Subtitle, BigButton, theme } from "../components/ui";
-import { useRoomState } from "../network/client";
 import { playSound } from "../audio/sounds";
 import { PlayerFrameEffect } from "../components/PlayerFrameEffect";
 
@@ -18,11 +17,11 @@ interface PublicPlayerView {
   stars: number;
   nameColor: string;
   frameId: string;
+  team: string;
 }
 
-export function LobbyScreen({ room, mySessionId }: { room: Room; mySessionId: string }) {
+export function LobbyScreen({ room, state, mySessionId }: { room: Room; state: any; mySessionId: string }) {
   const { t } = useTranslation();
-  const state = useRoomState<any>(room);
   const [copied, setCopied] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [countdownEndsAt, setCountdownEndsAt] = useState<number | null>(null);
@@ -75,6 +74,7 @@ export function LobbyScreen({ room, mySessionId }: { room: Room; mySessionId: st
     stars: p.stars,
     nameColor: p.nameColor,
     frameId: p.frameId,
+    team: p.team,
   }));
 
   const me = players.find((p) => p.id === mySessionId);
@@ -83,7 +83,8 @@ export function LobbyScreen({ room, mySessionId }: { room: Room; mySessionId: st
   const isRanked = state.gameMode === "ranked";
   const isChallenge = Boolean(state.isChallenge);
   const isMatchmade = isRanked || (state.gameMode === "damage" && !isChallenge);
-  const canStart = isHost && (state.gameMode === "damage" || state.gameMode === "ranked" ? players.length === requiredPlayers : players.length >= requiredPlayers);
+  const validFriendsTeamSize = state.gameMode !== "friends" || state.friendsTeamMode !== "duos" || (players.length >= 4 && players.length % 2 === 0);
+  const canStart = isHost && validFriendsTeamSize && (state.gameMode === "damage" || state.gameMode === "ranked" ? players.length === requiredPlayers : players.length >= requiredPlayers);
 
   async function handleCopyCode() {
     await Clipboard.setStringAsync(String(state.code));
@@ -101,6 +102,7 @@ export function LobbyScreen({ room, mySessionId }: { room: Room; mySessionId: st
               <View style={[styles.playerRow, item.frameId ? { borderWidth: 2, borderColor: FRAME_COSMETIC_COLORS[item.frameId as keyof typeof FRAME_COSMETIC_COLORS] } : null]}>
                 <PlayerFrameEffect frameId={item.frameId} />
                 <Text numberOfLines={1} style={[styles.playerName, { color: item.nameColor || theme.text }]}>{item.isHost ? "👑 " : ""}{item.name}{!item.connected ? " (reconnecting…)" : ""}</Text>
+                {item.team ? <Text style={[styles.teamBadge, item.team === "B" && styles.teamBadgeB]}>{t("lobby.team", { team: item.team })}</Text> : null}
                 {!isMatchmade ? <Text style={item.ready ? styles.readyBadge : styles.notReadyBadge}>{item.ready ? t("lobby.ready") : t("lobby.notReady")}</Text> : null}
               </View>
             )} />
@@ -113,7 +115,7 @@ export function LobbyScreen({ room, mySessionId }: { room: Room; mySessionId: st
               <Text style={styles.wagerStake}>{t("lobby.wagerStake", { count: state.damageWager })}</Text>
               <Text style={styles.wagerPot}>{t("lobby.wagerPot", { count: state.damagePot })}</Text>
             </View> : null}
-            {!isMatchmade && !isChallenge && isHost && !isStarting ? <Pressable accessibilityRole="switch" accessibilityState={{ checked: Boolean(state.isPublic) }} onPress={() => room.send("toggleRoomVisibility")} style={styles.visibilityControl}>
+            {!isMatchmade && !isChallenge && isHost && !isStarting && !state.customQuestionsEnabled ? <Pressable accessibilityRole="switch" accessibilityState={{ checked: Boolean(state.isPublic) }} onPress={() => room.send("toggleRoomVisibility")} style={styles.visibilityControl}>
               <Text style={styles.visibilityLabel}>{state.isPublic ? t("lobby.partyPublic") : t("lobby.partyPrivate")}</Text>
               <View style={[styles.visibilityTrack, state.isPublic && styles.visibilityTrackEnabled]}><View style={[styles.visibilityThumb, state.isPublic && styles.visibilityThumbEnabled]} /></View>
             </Pressable> : null}
@@ -181,6 +183,8 @@ const styles = StyleSheet.create({
   wagerBanner: { alignSelf: "center", flexDirection: "row", gap: 14, marginBottom: 8, paddingHorizontal: 14, paddingVertical: 5, borderRadius: 10, backgroundColor: "rgba(247, 216, 91, 0.11)", borderWidth: 1, borderColor: "rgba(247, 216, 91, 0.45)" },
   wagerStake: { color: "#F7D85B", fontSize: 12, fontWeight: "900" },
   wagerPot: { color: theme.text, fontSize: 12, fontWeight: "800" },
+  teamBadge: { marginRight: 7, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5, color: "#D8D0FF", backgroundColor: "rgba(124,92,255,0.25)", fontSize: 9, fontWeight: "900" },
+  teamBadgeB: { color: "#AEECD1", backgroundColor: "rgba(52,190,130,0.2)" },
   startError: { color: theme.danger, textAlign: "center", fontSize: 12, fontWeight: "700", marginTop: 5 },
   visibilityLabel: { color: theme.textDim, fontSize: 13, fontWeight: "700" },
   visibilityTrack: {

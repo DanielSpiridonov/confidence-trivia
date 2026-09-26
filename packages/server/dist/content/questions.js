@@ -481,8 +481,10 @@ validateQuestionBank();
  * long-running server (multiple concurrent rooms) avoid immediate repeats
  * within one room's own game — it does not need to be global.
  */
-function getQuestionSet(count, excludeIds = []) {
-    const enabledQuestions = exports.QUESTIONS.filter((q) => ENABLED_TEST_TYPES.has(q.type));
+function getQuestionSet(count, excludeIds = [], categories = []) {
+    const categorySet = new Set(categories.map((category) => category.trim().toLowerCase()).filter(Boolean));
+    const categoryQuestions = exports.QUESTIONS.filter((q) => ENABLED_TEST_TYPES.has(q.type) && (categorySet.size === 0 || categorySet.has(q.category.toLowerCase())));
+    const enabledQuestions = categoryQuestions.length > 0 ? categoryQuestions : exports.QUESTIONS.filter((q) => ENABLED_TEST_TYPES.has(q.type));
     const questionSet = [];
     const excluded = new Set(excludeIds);
     const usedIds = new Set();

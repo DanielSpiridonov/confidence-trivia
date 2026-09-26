@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { LayoutChangeEvent, View, Text, Pressable, StyleSheet, TextStyle, ViewStyle, StyleProp, Keyboard, Platform } from "react-native";
+import React from "react";
+import { View, Text, Pressable, StyleSheet, TextStyle, ViewStyle, StyleProp, Keyboard, Platform, useWindowDimensions } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { playSound, SoundEffect } from "../audio/sounds";
 
@@ -17,7 +17,13 @@ export const ANDROID_GAME_UI_SCALE = 0.982278;
 
 function AndroidDesignCanvas({ children, style, uiScale, overflowScale }: { children: React.ReactNode; style?: ViewStyle; uiScale: number; overflowScale: number }) {
   const insets = useSafeAreaInsets();
-  const [viewport, setViewport] = useState({ width: ANDROID_DESIGN_WIDTH, height: ANDROID_DESIGN_HEIGHT });
+  const window = useWindowDimensions();
+  const horizontalInset = Math.max(insets.left, insets.right, 8);
+  const verticalInset = Math.max(insets.top, insets.bottom, 4);
+  const viewport = {
+    width: Math.max(1, window.width - horizontalInset * 2),
+    height: Math.max(1, window.height - verticalInset * 2),
+  };
   const viewportFitScale = Math.min(
     viewport.width / ANDROID_DESIGN_WIDTH,
     viewport.height / ANDROID_DESIGN_HEIGHT,
@@ -31,17 +37,10 @@ function AndroidDesignCanvas({ children, style, uiScale, overflowScale }: { chil
   // a transformed canvas here also makes otherwise centered screens look
   // shifted or clipped.
   const scale = Math.min(baseScale * uiScale, viewportFitScale * overflowScale);
-  const horizontalInset = Math.max(insets.left, insets.right, 8);
-  const verticalInset = Math.max(insets.top, insets.bottom, 4);
-
-  function measureViewport(event: LayoutChangeEvent) {
-    const { width, height } = event.nativeEvent.layout;
-    setViewport((current) => current.width === width && current.height === height ? current : { width, height });
-  }
 
   return (
     <View style={[styles.androidSafeArea, { paddingHorizontal: horizontalInset, paddingVertical: verticalInset }]}>
-      <View style={styles.androidViewport} onLayout={measureViewport}>
+      <View style={styles.androidViewport}>
         <View style={[styles.androidCanvas, { transform: [{ scale }] }]}>
           <View style={[styles.content, style]}>{children}</View>
         </View>

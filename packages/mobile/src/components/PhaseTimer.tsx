@@ -36,14 +36,30 @@ export function PhaseTimer({ phaseEndsAt }: { phaseEndsAt: number }) {
 }
 
 export function usePhaseSecondsLeft(phaseEndsAt: number) {
-  const [now, setNow] = useState(Date.now());
+  const getSecondsLeft = () => Math.max(0, Math.ceil((phaseEndsAt - Date.now()) / 1000));
+  const [secondsLeft, setSecondsLeft] = useState(getSecondsLeft);
 
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 250);
-    return () => clearInterval(id);
-  }, []);
+    let timeout: ReturnType<typeof setTimeout> | undefined;
 
-  return Math.max(0, Math.ceil((phaseEndsAt - now) / 1000));
+    const tick = () => {
+      const remaining = Math.max(0, phaseEndsAt - Date.now());
+      setSecondsLeft(Math.ceil(remaining / 1000));
+      if (remaining <= 0) return;
+
+      // Wake just after the next displayed-second boundary instead of
+      // re-rendering the entire gameplay screen four times per second.
+      const untilBoundary = remaining % 1000 || 1000;
+      timeout = setTimeout(tick, untilBoundary + 16);
+    };
+
+    tick();
+    return () => {
+      if (timeout) clearTimeout(timeout);
+    };
+  }, [phaseEndsAt]);
+
+  return secondsLeft;
 }
 
 const styles = StyleSheet.create({

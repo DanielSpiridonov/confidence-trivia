@@ -27,6 +27,11 @@ const REWARD_STAGES = [10, 20, 30, 50, 75] as const;
 const SIDEBAR_ITEM_WIDTH = 82;
 const SIDEBAR_ITEM_HEIGHT = 91;
 
+function NotificationBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return <View pointerEvents="none" style={styles.notificationBadge}><Text style={styles.notificationBadgeText}>{count > 99 ? "99+" : count}</Text></View>;
+}
+
 function HomePopup({ label, amount, streakLabel, claimed, claimedLabel, countdown, platformImage, featureImage, disabled, onPress }: {
   label: string;
   amount: number;
@@ -70,6 +75,8 @@ export function HomeScreen({
   onFriends,
   onNews,
   onInventory,
+  friendRequestCount,
+  unreadNewsCount,
   deviceId,
   onRanked,
   onShop,
@@ -85,6 +92,8 @@ export function HomeScreen({
   onFriends: () => void;
   onNews: () => void;
   onInventory: () => void;
+  friendRequestCount: number;
+  unreadNewsCount: number;
   deviceId: string | null;
   onRanked: () => void;
   onShop: () => void;
@@ -104,6 +113,7 @@ export function HomeScreen({
   const celebrationScale = React.useRef(new Animated.Value(0.94)).current;
   const menuProgress = React.useRef(new Animated.Value(0)).current;
   const isAndroid = Platform.OS === "android";
+  const totalNotifications = friendRequestCount + unreadNewsCount;
 
   function toggleMenu() {
     const nextOpen = !menuOpen;
@@ -229,13 +239,14 @@ export function HomeScreen({
           ? [{ translateX: menuProgress.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }) }]
           : [{ translateX: menuProgress.interpolate({ inputRange: [0, 1], outputRange: [44, 0] }) }, { scale: menuProgress.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] }) }]
         }]}>
-          <Pressable accessibilityRole="button" accessibilityLabel={t("news.title")} onPress={() => openFromMenu(onNews)} style={({ pressed }) => [styles.menuItemButton, pressed && styles.profileButtonPressed]}><Image source={NEWS_MENU_IMAGE} defaultSource={NEWS_MENU_IMAGE} fadeDuration={0} resizeMode="contain" style={styles.menuItemIcon} /><Text numberOfLines={1} style={styles.profileLabel}>{t("news.shortTitle")}</Text></Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel={t("home.friends")} onPress={() => openFromMenu(onFriends)} style={({ pressed }) => [styles.menuItemButton, pressed && styles.profileButtonPressed]}><Image source={FRIENDS_MENU_IMAGE} defaultSource={FRIENDS_MENU_IMAGE} fadeDuration={0} resizeMode="contain" style={styles.menuItemIcon} /><Text numberOfLines={1} style={styles.profileLabel}>{t("home.friends")}</Text></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel={t("news.title")} onPress={() => openFromMenu(onNews)} style={({ pressed }) => [styles.menuItemButton, pressed && styles.profileButtonPressed]}><Image source={NEWS_MENU_IMAGE} defaultSource={NEWS_MENU_IMAGE} fadeDuration={0} resizeMode="contain" style={styles.menuItemIcon} /><Text numberOfLines={1} style={styles.profileLabel}>{t("news.shortTitle")}</Text><NotificationBadge count={unreadNewsCount} /></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel={t("home.friends")} onPress={() => openFromMenu(onFriends)} style={({ pressed }) => [styles.menuItemButton, pressed && styles.profileButtonPressed]}><Image source={FRIENDS_MENU_IMAGE} defaultSource={FRIENDS_MENU_IMAGE} fadeDuration={0} resizeMode="contain" style={styles.menuItemIcon} /><Text numberOfLines={1} style={styles.profileLabel}>{t("home.friends")}</Text><NotificationBadge count={friendRequestCount} /></Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel={t("shop.tabs.inventory")} onPress={() => openFromMenu(onInventory)} style={({ pressed }) => [styles.menuItemButton, pressed && styles.profileButtonPressed]}><Image source={INVENTORY_MENU_IMAGE} defaultSource={INVENTORY_MENU_IMAGE} fadeDuration={0} resizeMode="contain" style={styles.menuItemIcon} /><Text numberOfLines={1} style={styles.profileLabel}>{t("shop.tabs.inventory")}</Text></Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel={t("home.profile")} onPress={() => openFromMenu(onProfile)} style={({ pressed }) => [styles.menuItemButton, pressed && styles.profileButtonPressed]}><Image source={avatarHead} defaultSource={avatarHead} fadeDuration={0} resizeMode="contain" style={styles.profileAvatar} /><Text numberOfLines={1} style={styles.profileLabel}>{t("home.profile")}</Text></Pressable>
         </Animated.View>
         <Pressable accessibilityRole="button" accessibilityLabel={t("home.menu")} accessibilityState={{ expanded: menuOpen }} onPress={toggleMenu} style={({ pressed }) => [styles.hamburgerButton, pressed && styles.profileButtonPressed]}>
           <Animated.View style={isAndroid ? undefined : { transform: [{ rotate: menuProgress.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "90deg"] }) }] }}><Text style={styles.hamburgerIcon}>{menuOpen ? "×" : "☰"}</Text></Animated.View>
+          <NotificationBadge count={totalNotifications} />
         </Pressable>
       </View>
       {showCelebration && activeCelebration ? (
@@ -285,6 +296,8 @@ const styles = StyleSheet.create({
   hamburgerButton: { width: 44, height: 44, borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#7C5CFF", backgroundColor: "rgba(12,9,23,0.96)" },
   hamburgerIcon: { color: "#B9AAFF", fontSize: 27, lineHeight: 30, fontWeight: "900" },
   menuItemIcon: { width: 32, height: 32 },
+  notificationBadge: { position: "absolute", top: -7, right: -7, minWidth: 20, height: 20, paddingHorizontal: 5, borderRadius: 10, alignItems: "center", justifyContent: "center", backgroundColor: "#F04464", borderWidth: 2, borderColor: "#171025", zIndex: 20, elevation: 10 },
+  notificationBadgeText: { color: "#FFFFFF", fontSize: 10, lineHeight: 12, fontWeight: "900", textAlign: "center" },
   profileButtonPressed: { opacity: 0.72, transform: [{ scale: 0.97 }] },
   profileAvatar: { width: 34, height: 34 },
   profileLabel: { color: "#7C5CFF", fontSize: 14, fontWeight: "800", flexShrink: 0 },

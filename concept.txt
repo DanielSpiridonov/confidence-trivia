@@ -1585,6 +1585,46 @@ The client renders the global top 10. If the current player is outside the top 1
 
 ---
 
+# 42.1 CURRENT TODO
+
+## Priority 1 - Startup and account gate
+
+Build a simple startup/sign-in screen that appears before the home screen.
+
+* Show a focused **Start** button as the primary action.
+* Use the startup screen to finish essential boot work before entering the home screen: restore the session, load the player profile, stars, owned cosmetics, settings, daily reward state, and verify backend connectivity.
+* Show a clear loading state after Start is pressed and prevent duplicate startup requests.
+* Keep the player on this screen when critical loading fails, with a useful error and retry path instead of opening a partially loaded home screen.
+* Add compact utility actions in the top-left area:
+  * **Repair Client** - clear recoverable caches and stale room/session state, then rerun startup checks. It must not delete server-owned account progress or purchases.
+  * **Community** - open the official community destination when its URL is defined.
+  * **Account** - open sign-in/account linking and show the current account state.
+* Require players without a connected account to use **Account** and finish account connection before Start can enter the full game.
+* Clearly distinguish signed-out, connecting, connected, loading, ready, offline, and failed states.
+* Keep authentication tokens and account restoration secure; do not treat locally cached account data as proof of authentication.
+* Verify the flow on both Android and iPhone, including cold launch, slow Render wake-up, offline launch, expired sessions, retry, and app resume.
+
+## Priority 2 - Damage Mode completion
+
+* Replace prototype combat presentation with final damage, shield, health, victory, and defeat feedback.
+* Finish disconnect/forfeit handling and validate star-wager escrow, payout, refund, and idempotency rules.
+* Run balance playtests without changing Classic Mode scoring.
+
+## Priority 3 - Ranked public readiness
+
+* Replace the temporary ranked room flow with dedicated four-player matchmaking.
+* Complete abandonment, reconnect, duplicate-account, and boosting protections.
+* Add match history and LP audit visibility.
+* Define seasons and reset rules after rating balance is validated.
+
+## Priority 4 - Remaining platform work
+
+* Add Friends Mode after account identity and Ranked foundations are stable.
+* Add real App Store and Play Store billing with server-side receipt validation before enabling star-pack purchases.
+* Continue accessibility, localization, loading-state, reconnection, and device-layout regression testing.
+
+---
+
 # 43. TECH STACK
 
 Choose a modern, maintainable technology stack appropriate for:

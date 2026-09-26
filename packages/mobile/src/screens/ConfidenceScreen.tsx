@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next";
 import { Room } from "colyseus.js";
 import { CONFIDENCE_SCORING, ConfidenceValue } from "@confidence-trivia/shared";
 import { ANDROID_GAME_UI_SCALE, Screen, Title, theme } from "../components/ui";
-import { useRoomState } from "../network/client";
 import { PhaseTimer, usePhaseSecondsLeft } from "../components/PhaseTimer";
 import { playSound } from "../audio/sounds";
 
@@ -17,9 +16,8 @@ const CHOICE_COLORS: Record<string, string> = {
   6: "#FF5C7A",
 };
 
-export function ConfidenceScreen({ room }: { room: Room }) {
+export function ConfidenceScreen({ room, state }: { room: Room; state: any }) {
   const { t } = useTranslation();
-  const state = useRoomState<any>(room);
   const [selected, setSelected] = useState<ConfidenceValue | null>(null);
   const secondsLeft = usePhaseSecondsLeft(state?.phaseEndsAt ?? 0);
 

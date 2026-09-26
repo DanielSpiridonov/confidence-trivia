@@ -7,6 +7,16 @@
     "settings": "Settings",
     "profile": "Profile",
     "friends": "Friends",
+    "friendsPlayers": "Free-for-all or Duos",
+    "teamFormat": "Team format",
+    "ffa": "Free-for-all",
+    "duos": "Duos",
+    "categories": "Question categories",
+    "customQuestions": "Custom questions",
+    "addQuestion": "Add question",
+    "questionPlaceholder": "Question",
+    "answerPlaceholder": "Answer",
+    "customPrivateNote": "Rooms with custom questions are private.",
     "menu": "Menu",
     "ruleBook": "Rule Book",
     "dailyReward": "Daily Reward",
@@ -124,6 +134,7 @@
   "lobby": {
     "roomCode": "ROOM CODE",
     "players": "Players",
+    "team": "Team {{team}}",
     "wagerStake": "★ {{count}} each",
     "wagerPot": "Pot: ★ {{count}}",
     "insufficientWagerStars": "{{names}} need at least {{stake}} stars to start.",
@@ -256,6 +267,22 @@
       "master": "Master",
       "omniscient": "Omniscient"
     }
+  },
+  "startup": {
+    "start": "Start",
+    "loading": "Loading...",
+    "loadingAssets": "Loading assets...",
+    "connecting": "Connecting to game...",
+    "repair": "Repair Client",
+    "repairConfirmTitle": "Repair client?",
+    "repairConfirmMessage": "This resets temporary room and question data, reconnects to the game services, and reloads your profile. Your account, stars, purchases, and server progress stay safe.",
+    "repairConfirm": "Repair",
+    "community": "Community",
+    "account": "Account",
+    "connectedAs": "Connected as {{name}}",
+    "accountRequired": "Connected account required",
+    "connectHint": "Open Account to connect before starting.",
+    "serverUnavailable": "The game services could not be reached. Try Repair Client."
   },
   "account": {
     "title": "Profile",

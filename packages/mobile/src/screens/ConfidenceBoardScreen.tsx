@@ -3,12 +3,10 @@ import { View, Text, Pressable, FlatList, StyleSheet } from "react-native";
 import { useTranslation } from "react-i18next";
 import { Room } from "colyseus.js";
 import { ANDROID_GAME_UI_SCALE, Screen, Title, Subtitle, BigButton, theme } from "../components/ui";
-import { useRoomState } from "../network/client";
 import { PhaseTimer, usePhaseSecondsLeft } from "../components/PhaseTimer";
 
-export function ConfidenceBoardScreen({ room, mySessionId }: { room: Room; mySessionId: string }) {
+export function ConfidenceBoardScreen({ room, state, mySessionId }: { room: Room; state: any; mySessionId: string }) {
   const { t } = useTranslation();
-  const state = useRoomState<any>(room);
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   const [selectedPrediction, setSelectedPrediction] = useState<"correct" | "wrong" | "skip" | null>(null);
   const secondsLeft = usePhaseSecondsLeft(state?.phaseEndsAt ?? 0);

@@ -35,6 +35,7 @@ class PlayerSchema extends schema_1.Schema {
         this.ready = false;
         this.isHost = false;
         this.hasActedThisPhase = false; // for "waiting on X players" UI
+        this.team = "";
     }
 }
 exports.PlayerSchema = PlayerSchema;
@@ -110,6 +111,10 @@ __decorate([
     (0, schema_1.type)("boolean"),
     __metadata("design:type", Boolean)
 ], PlayerSchema.prototype, "hasActedThisPhase", void 0);
+__decorate([
+    (0, schema_1.type)("string"),
+    __metadata("design:type", String)
+], PlayerSchema.prototype, "team", void 0);
 /** What the client is allowed to see about the current question BEFORE
  * reveal — no correct answer field exists here. */
 class PublicQuestionSchema extends schema_1.Schema {
@@ -248,6 +253,8 @@ class RoomStateSchema extends schema_1.Schema {
         super(...arguments);
         this.code = "";
         this.gameMode = "classic";
+        this.friendsTeamMode = "ffa";
+        this.customQuestionsEnabled = false;
         this.phase = "lobby";
         this.hostId = "";
         this.isPublic = false;
@@ -276,6 +283,14 @@ __decorate([
     (0, schema_1.type)("string"),
     __metadata("design:type", String)
 ], RoomStateSchema.prototype, "gameMode", void 0);
+__decorate([
+    (0, schema_1.type)("string"),
+    __metadata("design:type", String)
+], RoomStateSchema.prototype, "friendsTeamMode", void 0);
+__decorate([
+    (0, schema_1.type)("boolean"),
+    __metadata("design:type", Boolean)
+], RoomStateSchema.prototype, "customQuestionsEnabled", void 0);
 __decorate([
     (0, schema_1.type)("string"),
     __metadata("design:type", String)

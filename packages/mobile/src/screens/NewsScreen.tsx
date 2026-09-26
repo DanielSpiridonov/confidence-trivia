@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { theme } from "../components/ui";
 import { getNews, NewsPost } from "../network/client";
 
-export function NewsScreen({ onBack }: { onBack: () => void }) {
+export function NewsScreen({ onPostsViewed, onBack }: { onPostsViewed: (posts: NewsPost[]) => void; onBack: () => void }) {
   const { t, i18n } = useTranslation();
   const [posts, setPosts] = React.useState<NewsPost[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -12,10 +12,14 @@ export function NewsScreen({ onBack }: { onBack: () => void }) {
 
   const load = React.useCallback(async () => {
     setLoading(true); setError(null);
-    try { setPosts(await getNews(i18n.language === "bg" ? "bg" : "en")); }
+    try {
+      const loadedPosts = await getNews(i18n.language === "bg" ? "bg" : "en");
+      setPosts(loadedPosts);
+      onPostsViewed(loadedPosts);
+    }
     catch (loadError) { setError(loadError instanceof Error ? loadError.message : t("feedback.tryAgain")); }
     finally { setLoading(false); }
-  }, [i18n.language, t]);
+  }, [i18n.language, onPostsViewed, t]);
 
   React.useEffect(() => { void load(); }, [load]);
 

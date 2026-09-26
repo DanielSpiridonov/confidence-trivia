@@ -3,7 +3,6 @@ import { Animated, View, Text, FlatList, Image, ImageSourcePropType, Platform, S
 import { useTranslation } from "react-i18next";
 import { Room } from "colyseus.js";
 import { ANDROID_GAME_UI_SCALE, Screen, Title, Subtitle, theme } from "../components/ui";
-import { useRoomState } from "../network/client";
 import { PhaseTimer } from "../components/PhaseTimer";
 import { LeaderboardStrip } from "./LeaderboardScreen";
 import { DamageHud } from "../components/DamageHud";
@@ -25,6 +24,15 @@ const IOS_DAMAGE_AVATARS: Record<string, ImageSourcePropType> = {
   trivia_wizard: require("../../assets/combat-ios/trivia-wizard.png"),
   detective_avatar: require("../../assets/combat-ios/detective.png"),
   living_globe: require("../../assets/combat-ios/globe.png"),
+};
+const IOS_DEFEATED_AVATARS: Record<string, ImageSourcePropType> = {
+  smart_owl: require("../../assets/combat-ios-defeated/smart-owl.png"),
+  clever_fox: require("../../assets/combat-ios-defeated/fox.png"),
+  quiz_bot: require("../../assets/combat-ios-defeated/quiz-bot.png"),
+  omniscient_avatar: require("../../assets/combat-ios-defeated/omniscient.png"),
+  trivia_wizard: require("../../assets/combat-ios-defeated/trivia-wizard.png"),
+  detective_avatar: require("../../assets/combat-ios-defeated/detective.png"),
+  living_globe: require("../../assets/combat-ios-defeated/globe.png"),
 };
 const DAMAGE_AVATARS = Platform.OS === "ios" ? IOS_DAMAGE_AVATARS : FULL_DAMAGE_AVATARS;
 const DAMAGE_AVATAR_PLACEHOLDERS: Record<string, number> = {
@@ -67,21 +75,31 @@ const PROJECTILE_BY_AVATAR: Record<string, ImageSourcePropType> = {
   living_globe: GLOBE_EARTH,
 };
 
-export function RevealScreen({ room, active = true }: { room: Room; active?: boolean }) {
+export function RevealScreen({ room, state, active = true }: { room: Room; state: any; active?: boolean }) {
   const { t } = useTranslation();
-  const state = useRoomState<any>(room);
   if (!state) return null;
 
   const nameFor = (id: string) => `${state.players.get(id)?.name ?? "?"}${id === room.sessionId ? " (You)" : ""}`;
   const results = [...state.revealResults];
-  const leaderboardPlayers = [...state.players.values()].map((player: any) => ({
+  const individualLeaderboardPlayers = [...state.players.values()].map((player: any) => ({
     id: player.id,
     name: player.name,
     score: player.score,
     streak: player.streak,
     nameColor: player.nameColor,
     frameId: player.frameId,
+    team: player.team,
   }));
+  const isFriendsDuos = state.gameMode === "friends" && state.friendsTeamMode === "duos";
+  const leaderboardPlayers = isFriendsDuos ? ["A", "B"].map((team) => ({
+    id: `team-${team}`,
+    name: t("lobby.team", { team }),
+    score: individualLeaderboardPlayers.filter((player) => player.team === team).reduce((total, player) => total + player.score, 0),
+    streak: 0,
+    nameColor: team === "A" ? "#BFB2FF" : "#AEECD1",
+    frameId: "",
+  })) : individualLeaderboardPlayers;
+  const myLeaderboardId = isFriendsDuos ? `team-${state.players.get(room.sessionId)?.team}` : room.sessionId;
   const isOrderingReveal = state.currentQuestion?.qType === "ordering";
   const isClosestAnswerReveal = state.currentQuestion?.qType === "closest_answer";
 
@@ -249,7 +267,7 @@ export function RevealScreen({ room, active = true }: { room: Room; active?: boo
           )}
         />
         <View style={styles.leaderboardPane}>
-          <LeaderboardStrip players={leaderboardPlayers} myPlayerId={room.sessionId} />
+          <LeaderboardStrip players={leaderboardPlayers} myPlayerId={myLeaderboardId} />
         </View>
       </View>
     </Screen>
@@ -258,6 +276,7 @@ export function RevealScreen({ room, active = true }: { room: Room; active?: boo
 
 function DamageAvatarPane({ state, results, myPlayerId, active }: { state: any; results: any[]; myPlayerId: string; active: boolean }) {
   const [showHit, setShowHit] = React.useState(false);
+  const [defeatedPlayerIds, setDefeatedPlayerIds] = React.useState<Set<string>>(() => new Set());
   const hitEndRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const allPlayers = [...state.players.values()] as any[];
   const players = [
@@ -265,6 +284,16 @@ function DamageAvatarPane({ state, results, myPlayerId, active }: { state: any; 
     ...allPlayers.filter((player) => player.id !== myPlayerId),
   ].filter(Boolean).slice(0, 2) as any[];
   const projectileAttack = players.some((player) => PROJECTILE_BY_AVATAR[player.avatarId] && (results.find((result: any) => result.playerId === player.id)?.damageDealt ?? 0) > 0);
+  const defeatedKey = players.filter((player) => player.health <= 0).map((player) => player.id).sort().join("|");
+
+  React.useEffect(() => {
+    setDefeatedPlayerIds(new Set());
+    if (!active || !defeatedKey) return;
+    const timer = setTimeout(() => {
+      setDefeatedPlayerIds(new Set(defeatedKey.split("|").filter(Boolean)));
+    }, projectileAttack ? 1_900 : 650);
+    return () => clearTimeout(timer);
+  }, [active, defeatedKey, projectileAttack, state.currentRoundIndex]);
 
   const triggerImpact = React.useCallback(() => {
     setShowHit(true);
@@ -289,16 +318,23 @@ function DamageAvatarPane({ state, results, myPlayerId, active }: { state: any; 
           const opponent = players[index === 0 ? 1 : 0];
           const incomingDamage = results.find((result: any) => result.playerId === opponent?.id)?.damageDealt ?? 0;
           const isHit = showHit && incomingDamage > 0;
+          const defeated = defeatedPlayerIds.has(player.id);
           return (
-            <DamageFighter key={player.id} isHit={isHit}>
+            <DamageFighter key={player.id} isHit={isHit} defeated={defeated} fallDirection={index === 0 ? -1 : 1} deathDelay={0}>
               <Image
-                source={DAMAGE_AVATARS[player.avatarId] ?? DAMAGE_AVATARS.smart_owl}
+                source={defeated && Platform.OS === "ios"
+                  ? IOS_DEFEATED_AVATARS[player.avatarId] ?? IOS_DEFEATED_AVATARS.smart_owl
+                  : DAMAGE_AVATARS[player.avatarId] ?? DAMAGE_AVATARS.smart_owl}
                 defaultSource={DAMAGE_AVATAR_PLACEHOLDERS[player.avatarId] ?? DAMAGE_AVATAR_PLACEHOLDERS.smart_owl}
                 fadeDuration={0}
                 resizeMode="contain"
-                style={[styles.damageAvatar, index === 1 && styles.damageAvatarFacingLeft]}
+                style={[
+                  styles.damageAvatar,
+                  index === 1 && styles.damageAvatarFacingLeft,
+                  defeated && Platform.OS !== "ios" && styles.damageAvatarDefeated,
+                ]}
               />
-              {isHit ? <Image source={DAMAGE_AVATARS[player.avatarId] ?? DAMAGE_AVATARS.smart_owl} resizeMode="contain" style={[styles.damageAvatarHitOverlay, index === 1 && styles.damageAvatarFacingLeft]} /> : null}
+              {isHit && !defeated ? <Image source={DAMAGE_AVATARS[player.avatarId] ?? DAMAGE_AVATARS.smart_owl} resizeMode="contain" style={[styles.damageAvatarHitOverlay, index === 1 && styles.damageAvatarFacingLeft]} /> : null}
               {incomingDamage > 0 && isHit ? <DamageNumber amount={incomingDamage} /> : null}
               <Text numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7} style={styles.damagePlayerAnswer}>{ownResult?.answerText || "—"}</Text>
             </DamageFighter>
@@ -381,8 +417,9 @@ function AvatarProjectile({ players, results, active, roundKey, onImpact }: { pl
   );
 }
 
-function DamageFighter({ isHit, children }: { isHit: boolean; children: React.ReactNode }) {
+function DamageFighter({ isHit, defeated, fallDirection, deathDelay, children }: { isHit: boolean; defeated: boolean; fallDirection: -1 | 1; deathDelay: number; children: React.ReactNode }) {
   const shake = React.useRef(new Animated.Value(0)).current;
+  const fall = React.useRef(new Animated.Value(0)).current;
   React.useEffect(() => {
     if (!isHit) return;
     Animated.sequence([
@@ -393,7 +430,22 @@ function DamageFighter({ isHit, children }: { isHit: boolean; children: React.Re
       Animated.timing(shake, { toValue: 0, duration: 60, useNativeDriver: true }),
     ]).start();
   }, [isHit, shake]);
-  return <Animated.View style={[styles.damageFighter, isHit && styles.damageFighterHit, { transform: [{ translateX: shake }] }]}>{children}</Animated.View>;
+  React.useEffect(() => {
+    fall.setValue(0);
+    if (!defeated) return;
+    const animation = Animated.timing(fall, { toValue: 1, duration: 720, delay: deathDelay, useNativeDriver: true });
+    animation.start();
+    return () => animation.stop();
+  }, [deathDelay, defeated, fall]);
+  return <Animated.View style={[styles.damageFighter, isHit && styles.damageFighterHit, {
+    opacity: fall.interpolate({ inputRange: [0, 1], outputRange: [1, .72] }),
+    transform: [
+      { translateX: Animated.add(shake, fall.interpolate({ inputRange: [0, 1], outputRange: [0, fallDirection * 24] })) },
+      { translateY: fall.interpolate({ inputRange: [0, 1], outputRange: [0, 34] }) },
+      { rotate: fall.interpolate({ inputRange: [0, 1], outputRange: ["0deg", `${fallDirection * 68}deg`] }) },
+      { scale: fall.interpolate({ inputRange: [0, 1], outputRange: [1, .96] }) },
+    ],
+  }]}>{children}</Animated.View>;
 }
 
 function DamageNumber({ amount }: { amount: number }) {
@@ -415,6 +467,7 @@ const styles = StyleSheet.create({
   damageFighterHit: { backgroundColor: "transparent" },
   damageAvatar: { width: "100%", height: "86%" },
   damageAvatarFacingLeft: { transform: [{ scaleX: -1 }] },
+  damageAvatarDefeated: { filter: [{ grayscale: 1 }], opacity: .78 },
   damageAvatarHitOverlay: { position: "absolute", top: 0, width: "100%", height: "86%", tintColor: "#FF405F", opacity: 0.78, zIndex: 2 },
   damageTaken: { position: "absolute", top: "42%", color: "#FFFFFF", fontSize: 18, fontWeight: "900", textShadowColor: "#8F1028", textShadowRadius: 5, zIndex: 3 },
   quizBotProjectile: { position: "absolute", top: "39%", width: 82, height: 82, zIndex: 8 },

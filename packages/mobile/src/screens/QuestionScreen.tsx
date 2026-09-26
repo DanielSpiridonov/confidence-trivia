@@ -4,7 +4,6 @@ import { PanResponder } from "react-native";
 import { useTranslation } from "react-i18next";
 import { Room } from "colyseus.js";
 import { ANDROID_GAME_UI_SCALE, Screen, Title, BigButton, theme } from "../components/ui";
-import { useRoomState } from "../network/client";
 import { PhaseTimer } from "../components/PhaseTimer";
 import { DamageHud } from "../components/DamageHud";
 
@@ -15,9 +14,8 @@ interface MeasuredRect {
   height: number;
 }
 
-export function QuestionScreen({ room }: { room: Room }) {
+export function QuestionScreen({ room, state }: { room: Room; state: any }) {
   const { t } = useTranslation();
-  const state = useRoomState<any>(room);
   const [selected, setSelected] = useState<number | null>(null);
   const [slotOrder, setSlotOrder] = useState<Array<number | null>>([]);
   const [freeAnswer, setFreeAnswer] = useState("");

@@ -41,9 +41,10 @@ tested on the affected platforms, and documented where applicable.
 
 ## 4. Legal documents and owner information
 
-- [ ] Confirm the legal developer/data-controller name and jurisdiction.
-- [ ] Create public support and privacy email addresses.
-- [ ] Decide the minimum player age and intended release regions.
+- [x] Confirm the legal developer/data-controller name and jurisdiction.
+- [x] Create public support and privacy email addresses.
+- [x] Decide the intended minimum player age and release regions; complete the
+      documented parental-consent review before a worldwide 13+ launch.
 - [ ] Publish an accurate Privacy Policy.
 - [ ] Publish Terms of Use.
 - [ ] Publish an Account Deletion page.

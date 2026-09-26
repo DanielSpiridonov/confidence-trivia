@@ -3,14 +3,12 @@ import { View, Text, StyleSheet, FlatList, Platform, Animated } from "react-nati
 import { useTranslation } from "react-i18next";
 import { Room } from "colyseus.js";
 import { ANDROID_GAME_UI_SCALE, Screen, Title, Subtitle, BigButton, theme } from "../components/ui";
-import { useRoomState } from "../network/client";
 import { PointsIcon } from "../components/PointsIcon";
 import { FRAME_COSMETIC_COLORS } from "@confidence-trivia/shared";
 import { PlayerFrameEffect } from "../components/PlayerFrameEffect";
 
-export function FinalResultsScreen({ room, onExit }: { room: Room; onExit: () => void }) {
+export function FinalResultsScreen({ room, state, onExit }: { room: Room; state: any; onExit: () => void }) {
   const { t } = useTranslation();
-  const state = useRoomState<any>(room);
   const currentPlayer = state?.players?.get(room.sessionId) as any;
   const starsEarned = currentPlayer?.starsEarnedThisGame ?? 0;
   const rewardedGamesToday = currentPlayer?.rewardedGamesToday ?? 0;
@@ -46,8 +44,15 @@ export function FinalResultsScreen({ room, onExit }: { room: Room; onExit: () =>
     streak: p.streak,
     nameColor: p.nameColor,
     frameId: p.frameId,
+    team: p.team,
   })).sort((a, b) => state.gameMode === "damage" ? b.health - a.health : b.score - a.score);
-  const winner = players[0];
+  const isFriendsDuos = state.gameMode === "friends" && state.friendsTeamMode === "duos";
+  const teamRows = isFriendsDuos ? ["A", "B"].map((team) => {
+    const members = players.filter((player) => player.team === team);
+    return { id: `team-${team}`, name: t("lobby.team", { team }), score: members.reduce((total, player) => total + player.score, 0), health: 0, streak: 0, nameColor: team === "A" ? "#BFB2FF" : "#AEECD1", frameId: "", team, members: members.map((player) => player.name).join(" · "), isMine: members.some((player) => player.id === room.sessionId) };
+  }).sort((left, right) => right.score - left.score) : null;
+  const resultRows: Array<any> = teamRows ?? players;
+  const winner = resultRows[0];
   const isDamageDraw = state.gameMode === "damage" && players.every((player) => player.health <= 0);
   const wonDamagePot = state.gameMode === "damage" && !isDamageDraw && winner?.id === room.sessionId;
 
@@ -92,17 +97,18 @@ export function FinalResultsScreen({ room, onExit }: { room: Room; onExit: () =>
 
       <FlatList
         style={styles.list}
-        data={players}
+        data={resultRows}
         keyExtractor={(player) => player.id}
         contentContainerStyle={styles.listContent}
         nestedScrollEnabled
         showsVerticalScrollIndicator={players.length > 4}
         renderItem={({ item, index }) => (
-          <View style={[styles.row, item.id === room.sessionId && styles.myRow, state.gameMode !== "damage" && item.frameId ? { borderWidth: 2, borderColor: FRAME_COSMETIC_COLORS[item.frameId as keyof typeof FRAME_COSMETIC_COLORS] } : null]}>
+          <View style={[styles.row, (item.id === room.sessionId || ("isMine" in item && item.isMine)) && styles.myRow, state.gameMode !== "damage" && item.frameId ? { borderWidth: 2, borderColor: FRAME_COSMETIC_COLORS[item.frameId as keyof typeof FRAME_COSMETIC_COLORS] } : null]}>
             {state.gameMode !== "damage" ? <PlayerFrameEffect frameId={item.frameId} /> : null}
             <Text style={styles.rank}>#{index + 1}</Text>
             <View style={styles.playerBlock}>
               <Text style={[styles.name, { color: item.nameColor || theme.text }]}>{item.name}{item.id === room.sessionId ? " (You)" : ""}</Text>
+              {"members" in item ? <Text numberOfLines={1} style={styles.teamMembers}>{item.members}</Text> : null}
               {item.streak > 0 ? <Text style={styles.streak}>🔥 {item.streak}</Text> : null}
             </View>
             <Text style={styles.score}>{state.gameMode === "damage" ? `${item.health} HP` : item.score}</Text>
@@ -191,6 +197,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
   },
+  teamMembers: { flex: 1, marginLeft: 10, color: theme.textDim, fontSize: 11, fontWeight: "700" },
   streak: {
     color: "#FFB84D",
     marginLeft: 10,

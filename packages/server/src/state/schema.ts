@@ -23,6 +23,7 @@ export class PlayerSchema extends Schema {
   @type("boolean") ready: boolean = false;
   @type("boolean") isHost: boolean = false;
   @type("boolean") hasActedThisPhase: boolean = false; // for "waiting on X players" UI
+  @type("string") team: string = "";
 }
 
 /** What the client is allowed to see about the current question BEFORE
@@ -64,6 +65,8 @@ export class RevealEntrySchema extends Schema {
 export class RoomStateSchema extends Schema {
   @type("string") code: string = "";
   @type("string") gameMode: string = "classic";
+  @type("string") friendsTeamMode: string = "ffa";
+  @type("boolean") customQuestionsEnabled: boolean = false;
   @type("string") phase: RoundPhase = "lobby";
   @type("string") hostId: string = "";
   @type("boolean") isPublic: boolean = false;

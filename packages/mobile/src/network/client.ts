@@ -316,11 +316,12 @@ export async function createRoom(
   playerName: string,
   roundCount: number,
   locale: "en" | "bg",
-  gameMode: "classic" | "ranked" | "damage",
+  gameMode: "classic" | "friends" | "ranked" | "damage",
   excludeQuestionIds: string[] = [],
   visibility: "private" | "public" = "private",
   damageWager = 5,
   challengeId?: string,
+  friendsOptions?: { teamMode: "ffa" | "duos"; categories: string[]; customQuestions: Array<{ question: string; answer: string }> },
 ) {
   const accessToken = await getAccessToken();
   const options = {
@@ -334,6 +335,9 @@ export async function createRoom(
       damageWager,
       challengeId: challengeId ?? "",
       accessToken,
+      friendsTeamMode: friendsOptions?.teamMode,
+      friendCategories: friendsOptions?.categories,
+      customQuestions: friendsOptions?.customQuestions,
     };
   const room = await withRoomRequestTimeout(gameMode === "ranked" || gameMode === "damage"
     ? getClient().joinOrCreate("confidence_trivia", options)

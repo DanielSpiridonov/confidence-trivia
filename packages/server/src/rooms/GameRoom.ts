@@ -49,6 +49,9 @@ interface CreateOptions extends JoinOptions {
   visibility?: "private" | "public";
   damageWager?: number;
   challengeId?: string;
+  friendsTeamMode?: "ffa" | "duos";
+  friendCategories?: string[];
+  customQuestions?: Array<{ question?: string; answer?: string }>;
 }
 
 const PLAYER_NAME_PATTERN = /^[\p{L}\p{N} ]+$/u;
@@ -97,11 +100,9 @@ export class GameRoom extends Room<RoomStateSchema> {
   private damageKnockout = false;
   private damageWagerReserved = false;
   private gameStartPending = false;
+  private hasCustomQuestions = false;
 
   async onCreate(options: CreateOptions = {}) {
-    if (options.gameMode === "friends") {
-      throw new Error("Friends Mode is not available yet.");
-    }
     // Use the public six-digit code as the actual Colyseus room id so
     // clients can continue joining directly through joinById().
     for (let attempt = 0; attempt < 20; attempt += 1) {
@@ -124,7 +125,8 @@ export class GameRoom extends Room<RoomStateSchema> {
       ? "damage"
       : options.gameMode === "ranked"
         ? "ranked"
-        : "classic";
+        : options.gameMode === "friends" ? "friends" : "classic";
+    this.state.friendsTeamMode = this.state.gameMode === "friends" && options.friendsTeamMode === "duos" ? "duos" : "ffa";
     this.state.damageWager = this.state.gameMode === "damage" && isDamageWager(options.damageWager)
       ? options.damageWager
       : this.state.gameMode === "damage" ? DEFAULT_DAMAGE_WAGER : 0;
@@ -137,9 +139,23 @@ export class GameRoom extends Room<RoomStateSchema> {
         ? RANKED_FIXED_ROUND_COUNT
         : options.roundCount ?? DEFAULT_ROUND_COUNT;
     this.locale = options.locale ?? "en";
-    this.isPublic = options.visibility === "public";
+    const customQuestions = this.state.gameMode === "friends"
+      ? (options.customQuestions ?? []).slice(0, 10).flatMap((item, index): QuestionRecord[] => {
+          const question = typeof item.question === "string" ? item.question.trim().slice(0, 160) : "";
+          const answer = typeof item.answer === "string" ? item.answer.trim().slice(0, 48) : "";
+          if (!question || !answer) return [];
+          return [{ id: `custom-${this.matchId}-${index}`, type: "word", category: "custom", difficulty: "medium", correctAnswer: answer, basePoints: DIFFICULTY_REWARDS.medium, translations: { en: { text: question }, bg: { text: question } } }];
+        })
+      : [];
+    this.hasCustomQuestions = customQuestions.length > 0;
+    this.state.customQuestionsEnabled = this.hasCustomQuestions;
+    this.isPublic = options.visibility === "public" && customQuestions.length === 0;
     this.state.isPublic = this.isPublic;
-    this.questionSet = getQuestionSet(this.state.gameMode === "damage" ? 100 : this.state.totalRounds, options.excludeQuestionIds ?? []);
+    const requestedCategories = this.state.gameMode === "friends" && Array.isArray(options.friendCategories)
+      ? options.friendCategories.filter((category): category is string => typeof category === "string").slice(0, 12)
+      : [];
+    const standardQuestions = getQuestionSet(this.state.gameMode === "damage" ? 100 : Math.max(0, this.state.totalRounds - customQuestions.length), options.excludeQuestionIds ?? [], requestedCategories);
+    this.questionSet = [...customQuestions, ...standardQuestions].slice(0, this.state.gameMode === "damage" ? 100 : this.state.totalRounds);
     // Matchmade rooms stay available to joinOrCreate, but are filtered out
     // of the user-facing public lobby browser.
     const isMatchmade = this.state.gameMode === "ranked" || this.state.gameMode === "damage";
@@ -189,6 +205,11 @@ export class GameRoom extends Room<RoomStateSchema> {
     const challengeRole = this.challengeRoles.get(client.sessionId) ?? null;
     player.isHost = this.challengeId ? challengeRole === "challenger" : this.state.players.size === 0;
     player.health = 15;
+    if (this.state.gameMode === "friends" && this.state.friendsTeamMode === "duos") {
+      const teamACount = [...this.state.players.values()].filter((existing) => existing.team === "A").length;
+      const teamBCount = [...this.state.players.values()].filter((existing) => existing.team === "B").length;
+      player.team = teamACount <= teamBCount ? "A" : "B";
+    }
     if (player.isHost) {
       this.state.players.forEach((existingPlayer) => { existingPlayer.isHost = false; });
       this.state.hostId = player.id;
@@ -314,6 +335,7 @@ export class GameRoom extends Room<RoomStateSchema> {
 
   private async handleToggleRoomVisibility(client: Client) {
     if (client.sessionId !== this.state.hostId || this.state.gameStarted || this.state.phase !== "lobby") return;
+    if (this.hasCustomQuestions) return;
     const nextIsPublic = !this.isPublic;
     await this.setPrivate(!nextIsPublic);
     this.isPublic = nextIsPublic;
@@ -328,6 +350,7 @@ export class GameRoom extends Room<RoomStateSchema> {
       : this.state.gameMode === "ranked"
         ? RANKED_PLAYER_COUNT
         : MIN_PLAYERS_TO_START;
+    if (this.state.gameMode === "friends" && this.state.friendsTeamMode === "duos" && (this.state.players.size < 4 || this.state.players.size % 2 !== 0)) return;
     if (this.state.gameMode === "damage" || this.state.gameMode === "ranked"
       ? this.state.players.size !== requiredPlayerCount
       : this.state.players.size < requiredPlayerCount) return;
@@ -763,21 +786,24 @@ export class GameRoom extends Room<RoomStateSchema> {
     if (this.resultsPersisted) return;
     this.resultsPersisted = true;
 
+    const rankingValueFor = (player: PlayerSchema) => this.state.gameMode === "friends" && this.state.friendsTeamMode === "duos"
+      ? [...this.state.players.values()].filter((teammate) => teammate.team === player.team).reduce((total, teammate) => total + teammate.score, 0)
+      : this.state.gameMode === "damage" ? player.health : player.score;
     const rankedPlayers = [...this.state.players.values()]
       .sort((left, right) => {
         if (this.state.gameMode === "ranked" && left.connected !== right.connected) return left.connected ? -1 : 1;
-        return this.state.gameMode === "damage" ? right.health - left.health : right.score - left.score;
+        return rankingValueFor(right) - rankingValueFor(left);
       });
     const completedPlayers = rankedPlayers.flatMap((player, index) => {
       const deviceId = this.deviceIds.get(player.id);
       if (!deviceId) return [];
       const priorPlayer = rankedPlayers[index - 1];
-      const rankingValue = this.state.gameMode === "damage" ? player.health : player.score;
-      const priorRankingValue = priorPlayer ? (this.state.gameMode === "damage" ? priorPlayer.health : priorPlayer.score) : null;
+      const rankingValue = rankingValueFor(player);
+      const priorRankingValue = priorPlayer ? rankingValueFor(priorPlayer) : null;
       const finalRank = this.state.gameMode === "ranked" && !player.connected
         ? 4
         : priorPlayer && priorPlayer.connected === player.connected && priorRankingValue === rankingValue
-        ? rankedPlayers.findIndex((candidate) => (this.state.gameMode === "damage" ? candidate.health : candidate.score) === rankingValue) + 1
+        ? rankedPlayers.findIndex((candidate) => rankingValueFor(candidate) === rankingValue) + 1
         : index + 1;
       return [{
         deviceId,

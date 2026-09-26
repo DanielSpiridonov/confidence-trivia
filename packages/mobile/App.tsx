@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Animated, AppState, Image, Keyboard, Platform, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import * as NavigationBar from "expo-navigation-bar";
+import { useKeepAwake } from "expo-keep-awake";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Room } from "colyseus.js";
 import { isOffensivePlayerName } from "@confidence-trivia/shared";
@@ -29,13 +30,14 @@ import { ProfileScreen } from "./src/screens/ProfileScreen";
 import { RulesScreen } from "./src/screens/RulesScreen";
 import { FriendsScreen } from "./src/screens/FriendsScreen";
 import { NewsScreen } from "./src/screens/NewsScreen";
-import { AccountProfile, claimDailyReward, createRoom, DailyRewardStatus, deleteAccount, getAccountProfile, getChallenges, getDailyRewardStatus, getPlayerStars, joinPublicRoom, joinRoom, linkPlayerAccount, PlayerChallenge, reconnectRoom, respondChallenge, updateAccountName, updatePresence, useRoomState } from "./src/network/client";
+import { StartupScreen, StartupState } from "./src/screens/StartupScreen";
+import { AccountProfile, claimDailyReward, createRoom, DailyRewardStatus, deleteAccount, getAccountProfile, getChallenges, getDailyRewardStatus, getFriends, getNews, getPlayerStars, joinPublicRoom, joinRoom, linkPlayerAccount, NewsPost, PlayerChallenge, reconnectRoom, respondChallenge, updateAccountName, updatePresence, useRoomState } from "./src/network/client";
 import { prepareSoundEffects, setSoundEffectsVolume, stopAllSoundEffects } from "./src/audio/sounds";
 import { pauseMusicForBackground, prepareMusic, setMusicVolume as applyMusicVolume, startMenuMusic, stopMenuMusic } from "./src/audio/music";
 import { createFreshGuestIdentity, getOrCreateDeviceId, getOrCreateGuestName } from "./src/utils/deviceId";
 import { authConfigured, getLinkedProviders, getStoredSession, linkAppleIdentity, linkGoogleIdentity, signInWithApple, signInWithSocialProvider, signOutAccount, subscribeToAuthChanges } from "./src/auth/supabase";
 
-type Nav = "home" | "create" | "join" | "ranked" | "shop" | "settings" | "profile" | "friends" | "rules" | "in-room";
+type Nav = "startup" | "home" | "create" | "join" | "ranked" | "shop" | "settings" | "profile" | "friends" | "rules" | "in-room";
 type RoomRecoveryState = "reconnecting" | "failed";
 const LANGUAGE_STORAGE_KEY = "confidence-trivia:locale";
 const SFX_VOLUME_STORAGE_KEY = "confidence-trivia:sfx-volume";
@@ -44,9 +46,11 @@ const PLAYER_NAME_STORAGE_KEY = "confidence-trivia:player-name";
 const HAPTICS_STORAGE_KEY = "confidence-trivia:haptics-enabled";
 const HIGH_CONTRAST_STORAGE_KEY = "confidence-trivia:high-contrast-enabled";
 const RECENT_QUESTIONS_STORAGE_KEY = "confidence-trivia:recent-question-ids";
+const NEWS_READ_STORAGE_PREFIX = "confidence-trivia:read-news";
+const COMMUNITY_URL = process.env.EXPO_PUBLIC_COMMUNITY_URL?.trim() || null;
+const MINIMUM_STARTUP_CHECK_MS = 3_000;
+const MINIMUM_ASSET_STAGE_MS = 900;
 const RECENT_QUESTION_LIMIT = 40;
-const LOADING_EMBLEM = require("./assets/loading-emblem.png");
-const LOADING_GLOW = require("./assets/loading-glow.png");
 const UI_PRELOAD_IMAGES = [
   ...RANK_IMAGE_SOURCES,
   require("./assets/avatar-thumbnails/smart-owl.png"),
@@ -105,6 +109,13 @@ const IOS_COMBAT_PRELOAD_IMAGES = [
   require("./assets/combat-ios/trivia-wizard.png"),
   require("./assets/combat-ios/detective.png"),
   require("./assets/combat-ios/globe.png"),
+  require("./assets/combat-ios-defeated/smart-owl.png"),
+  require("./assets/combat-ios-defeated/fox.png"),
+  require("./assets/combat-ios-defeated/quiz-bot.png"),
+  require("./assets/combat-ios-defeated/omniscient.png"),
+  require("./assets/combat-ios-defeated/trivia-wizard.png"),
+  require("./assets/combat-ios-defeated/detective.png"),
+  require("./assets/combat-ios-defeated/globe.png"),
   require("./assets/combat-ios/quiz-bot-calculator.png"),
   require("./assets/combat-ios/smart-owl-book.png"),
   require("./assets/combat-ios/fox-lightbulb.png"),
@@ -127,49 +138,6 @@ function AssetPreloader({ sources, onReady }: { sources: readonly number[]; onRe
   return (
     <View pointerEvents="none" style={styles.combatPreloader}>
       {sources.map((source, index) => <Image key={index} source={source} defaultSource={source} fadeDuration={0} onLoadEnd={() => handleLoadEnd(index)} style={styles.combatPreloadImage} />)}
-    </View>
-  );
-}
-
-function LoadingScreen() {
-  const pulse = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    const animation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, { toValue: 1, duration: 650, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 0, duration: 650, useNativeDriver: true }),
-      ]),
-    );
-    animation.start();
-    return () => animation.stop();
-  }, [pulse]);
-
-  const emblemScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1.02] });
-  const glowOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.28, 0.46] });
-
-  return (
-    <View style={styles.loadingRoot}>
-      <Animated.Image
-        source={LOADING_GLOW}
-        defaultSource={LOADING_GLOW}
-        fadeDuration={0}
-        resizeMode="contain"
-        style={[styles.loadingGlow, { opacity: glowOpacity, transform: [{ scale: emblemScale }] }]}
-      />
-      <Animated.Image
-        source={LOADING_EMBLEM}
-        defaultSource={LOADING_EMBLEM}
-        fadeDuration={0}
-        resizeMode="contain"
-        style={[styles.loadingEmblem, { transform: [{ scale: emblemScale }] }]}
-      />
-      <Text style={styles.loadingTitle}>CONFIDENCE TRIVIA</Text>
-      <View style={styles.loadingDots}>
-        <View style={styles.loadingDot} />
-        <View style={[styles.loadingDot, styles.loadingDotMiddle]} />
-        <View style={styles.loadingDot} />
-      </View>
     </View>
   );
 }
@@ -232,16 +200,28 @@ function StarsBadge({ stars, gain, width, onPress }: { stars: number; gain: { id
 export default function App() {
   const { notice: appNotice, showFeedback, clearFeedback } = useFeedbackPopup();
   const { dialog: appDialog, showDialog, dismissDialog, confirmDialog } = useGameDialog();
-  const [nav, setNav] = useState<Nav>("home");
+  const [nav, setNav] = useState<Nav>("startup");
+  const [hasEnteredApp, setHasEnteredApp] = useState(false);
+  const [sessionReady, setSessionReady] = useState(false);
+  const [startupState, setStartupState] = useState<StartupState>("idle");
+  const [startupStage, setStartupStage] = useState<"assets" | "connecting" | null>(null);
+  const [startupError, setStartupError] = useState<string | null>(null);
   const [newsOpen, setNewsOpen] = useState(false);
+  const [friendRequestCount, setFriendRequestCount] = useState(0);
+  const [unreadNewsCount, setUnreadNewsCount] = useState(0);
   const [shopRequest, setShopRequest] = useState<{ tab: "featured" | "inventory" | "stars"; id: number }>({ tab: "featured", id: 0 });
   const [room, setRoom] = useState<Room | null>(null);
   const [locale, setLocale] = useState<"en" | "bg">("en");
   const [localeReady, setLocaleReady] = useState(false);
   const [uiImagesReady, setUiImagesReady] = useState(false);
+  const [combatImagesReady, setCombatImagesReady] = useState(false);
+  const visualAssetsReadyRef = useRef(false);
+  visualAssetsReadyRef.current = uiImagesReady && combatImagesReady;
   const [soundEffectsVolume, setSoundEffectsVolumeState] = useState(1);
   const [musicVolume, setMusicVolume] = useState(0.5);
   const [defaultPlayerName, setDefaultPlayerName] = useState("");
+  const defaultPlayerNameRef = useRef("");
+  defaultPlayerNameRef.current = defaultPlayerName;
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [guestPlayerId, setGuestPlayerId] = useState<string | null>(null);
   const [registeredAccount, setRegisteredAccount] = useState<AccountProfile | null>(null);
@@ -266,6 +246,41 @@ export default function App() {
   const reconnectionTokenRef = useRef<string | null>(null);
   const intentionalSignOutRef = useRef(false);
 
+  const refreshNotificationCounts = React.useCallback(async () => {
+    if (!hasEnteredApp || !registeredAccount || !deviceId || nav === "in-room") return;
+    const readNewsKey = `${NEWS_READ_STORAGE_PREFIX}:${deviceId}:${locale}`;
+    const [friendsResult, newsResult, savedReadIds] = await Promise.all([
+      getFriends(deviceId).catch(() => null),
+      getNews(locale).catch(() => null),
+      AsyncStorage.getItem(readNewsKey).catch(() => null),
+    ]);
+    if (friendsResult) setFriendRequestCount(friendsResult.incoming.length);
+    if (newsResult) {
+      let readIds = new Set<string>();
+      try {
+        const parsed = savedReadIds ? JSON.parse(savedReadIds) : [];
+        if (Array.isArray(parsed)) readIds = new Set(parsed.filter((id): id is string => typeof id === "string"));
+      } catch {
+        // Invalid local read history should make current posts appear unread.
+      }
+      setUnreadNewsCount(newsResult.filter((post) => !readIds.has(post.id)).length);
+    }
+  }, [deviceId, hasEnteredApp, locale, nav, registeredAccount]);
+
+  useEffect(() => {
+    if (!hasEnteredApp || !registeredAccount || !deviceId || nav === "in-room") return;
+    void refreshNotificationCounts();
+    const interval = setInterval(() => void refreshNotificationCounts(), 15_000);
+    return () => clearInterval(interval);
+  }, [deviceId, hasEnteredApp, nav, refreshNotificationCounts, registeredAccount]);
+
+  const handleNewsViewed = React.useCallback((posts: NewsPost[]) => {
+    if (!deviceId) return;
+    const postIds = posts.map((post) => post.id);
+    setUnreadNewsCount(0);
+    void AsyncStorage.setItem(`${NEWS_READ_STORAGE_PREFIX}:${deviceId}:${locale}`, JSON.stringify(postIds));
+  }, [deviceId, locale]);
+
   useEffect(() => {
     if (Platform.OS !== "android") return;
 
@@ -289,6 +304,7 @@ export default function App() {
     if (intentionalSignOutRef.current || !registeredAccount) return;
     void createFreshGuestIdentity().then((guest) => {
       setGuestPlayerId(guest.deviceId); setDeviceId(guest.deviceId); setDefaultPlayerName(guest.displayName); setRegisteredAccount(null); setStars(0);
+      setHasEnteredApp(false); setNav("startup"); setStartupState("idle");
       showFeedback(i18n.t("account.sessionExpired"), i18n.t("account.sessionExpiredMessage"), "info");
     });
   }), [registeredAccount]);
@@ -367,7 +383,7 @@ export default function App() {
   }
 
   const applyAuthenticatedSession = React.useCallback(async (guestId: string, accessToken: string) => {
-    const account = await linkPlayerAccount(guestId, defaultPlayerName, accessToken);
+    const account = await linkPlayerAccount(guestId, defaultPlayerNameRef.current, accessToken);
     if (!account) throw new Error(i18n.t("account.linkFailed"));
     setDeviceId(account.playerId);
     const profile = await getAccountProfile(account.playerId);
@@ -375,21 +391,101 @@ export default function App() {
     if (account.displayName) setDefaultPlayerName(account.displayName);
     const accountStars = await getPlayerStars(account.playerId);
     if (accountStars !== null) setStars(accountStars);
-  }, [defaultPlayerName]);
+  }, []);
 
   useEffect(() => {
-    if (!guestPlayerId || !authConfigured) return;
+    if (!guestPlayerId) return;
+    if (!authConfigured) {
+      setSessionReady(true);
+      return;
+    }
     let cancelled = false;
+    setSessionReady(false);
     void getStoredSession().then(async (session) => {
       if (!session || cancelled) return;
       try {
         await applyAuthenticatedSession(guestPlayerId, session.access_token);
-      } catch {
-        // The Profile screen remains available for retrying a failed account link.
+      } catch (error) {
+        if (!cancelled) setStartupError(error instanceof Error ? error.message : i18n.t("network.unknownError"));
       }
-    });
+    }).finally(() => { if (!cancelled) setSessionReady(true); });
     return () => { cancelled = true; };
   }, [applyAuthenticatedSession, guestPlayerId]);
+
+  const runStartupChecks = React.useCallback(async (enterHome: boolean) => {
+    if (!registeredAccount || !deviceId) {
+      setStartupError(i18n.t("startup.accountRequired"));
+      return;
+    }
+    setStartupState("loading");
+    setStartupStage(enterHome ? "assets" : "connecting");
+    setStartupError(null);
+    try {
+      const startedAt = Date.now();
+      const waitForVisualAssets = async () => {
+        if (visualAssetsReadyRef.current) return;
+        await new Promise<void>((resolve) => {
+          const interval = setInterval(() => {
+            if (!visualAssetsReadyRef.current) return;
+            clearInterval(interval);
+            resolve();
+          }, 50);
+        });
+      };
+      const serverRequest = Promise.all([
+        getAccountProfile(deviceId),
+        getPlayerStars(deviceId),
+        getDailyRewardStatus(deviceId),
+      ]).then(
+        ([profile, storedStars, rewardStatus]) => ({ profile, storedStars, rewardStatus, error: null as unknown }),
+        (error: unknown) => ({ profile: null, storedStars: null, rewardStatus: null, error }),
+      );
+      if (enterHome) {
+        await Promise.all([
+          waitForVisualAssets(),
+          new Promise<void>((resolve) => setTimeout(resolve, MINIMUM_ASSET_STAGE_MS)),
+        ]);
+        setStartupStage("connecting");
+      }
+      const { profile, storedStars, rewardStatus, error } = await serverRequest;
+      if (error) throw error;
+      if (enterHome) {
+        const remaining = Math.max(0, MINIMUM_STARTUP_CHECK_MS - (Date.now() - startedAt));
+        if (remaining > 0) await new Promise<void>((resolve) => setTimeout(resolve, remaining));
+      }
+      if (!profile) throw new Error(i18n.t("startup.serverUnavailable"));
+      if (storedStars === null || rewardStatus === null) throw new Error(i18n.t("startup.serverUnavailable"));
+      setRegisteredAccount(profile);
+      setDefaultPlayerName(profile.displayName);
+      setStars(rewardStatus.stars ?? storedStars);
+      setDailyReward(rewardStatus);
+      setStartupState("idle");
+      setStartupStage(null);
+      if (enterHome) {
+        setHasEnteredApp(true);
+        setNav("home");
+      }
+    } catch (error) {
+      setStartupState("error");
+      setStartupStage(null);
+      setStartupError(error instanceof Error ? error.message : i18n.t("startup.serverUnavailable"));
+    }
+  }, [deviceId, registeredAccount]);
+
+  async function handleRepairClient() {
+    setStartupState("loading");
+    setStartupError(null);
+    intentionalLeaveRef.current = true;
+    stopAllSoundEffects();
+    await room?.leave().catch(() => undefined);
+    setRoom(null);
+    reconnectionTokenRef.current = null;
+    setRoomRecovery(null);
+    setRoomRecoveryMessage(null);
+    await AsyncStorage.removeItem(RECENT_QUESTIONS_STORAGE_KEY).catch(() => undefined);
+    intentionalLeaveRef.current = false;
+    await runStartupChecks(false);
+  }
 
   async function handleSocialSignIn(provider: "google" | "apple") {
     if (!authConfigured) {
@@ -473,6 +569,7 @@ export default function App() {
           await signOutAccount();
           const guest = await createFreshGuestIdentity();
           setGuestPlayerId(guest.deviceId); setDeviceId(guest.deviceId); setDefaultPlayerName(guest.displayName); setRegisteredAccount(null); setStars(0);
+          setHasEnteredApp(false); setNav("startup"); setStartupState("idle"); setStartupError(null);
         } finally { intentionalSignOutRef.current = false; setAuthBusy(false); }
       })() });
   }
@@ -486,7 +583,7 @@ export default function App() {
         intentionalSignOutRef.current = true;
         await signOutAccount();
         const guest = await createFreshGuestIdentity();
-        setGuestPlayerId(guest.deviceId); setDeviceId(guest.deviceId); setDefaultPlayerName(guest.displayName); setRegisteredAccount(null); setStars(0); setNav("home");
+        setGuestPlayerId(guest.deviceId); setDeviceId(guest.deviceId); setDefaultPlayerName(guest.displayName); setRegisteredAccount(null); setStars(0); setHasEnteredApp(false); setNav("startup"); setStartupState("idle"); setStartupError(null);
         showFeedback(i18n.t("account.accountDeleted"), undefined, "success");
       } catch (error) {
         showFeedback(i18n.t("account.deleteFailed"), error instanceof Error ? error.message : i18n.t("feedback.tryAgain"));
@@ -502,7 +599,7 @@ export default function App() {
     showDialog({ title: i18n.t("account.signInRequired"), message: i18n.t(`account.${destination}RequiresAccount`), cancelLabel: i18n.t("validation.cancel"), confirmLabel: i18n.t("account.signIn"), onConfirm: () => setNav("profile") });
   }
 
-  async function handleCreate(name: string, rounds: number, gameMode: "classic" | "ranked" | "damage", visibility: "private" | "public", damageWager: number) {
+  async function handleCreate(name: string, rounds: number, gameMode: "classic" | "friends" | "ranked" | "damage", visibility: "private" | "public", damageWager: number, friendsOptions?: { teamMode: "ffa" | "duos"; categories: string[]; customQuestions: Array<{ question: string; answer: string }> }) {
     const currentDeviceId = await requireDeviceId();
     let recentQuestionIds: string[] = [];
     try {
@@ -512,7 +609,7 @@ export default function App() {
     } catch {
       // A corrupt local history should never prevent room creation.
     }
-    const r = await createRoom(currentDeviceId, name, rounds, locale, gameMode, recentQuestionIds, visibility, damageWager);
+    const r = await createRoom(currentDeviceId, name, rounds, locale, gameMode, recentQuestionIds, visibility, damageWager, undefined, friendsOptions);
     reconnectionTokenRef.current = r.reconnectionToken;
     setRoom(r);
     setRoomRecovery(null);
@@ -730,8 +827,13 @@ export default function App() {
   }, [room]);
 
   useEffect(() => {
-    if (!registeredAccount || !deviceId) {
+    if (!hasEnteredApp || !registeredAccount || !deviceId) {
       setIncomingChallenge(null);
+      return;
+    }
+    if (nav === "in-room") {
+      setIncomingChallenge(null);
+      void updatePresence(deviceId, false).catch(() => undefined);
       return;
     }
     let cancelled = false;
@@ -740,13 +842,13 @@ export default function App() {
       if (polling) return;
       polling = true;
       try {
-        await updatePresence(deviceId, nav !== "in-room");
+        await updatePresence(deviceId, true);
         const challenges = await getChallenges(deviceId);
         if (cancelled) return;
         const incoming = challenges.find((challenge) => challenge.status === "pending" && challenge.challengedId === deviceId) ?? null;
         setIncomingChallenge(incoming);
         const accepted = challenges.find((challenge) => challenge.status === "accepted" && !handledChallengeIds.current.has(challenge.id));
-        if (accepted && nav !== "in-room") await enterChallengeLobby(accepted);
+        if (accepted) await enterChallengeLobby(accepted);
       } catch {
         // Presence polling recovers automatically on the next interval.
       } finally {
@@ -756,7 +858,7 @@ export default function App() {
     void poll();
     const interval = setInterval(() => void poll(), 2_000);
     return () => { cancelled = true; clearInterval(interval); };
-  }, [defaultPlayerName, deviceId, nav, registeredAccount]);
+  }, [defaultPlayerName, deviceId, hasEnteredApp, nav, registeredAccount]);
 
   async function enterChallengeLobby(challenge: PlayerChallenge) {
     if (!deviceId || nav === "in-room" || joiningChallengeId.current === challenge.id || handledChallengeIds.current.has(challenge.id)) return;
@@ -808,25 +910,36 @@ export default function App() {
     return () => animation.stop();
   }, [challengeSentNotice?.id, challengeSentOpacity]);
 
-  if (!localeReady || !uiImagesReady) {
-    return (
-      <AppFrame highContrast={highContrastEnabled}>
-        <AssetPreloader sources={UI_PRELOAD_IMAGES} onReady={() => setUiImagesReady(true)} />
-        <LoadingScreen />
-      </AppFrame>
-    );
-  }
-
   const starsBadgeWidth = Math.max(88, 70 + String(Math.max(0, stars)).length * 10);
   const settingsButtonRight = 18 + starsBadgeWidth + 8;
   const rulesButtonRight = settingsButtonRight + 48;
 
   return (
     <AppFrame highContrast={highContrastEnabled}>
-      <AssetPreloader sources={UI_PRELOAD_IMAGES} />
-      <AssetPreloader sources={COMBAT_PRELOAD_IMAGES} />
+      <AssetPreloader sources={UI_PRELOAD_IMAGES} onReady={() => setUiImagesReady(true)} />
+      <AssetPreloader sources={COMBAT_PRELOAD_IMAGES} onReady={() => setCombatImagesReady(true)} />
       <StatusBar style="light" hidden={Platform.OS === "android"} animated />
-      <View pointerEvents={nav === "home" ? "auto" : "none"} style={[styles.persistentScreen, nav !== "home" && styles.persistentScreenHidden]}>
+      {nav === "startup" ? (
+        <StartupScreen
+          accountName={registeredAccount?.displayName ?? defaultPlayerName}
+          accountConnected={Boolean(registeredAccount)}
+          sessionReady={sessionReady && localeReady}
+          state={startupState}
+          stage={startupStage}
+          error={startupError}
+          communityUrl={COMMUNITY_URL}
+          onStart={() => void runStartupChecks(true)}
+          onRepair={() => showDialog({
+            title: i18n.t("startup.repairConfirmTitle"),
+            message: i18n.t("startup.repairConfirmMessage"),
+            cancelLabel: i18n.t("validation.cancel"),
+            confirmLabel: i18n.t("startup.repairConfirm"),
+            onConfirm: () => void handleRepairClient(),
+          })}
+          onAccount={() => setNav("profile")}
+        />
+      ) : null}
+      {hasEnteredApp && nav !== "in-room" ? <View pointerEvents={nav === "home" ? "auto" : "none"} style={[styles.persistentScreen, nav !== "home" && styles.persistentScreenHidden]}>
         <HomeScreen
           onCreate={() => {
             if (!defaultPlayerName.trim()) {
@@ -839,6 +952,8 @@ export default function App() {
           onProfile={() => setNav("profile")}
           onFriends={() => openRegisteredFeature("friends", () => setNav("friends"))}
           onNews={() => setNewsOpen(true)}
+          friendRequestCount={friendRequestCount}
+          unreadNewsCount={unreadNewsCount}
           onInventory={() => openRegisteredFeature("shop", () => openShop("inventory"))}
           deviceId={deviceId}
           onRanked={() => openRegisteredFeature("ranked", () => setNav("ranked"))}
@@ -849,8 +964,8 @@ export default function App() {
           onDailyRewardCelebrationShown={() => setDailyRewardCelebration(null)}
           onClaimDailyReward={() => void handleClaimDailyReward()}
         />
-      </View>
-      {deviceId ? (
+      </View> : null}
+      {hasEnteredApp && deviceId && nav !== "in-room" ? (
         <View pointerEvents={nav === "shop" ? "auto" : "none"} style={[styles.persistentScreen, nav !== "shop" && styles.persistentScreenHidden]}>
           <ShopScreen deviceId={deviceId} displayName={defaultPlayerName} stars={stars} onStarsChange={setStars} requestedTab={shopRequest.tab} requestId={shopRequest.id} onBack={() => setNav("home")} />
         </View>
@@ -900,7 +1015,7 @@ export default function App() {
             />
           )}
           {nav === "rules" && <RulesScreen onBack={() => setNav("home")} />}
-          {nav === "friends" && deviceId ? <FriendsScreen playerId={deviceId} stars={stars} onStarsChange={setStars} onChallengeSent={(playerName, damageWager) => setChallengeSentNotice({ id: Date.now(), playerName, damageWager })} onBack={() => setNav("home")} /> : null}
+          {nav === "friends" && deviceId ? <FriendsScreen playerId={deviceId} stars={stars} onStarsChange={setStars} onRequestCountChange={setFriendRequestCount} onChallengeSent={(playerName, damageWager) => setChallengeSentNotice({ id: Date.now(), playerName, damageWager })} onBack={() => setNav("home")} /> : null}
           {nav === "profile" && (
             <ProfileScreen
               displayName={defaultPlayerName}
@@ -917,7 +1032,7 @@ export default function App() {
               onSaveName={(name) => void handleAccountName(name)}
               onSignOut={handleSignOut}
               onDeleteAccount={handleDeleteAccount}
-              onBack={() => setNav("home")}
+              onBack={() => setNav(hasEnteredApp ? "home" : "startup")}
             />
           )}
         </>
@@ -932,7 +1047,7 @@ export default function App() {
           </Pressable>
         </>
       ) : null}
-      {nav === "home" && newsOpen ? <NewsScreen onBack={() => setNewsOpen(false)} /> : null}
+      {nav === "home" && newsOpen ? <NewsScreen onPostsViewed={handleNewsViewed} onBack={() => setNewsOpen(false)} /> : null}
       {incomingChallenge && deviceId ? (
         <Animated.View style={[styles.challengePopup, { opacity: challengeOpacity }]}>
           <Text style={styles.challengePopupTitle}>{i18n.t("friends.challengeIncoming", { player: incomingChallenge.challengerName })}</Text>
@@ -952,8 +1067,8 @@ export default function App() {
       <FeedbackPopup notice={appNotice} onDismiss={clearFeedback} />
       <GameDialog dialog={appDialog} onCancel={dismissDialog} onConfirm={confirmDialog} />
       <View
-        pointerEvents={nav !== "in-room" ? "box-none" : "none"}
-        style={[styles.starsPersistentLayer, nav === "in-room" && styles.persistentScreenHidden]}
+        pointerEvents={hasEnteredApp && nav !== "in-room" ? "box-none" : "none"}
+        style={[styles.starsPersistentLayer, (!hasEnteredApp || nav === "in-room") && styles.persistentScreenHidden]}
       >
         <StarsBadge stars={stars} gain={starGain} width={starsBadgeWidth} onPress={() => openRegisteredFeature("shop", () => openShop("stars"))} />
       </View>
@@ -994,6 +1109,7 @@ function InRoomRouter({
   hapticsEnabled: boolean;
   onStarsChange: (stars: number) => void;
 }) {
+  useKeepAwake();
   const { t } = i18n;
   const state = useRoomState<any>(room);
   const [gameMenuPanel, setGameMenuPanel] = useState<"menu" | "settings" | null>(null);
@@ -1045,17 +1161,17 @@ function InRoomRouter({
     switch (state.phase) {
       case "lobby":
       case "starting":
-        return <LobbyScreen room={room} mySessionId={room.sessionId} />;
+        return <LobbyScreen room={room} state={state} mySessionId={room.sessionId} />;
       case "question":
-        return <QuestionScreen room={room} />;
+        return <QuestionScreen room={room} state={state} />;
       case "confidence":
-        return <ConfidenceScreen room={room} />;
+        return <ConfidenceScreen room={room} state={state} />;
       case "board_sidebet":
-        return <ConfidenceBoardScreen room={room} mySessionId={room.sessionId} />;
+        return <ConfidenceBoardScreen room={room} state={state} mySessionId={room.sessionId} />;
       case "reveal":
-        return state.gameMode === "damage" ? null : <RevealScreen room={room} />;
+        return <RevealScreen room={room} state={state} />;
       case "final_results":
-        return <FinalResultsScreen room={room} onExit={onExit} />;
+        return <FinalResultsScreen room={room} state={state} onExit={onExit} />;
       default:
         return null;
     }
@@ -1067,6 +1183,7 @@ function InRoomRouter({
         <View style={styles.modalBackdrop}>
           <Pressable style={styles.modalDismissArea} onPress={() => setGameMenuPanel(null)} />
           <View style={[styles.modalCard, styles.gameMenuCard, gameMenuPanel === "settings" && styles.settingsModalCard]}>
+            <View style={styles.gameMenuTopAccent} />
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={t("gameMenu.continue")}
@@ -1079,6 +1196,7 @@ function InRoomRouter({
             <Text style={styles.modalTitle}>
               {gameMenuPanel === "settings" ? t("settings.title") : t("gameMenu.title")}
             </Text>
+            <View style={styles.gameMenuDivider} />
             {gameMenuPanel === "menu" ? (
               <View style={styles.gameMenuActions}>
                 <BigButton label={t("settings.title")} onPress={() => setGameMenuPanel("settings")} variant="secondary" style={styles.gameMenuButton} />
@@ -1134,27 +1252,12 @@ function InRoomRouter({
       >
         <Text style={styles.menuButtonIcon}>⚙</Text>
       </Pressable>
-      {state.gameMode === "damage" ? (
-        <View
-          pointerEvents={state.phase === "reveal" ? "auto" : "none"}
-          style={[styles.persistentDamageReveal, state.phase !== "reveal" && styles.persistentScreenHidden]}
-        >
-          <RevealScreen room={room} active={state.phase === "reveal"} />
-        </View>
-      ) : null}
       {currentScreen}
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  loadingRoot: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "transparent" },
-  loadingGlow: { position: "absolute", width: 288, height: 192 },
-  loadingEmblem: { width: 210, height: 150 },
-  loadingTitle: { marginTop: 3, color: "#FFF1B8", fontSize: 17, fontWeight: "900", letterSpacing: 2.2, textShadowColor: "rgba(112,38,190,0.95)", textShadowRadius: 9 },
-  loadingDots: { flexDirection: "row", gap: 6, marginTop: 10 },
-  loadingDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: "rgba(255,218,70,0.45)" },
-  loadingDotMiddle: { backgroundColor: "#FFDA46" },
   appFrame: {
     flex: 1,
     backgroundColor: theme.bg,
@@ -1176,7 +1279,6 @@ const styles = StyleSheet.create({
   },
   persistentScreen: { ...StyleSheet.absoluteFillObject, opacity: 1 },
   persistentScreenHidden: { opacity: 0 },
-  persistentDamageReveal: { ...StyleSheet.absoluteFillObject, opacity: 1 },
   starsPersistentLayer: { ...StyleSheet.absoluteFillObject, zIndex: 20 },
   combatPreloader: { position: "absolute", left: 0, top: 0, width: 192, height: 192, opacity: 0.001, overflow: "hidden" },
   combatPreloadImage: { position: "absolute", width: 192, height: 192 },
@@ -1271,24 +1373,39 @@ const styles = StyleSheet.create({
   },
   gameMenuCard: {
     maxWidth: 500,
-    backgroundColor: "rgba(31, 26, 51, 0.96)",
+    backgroundColor: "rgba(22, 17, 39, 0.98)",
+    borderWidth: 2,
+    borderColor: "rgba(124, 92, 255, 0.72)",
+    borderRadius: 16,
+    paddingTop: 18,
+    shadowColor: "#7C5CFF",
+    shadowOpacity: 0.34,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 12,
     overflow: "hidden",
   },
-  settingsModalCard: { maxWidth: 540, paddingVertical: 16 },
+  settingsModalCard: { maxWidth: 540, paddingVertical: 16, paddingHorizontal: 20 },
+  gameMenuTopAccent: { position: "absolute", top: 0, left: "22%", right: "22%", height: 3, borderBottomLeftRadius: 4, borderBottomRightRadius: 4, backgroundColor: "#A982FF" },
+  gameMenuDivider: { alignSelf: "center", width: "76%", height: 1, marginTop: 9, marginBottom: 7, backgroundColor: "rgba(185,176,214,0.22)" },
   gameMenuCloseButton: {
     position: "absolute",
     top: 12,
     right: 14,
     zIndex: 2,
-    width: 32,
-    height: 32,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
   },
-  gameMenuCloseText: { color: theme.textDim, fontSize: 20, lineHeight: 22, fontWeight: "800" },
-  gameMenuActions: { alignItems: "center", marginTop: 12 },
-  gameMenuButton: { width: 280, minWidth: 0 },
-  inGameSettings: { width: "100%", maxWidth: 520, alignSelf: "center", marginTop: 6 },
+  gameMenuCloseText: { color: theme.text, fontSize: 16, lineHeight: 19, fontWeight: "900" },
+  gameMenuActions: { width: "100%", alignItems: "center", marginTop: 3, paddingBottom: 2 },
+  gameMenuButton: { width: 280, minWidth: 0, marginTop: 8 },
+  inGameSettings: { width: "100%", maxWidth: 500, alignSelf: "center", marginTop: 0, paddingHorizontal: 6 },
   modalTitle: {
     color: theme.text,
     fontSize: 24,
