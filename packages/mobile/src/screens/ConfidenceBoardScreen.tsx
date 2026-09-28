@@ -46,6 +46,9 @@ export function ConfidenceBoardScreen({ room, state, mySessionId }: { room: Room
         keyExtractor={(e: any) => e.playerId}
         renderItem={({ item }: any) => (
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={nameFor(item.playerId)}
+            accessibilityState={{ selected: selectedTarget === item.playerId, disabled: isFinalized }}
             onPress={() => !isFinalized && setSelectedTarget((current) => current === item.playerId ? null : item.playerId)}
             style={[styles.row, selectedTarget === item.playerId && styles.rowSelected]}
           >

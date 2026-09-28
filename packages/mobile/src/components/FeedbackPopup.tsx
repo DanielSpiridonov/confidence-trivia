@@ -1,5 +1,6 @@
 import React from "react";
 import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 import { theme } from "./ui";
 
 export type FeedbackKind = "error" | "success" | "info";
@@ -13,6 +14,7 @@ export function useFeedbackPopup() {
 }
 
 export function FeedbackPopup({ notice, onDismiss }: { notice: FeedbackNotice | null; onDismiss: () => void }) {
+  const { t } = useTranslation();
   const opacity = React.useRef(new Animated.Value(0)).current;
   const translateY = React.useRef(new Animated.Value(-8)).current;
 
@@ -30,7 +32,7 @@ export function FeedbackPopup({ notice, onDismiss }: { notice: FeedbackNotice | 
   if (!notice) return null;
   return <Animated.View style={[styles.popup, styles[notice.kind], { opacity, transform: [{ translateY }] }]}>
     <View style={styles.copy}><Text style={styles.title}>{notice.title}</Text>{notice.message ? <Text style={styles.message}>{notice.message}</Text> : null}</View>
-    <Pressable accessibilityRole="button" onPress={onDismiss} hitSlop={8}><Text style={styles.close}>×</Text></Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel={t("common.close")} onPress={onDismiss} hitSlop={8} style={styles.closeButton}><Text style={styles.close}>×</Text></Pressable>
   </Animated.View>;
 }
 
@@ -38,5 +40,6 @@ const styles = StyleSheet.create({
   popup: { position: "absolute", top: 66, right: 18, zIndex: 100, elevation: 12, width: 292, minHeight: 58, paddingHorizontal: 13, paddingVertical: 10, borderRadius: 12, flexDirection: "row", alignItems: "flex-start", gap: 9, backgroundColor: "rgba(31,26,51,0.98)", borderWidth: 1 },
   error: { borderColor: "#FF7587" }, success: { borderColor: "#63D991" }, info: { borderColor: theme.primary },
   copy: { flex: 1 }, title: { color: "#FFF", fontSize: 13, fontWeight: "900" }, message: { color: theme.textDim, fontSize: 10, lineHeight: 14, fontWeight: "700", marginTop: 3 },
+  closeButton: { width: 44, height: 44, marginRight: -10, marginTop: -8, alignItems: "center", justifyContent: "center" },
   close: { color: theme.textDim, fontSize: 20, lineHeight: 21, fontWeight: "700" },
 });

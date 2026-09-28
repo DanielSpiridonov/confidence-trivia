@@ -39,7 +39,6 @@ import { authConfigured, getLinkedProviders, getStoredSession, linkAppleIdentity
 
 type Nav = "startup" | "home" | "create" | "join" | "ranked" | "shop" | "settings" | "profile" | "friends" | "rules" | "in-room";
 type RoomRecoveryState = "reconnecting" | "failed";
-const LANGUAGE_STORAGE_KEY = "confidence-trivia:locale";
 const SFX_VOLUME_STORAGE_KEY = "confidence-trivia:sfx-volume";
 const MUSIC_VOLUME_STORAGE_KEY = "confidence-trivia:music-volume";
 const PLAYER_NAME_STORAGE_KEY = "confidence-trivia:player-name";
@@ -47,11 +46,13 @@ const HAPTICS_STORAGE_KEY = "confidence-trivia:haptics-enabled";
 const HIGH_CONTRAST_STORAGE_KEY = "confidence-trivia:high-contrast-enabled";
 const RECENT_QUESTIONS_STORAGE_KEY = "confidence-trivia:recent-question-ids";
 const NEWS_READ_STORAGE_PREFIX = "confidence-trivia:read-news";
-const COMMUNITY_URL = process.env.EXPO_PUBLIC_COMMUNITY_URL?.trim() || null;
+const COMMUNITY_URL = "https://discord.gg/BjcjJGSyxv";
+const LEGAL_URL = "https://daniel-portfolio-pied.vercel.app/projects/confivia/privacy";
 const MINIMUM_STARTUP_CHECK_MS = 3_000;
 const MINIMUM_ASSET_STAGE_MS = 900;
 const RECENT_QUESTION_LIMIT = 40;
 const UI_PRELOAD_IMAGES = [
+  require("./assets/startup-emblem-fast.png"),
   ...RANK_IMAGE_SOURCES,
   require("./assets/avatar-thumbnails/smart-owl.png"),
   require("./assets/avatar-thumbnails/fox.png"),
@@ -79,11 +80,6 @@ const UI_PRELOAD_IMAGES = [
   require("./assets/shop-tabs/avatars.png"),
   require("./assets/shop-tabs/frames.png"),
   require("./assets/star-currency-icon.png"),
-  require("./assets/star-packs/handful.png"),
-  require("./assets/star-packs/pouch.png"),
-  require("./assets/star-packs/chest.png"),
-  require("./assets/star-packs/vault.png"),
-  require("./assets/star-packs/treasury.png"),
 ] as const;
 const FULL_COMBAT_PRELOAD_IMAGES = [
   require("./assets/avatars/smart-owl.png"),
@@ -209,7 +205,7 @@ export default function App() {
   const [newsOpen, setNewsOpen] = useState(false);
   const [friendRequestCount, setFriendRequestCount] = useState(0);
   const [unreadNewsCount, setUnreadNewsCount] = useState(0);
-  const [shopRequest, setShopRequest] = useState<{ tab: "featured" | "inventory" | "stars"; id: number }>({ tab: "featured", id: 0 });
+  const [shopRequest, setShopRequest] = useState<{ tab: "featured" | "inventory"; id: number }>({ tab: "featured", id: 0 });
   const [room, setRoom] = useState<Room | null>(null);
   const [locale, setLocale] = useState<"en" | "bg">("en");
   const [localeReady, setLocaleReady] = useState(false);
@@ -314,8 +310,7 @@ export default function App() {
 
     async function loadLocale() {
       try {
-        const [saved, savedSfxVolume, savedMusicVolume, savedPlayerName, savedHaptics, savedHighContrast, storedDeviceId, storedGuestName] = await Promise.all([
-          AsyncStorage.getItem(LANGUAGE_STORAGE_KEY),
+        const [savedSfxVolume, savedMusicVolume, savedPlayerName, savedHaptics, savedHighContrast, storedDeviceId, storedGuestName] = await Promise.all([
           AsyncStorage.getItem(SFX_VOLUME_STORAGE_KEY),
           AsyncStorage.getItem(MUSIC_VOLUME_STORAGE_KEY),
           AsyncStorage.getItem(PLAYER_NAME_STORAGE_KEY),
@@ -342,9 +337,9 @@ export default function App() {
             setStars(status.stars);
           }
         });
-        if (!cancelled && (saved === "en" || saved === "bg")) {
-          setLocale(saved);
-          await i18n.changeLanguage(saved);
+        if (!cancelled) {
+          setLocale("en");
+          await i18n.changeLanguage("en");
         }
         const parsedSfxVolume = Number(savedSfxVolume);
         if (!cancelled && savedSfxVolume !== null && Number.isFinite(parsedSfxVolume)) {
@@ -648,15 +643,9 @@ export default function App() {
     intentionalLeaveRef.current = false;
   }
 
-  function openShop(tab: "featured" | "inventory" | "stars") {
+  function openShop(tab: "featured" | "inventory") {
     setShopRequest((current) => ({ tab, id: current.id + 1 }));
     setNav("shop");
-  }
-
-  function handleChangeLocale(l: "en" | "bg") {
-    setLocale(l);
-    void i18n.changeLanguage(l);
-    void AsyncStorage.setItem(LANGUAGE_STORAGE_KEY, l);
   }
 
   function handleSoundEffectsVolume(volume: number) {
@@ -928,6 +917,7 @@ export default function App() {
           stage={startupStage}
           error={startupError}
           communityUrl={COMMUNITY_URL}
+          legalUrl={LEGAL_URL}
           onStart={() => void runStartupChecks(true)}
           onRepair={() => showDialog({
             title: i18n.t("startup.repairConfirmTitle"),
@@ -997,12 +987,10 @@ export default function App() {
           ) : null}
           {nav === "settings" && (
             <SettingsScreen
-              locale={locale}
               soundEffectsVolume={soundEffectsVolume}
               musicVolume={musicVolume}
               hapticsEnabled={hapticsEnabled}
               highContrastEnabled={highContrastEnabled}
-              onChangeLocale={handleChangeLocale}
               onChangeSoundEffectsVolume={handleSoundEffectsVolume}
               onChangeMusicVolume={handleMusicVolume}
               onChangeHapticsEnabled={handleHapticsEnabled}
@@ -1070,7 +1058,7 @@ export default function App() {
         pointerEvents={hasEnteredApp && nav !== "in-room" ? "box-none" : "none"}
         style={[styles.starsPersistentLayer, (!hasEnteredApp || nav === "in-room") && styles.persistentScreenHidden]}
       >
-        <StarsBadge stars={stars} gain={starGain} width={starsBadgeWidth} onPress={() => openRegisteredFeature("shop", () => openShop("stars"))} />
+        <StarsBadge stars={stars} gain={starGain} width={starsBadgeWidth} onPress={() => openRegisteredFeature("shop", () => openShop("featured"))} />
       </View>
     </AppFrame>
   );

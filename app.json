@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "a0f50448-01fb-4a56-aa8f-4b822429acc2"
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "com.daniespi.confidencetrivia",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    }
+  }
+}

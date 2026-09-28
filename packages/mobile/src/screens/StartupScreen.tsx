@@ -1,10 +1,10 @@
 import React from "react";
-import { ActivityIndicator, Image, Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Image, Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { Ionicons } from "@expo/vector-icons";
 import { ANDROID_MENU_UI_SCALE, BigButton, Screen, theme } from "../components/ui";
 
-const EMBLEM = require("../../assets/startup-emblem.png");
+const EMBLEM = require("../../assets/startup-emblem-fast.png");
 
 export type StartupState = "idle" | "loading" | "error";
 
@@ -16,6 +16,7 @@ export function StartupScreen({
   stage,
   error,
   communityUrl,
+  legalUrl,
   onStart,
   onRepair,
   onAccount,
@@ -27,6 +28,7 @@ export function StartupScreen({
   stage: "assets" | "connecting" | null;
   error: string | null;
   communityUrl: string | null;
+  legalUrl: string | null;
   onStart: () => void;
   onRepair: () => void;
   onAccount: () => void;
@@ -45,17 +47,23 @@ export function StartupScreen({
       <View style={styles.utilities}>
         <UtilityButton icon="build-outline" label={t("startup.repair")} onPress={onRepair} disabled={loading} />
         <UtilityButton
-          icon="people-outline"
+          icon="logo-discord"
           label={t("startup.community")}
           onPress={() => communityUrl && void Linking.openURL(communityUrl)}
           disabled={!communityUrl || loading}
+        />
+        <UtilityButton
+          icon="document-text-outline"
+          label={t("startup.legal")}
+          onPress={() => legalUrl && void Linking.openURL(legalUrl)}
+          disabled={!legalUrl || loading}
         />
         <UtilityButton icon="person-circle-outline" label={t("startup.account")} onPress={onAccount} disabled={loading} />
       </View>
 
       <View style={styles.main}>
         <Image source={EMBLEM} defaultSource={EMBLEM} fadeDuration={0} resizeMode="contain" style={styles.emblem} />
-        <Text style={styles.title}>CONFIDENCE TRIVIA</Text>
+        <Text style={styles.title}>CONFIVIA</Text>
         <BigButton
           label={loading ? loadingLabel : t("startup.start")}
           onPress={onStart}
@@ -85,7 +93,7 @@ function UtilityButton({ icon, label, onPress, disabled }: { icon: keyof typeof 
       onPress={onPress}
       style={({ pressed }) => [styles.utilityButton, disabled && styles.disabled, pressed && !disabled && styles.pressed]}
     >
-      <Ionicons name={icon} size={17} color={theme.text} style={styles.utilityIcon} />
+      <Ionicons name={icon} size={Platform.OS === "android" ? 21 : 17} color={theme.text} style={styles.utilityIcon} />
       <Text numberOfLines={1} style={styles.utilityText}>{label}</Text>
     </Pressable>
   );
@@ -93,10 +101,10 @@ function UtilityButton({ icon, label, onPress, disabled }: { icon: keyof typeof 
 
 const styles = StyleSheet.create({
   screen: { justifyContent: "center" },
-  utilities: { position: "absolute", left: 18, top: 14, width: 142, gap: 6 },
-  utilityButton: { minHeight: 34, flexDirection: "row", alignItems: "center", paddingHorizontal: 10, borderRadius: 6, backgroundColor: "rgba(31,26,51,.88)", borderWidth: 1, borderColor: "rgba(185,176,214,.25)" },
-  utilityIcon: { width: 23 },
-  utilityText: { flex: 1, color: theme.text, fontSize: 10, fontWeight: "800" },
+  utilities: { position: "absolute", left: 18, top: 14, width: Platform.OS === "android" ? 174 : 142, gap: Platform.OS === "android" ? 8 : 6 },
+  utilityButton: { minHeight: Platform.OS === "android" ? 43 : 34, flexDirection: "row", alignItems: "center", paddingHorizontal: Platform.OS === "android" ? 13 : 10, borderRadius: 6, backgroundColor: "rgba(31,26,51,.88)", borderWidth: 1, borderColor: "rgba(185,176,214,.25)" },
+  utilityIcon: { width: Platform.OS === "android" ? 29 : 23 },
+  utilityText: { flex: 1, color: theme.text, fontSize: Platform.OS === "android" ? 12 : 10, fontWeight: "800" },
   main: { width: "100%", alignItems: "center", justifyContent: "center" },
   emblem: { width: 106, height: 106 },
   title: { color: theme.text, fontSize: 25, fontWeight: "900", marginTop: -4 },

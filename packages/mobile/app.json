@@ -1,9 +1,9 @@
 {
   "expo": {
-    "name": "Confidence Trivia",
+    "name": "Confivia",
     "slug": "confidence-trivia",
     "scheme": "confidence-trivia",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "orientation": "landscape",
     "icon": "./assets/app-icon.png",
     "backgroundColor": "#14101F",

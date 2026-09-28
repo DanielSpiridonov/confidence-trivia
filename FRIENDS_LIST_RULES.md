@@ -1,6 +1,6 @@
 # Friends List Rules
 
-This social/account feature is separate from the future Friends Mode game mode.
+This social/account feature is separate from the private Custom game mode.
 
 Implementation status: initial authenticated Friends screen, player search, requests, removal/blocking, daily sending, and explicit gift claiming are implemented. Cross-platform multiplayer testing and notification polish remain.
 

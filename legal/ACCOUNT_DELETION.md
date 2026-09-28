@@ -1,19 +1,22 @@
-# Delete your Confidence Trivia account
+# Delete your Confivia account
 
-You can permanently delete your account and associated personal data.
+You can request permanent deletion of your Confivia account and the personal
+data associated with it.
 
 ## Delete inside the app
 
-1. Open Confidence Trivia and sign in.
-2. Open **Profile**.
+1. Open Confivia.
+2. Open **Profile** for the connected account.
 3. Select **Delete account**.
-4. Read the confirmation and select **Delete forever**.
+4. Review the explanation and confirm **Delete forever**.
 
-Deletion removes your sign-in link, profile, email association, friends,
-blocks, pending social activity, stars, inventory, and equipped cosmetics.
-Completed match and transaction records may remain only as anonymised integrity
-history under a generic deleted-user identity. Limited records may also be kept
-where required by law, security, fraud prevention, or dispute resolution.
+This removes its authentication link and email association and removes or
+de-identifies the profile, progression, social relationships, star balance,
+inventory, and equipped cosmetics associated with the account.
+Limited match, security, or transaction records may be retained only when
+needed for fraud prevention, currency integrity, dispute resolution, or a legal
+obligation. Where identification is no longer necessary, those records are
+de-identified and are no longer displayed as belonging to the deleted player.
 
 Deletion is permanent and cannot be undone. Deleting the mobile app by itself
 does not delete a registered account.
@@ -21,15 +24,18 @@ does not delete a registered account.
 ## Request deletion on the web
 
 If you cannot access the app, email spiridonovdaniels@gmail.com with the subject
-**Confidence Trivia account deletion request**. Send the request from the email
-address associated with your Apple or Google sign-in. If you used Apple's Hide
-My Email feature, use or identify the corresponding private relay address where
-possible. We may request reasonable information to verify ownership before
-deleting the account.
+**Confivia account deletion request**.
 
-We will confirm receipt and complete verified requests within the period
-required by applicable law. Never send passwords, access tokens, or payment
-details by email.
+For a signed-in account, send the request from the email address connected to
+your Apple or Google sign-in. If you used Apple's Hide My Email feature, use or
+identify the corresponding private relay address where possible. We may request
+reasonable additional information to verify that the account belongs to you.
 
-Privacy questions: spiridonovdaniels@gmail.com  
-Full policy: [PUBLIC SITE URL]/privacy
+We will confirm receipt and complete a verified request without undue delay and
+within the period required by applicable law. Never send passwords, one-time
+codes, access tokens, or payment details by email.
+
+For more information about retention and your privacy rights, read the full
+policy at https://daniel-portfolio-pied.vercel.app/projects/confivia/privacy.
+
+Privacy and deletion contact: spiridonovdaniels@gmail.com

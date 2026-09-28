@@ -1,9 +1,11 @@
 import React from "react";
 import { Animated, Image, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
-import { ANDROID_MENU_UI_SCALE, Screen, Title, BigButton } from "../components/ui";
+import { Ionicons } from "@expo/vector-icons";
+import { ANDROID_MENU_UI_SCALE, Screen } from "../components/ui";
 import { PointsIcon } from "../components/PointsIcon";
 import { getPlayerCustomization } from "../network/client";
+import { playSound } from "../audio/sounds";
 
 const DAILY_REWARD_PLATFORM_IMAGE: number = require("../../assets/popup-platform.png");
 const DAILY_REWARD_PRESENT_IMAGE: number = require("../../assets/stars-gift.png");
@@ -30,6 +32,26 @@ const SIDEBAR_ITEM_HEIGHT = 91;
 function NotificationBadge({ count }: { count: number }) {
   if (count <= 0) return null;
   return <View pointerEvents="none" style={styles.notificationBadge}><Text style={styles.notificationBadgeText}>{count > 99 ? "99+" : count}</Text></View>;
+}
+
+function HomeActionButton({ label, icon, secondary, onPress }: { label: string; icon: keyof typeof Ionicons.glyphMap; secondary?: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={() => { playSound("button"); onPress(); }}
+      style={({ pressed }) => [styles.homeActionButton, secondary ? styles.homeActionButtonSecondary : styles.homeActionButtonPrimary, pressed && styles.homeActionButtonPressed]}
+    >
+      <View style={[styles.homeActionAccent, secondary && styles.homeActionAccentSecondary]} />
+      <View style={styles.homeActionContent}>
+        <Ionicons name={icon} size={31} color={secondary ? "#B6A9E8" : "#D0C4F5"} style={styles.homeActionIcon} />
+        <Text maxFontSizeMultiplier={1.25} numberOfLines={1} style={styles.homeActionLabel}>{label}</Text>
+        <View style={[styles.homeActionArrow, secondary && styles.homeActionArrowSecondary]}>
+          <Ionicons name="chevron-forward" size={19} color="#FFFFFF" />
+        </View>
+      </View>
+    </Pressable>
+  );
 }
 
 function HomePopup({ label, amount, streakLabel, claimed, claimedLabel, countdown, platformImage, featureImage, disabled, onPress }: {
@@ -228,10 +250,9 @@ export function HomeScreen({
         </Pressable>
       </View>
       <View style={styles.mainActionsBlock}>
-        <Title>🔥 {t("home.title")}</Title>
         <View style={styles.actions}>
-          <BigButton label={t("home.createGame")} onPress={onCreate} style={styles.homePlayButton} textStyle={styles.homePlayButtonText} />
-          <BigButton label={t("home.joinGame")} onPress={onJoin} variant="secondary" style={styles.homePlayButton} textStyle={styles.homePlayButtonText} />
+          <HomeActionButton label={t("home.createGame")} icon="add-circle-outline" onPress={onCreate} />
+          <HomeActionButton label={t("home.joinGame")} icon="enter-outline" secondary onPress={onJoin} />
         </View>
       </View>
       <View style={styles.homeMenuDock}>
@@ -285,11 +306,21 @@ const styles = StyleSheet.create({
   mainActionsBlock: Platform.OS === "android" ? { width: "100%", alignItems: "center", transform: [{ translateY: -24 }] } : { width: "100%", alignItems: "center" },
   actions: {
     width: "100%",
-    maxWidth: Platform.OS === "android" ? 460 : 420,
+    maxWidth: Platform.OS === "android" ? 510 : 480,
     alignSelf: "center",
+    gap: 8,
   },
-  homePlayButton: Platform.OS === "android" ? { maxWidth: 430, minHeight: 52, paddingVertical: 12, marginTop: 7 } : {},
-  homePlayButtonText: Platform.OS === "android" ? { paddingHorizontal: 5, fontSize: 16 } : {},
+  homeActionButton: { width: "88%", height: Platform.OS === "android" ? 61 : 65, alignSelf: "center", overflow: "hidden", borderWidth: 2, borderRadius: 5, transform: [{ skewX: "-7deg" }], shadowColor: "#000000", shadowOpacity: 0.34, shadowRadius: 5, shadowOffset: { width: 0, height: 4 }, elevation: 6 },
+  homeActionButtonPrimary: { marginLeft: -25, backgroundColor: "#5039A0", borderColor: "#8975CC" },
+  homeActionButtonSecondary: { marginLeft: 25, backgroundColor: "#29233F", borderColor: "#6F6398" },
+  homeActionButtonPressed: { opacity: 0.72 },
+  homeActionAccent: { position: "absolute", left: 0, top: 0, bottom: 0, width: 9, backgroundColor: "#A996E5" },
+  homeActionAccentSecondary: { backgroundColor: "#746A98" },
+  homeActionContent: { flex: 1, paddingLeft: 22, paddingRight: 13, flexDirection: "row", alignItems: "center", transform: [{ skewX: "7deg" }] },
+  homeActionIcon: { width: 48 },
+  homeActionLabel: { flex: 1, color: "#FFFFFF", fontSize: Platform.OS === "android" ? 17 : 18, fontWeight: "900", textAlign: "center", textTransform: "uppercase" },
+  homeActionArrow: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(188,169,238,0.18)", borderWidth: 1, borderColor: "rgba(202,188,242,0.42)" },
+  homeActionArrowSecondary: { backgroundColor: "rgba(151,137,190,0.12)", borderColor: "rgba(177,163,216,0.3)" },
   homeMenuDock: { position: "absolute", right: Platform.OS === "android" ? 34 : 8, bottom: Platform.OS === "android" ? 26 : 4, height: 44, zIndex: 12 },
   homeMenuItems: { position: "absolute", right: 72, bottom: 0, height: 44, flexDirection: "row", gap: 6 },
   menuItemButton: { minWidth: 106, height: 44, paddingHorizontal: 10, borderRadius: 14, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, borderWidth: 2, borderColor: "#A982FF", backgroundColor: "rgba(42,25,72,0.97)", shadowColor: "#7C5CFF", shadowOpacity: 0.42, shadowRadius: 5, shadowOffset: { width: 0, height: 2 }, elevation: 5 },

@@ -1,4 +1,4 @@
-# Confidence Trivia — Final Pre-Publishing Checklist
+# Confivia — Final Pre-Publishing Checklist
 
 This is the canonical checklist that must be completed before preparing the
 Apple App Store and Google Play submissions. A checked item must be implemented,
@@ -12,7 +12,7 @@ tested on the affected platforms, and documented where applicable.
 - [x] Define which records are deleted, anonymized, or retained for account deletion.
 - [x] Remove or anonymize all personal and social data during deletion.
 - [x] Delete the linked Supabase Auth identity safely.
-- [ ] Publish a public account-deletion/request page.
+- [x] Publish a public account-deletion/request page.
 - [x] Complete the full account-lifecycle test, including account creation,
       cross-device sign-in, sign-out, session expiry, and deletion.
 - [ ] Decide whether account-data export is required for version 1.
@@ -30,7 +30,7 @@ tested on the affected platforms, and documented where applicable.
 ## 3. Privacy and data handling
 
 - [x] Maintain a verified inventory of collected, transmitted, and stored data.
-- [x] Define retention periods for guests, accounts, matches, ranked history,
+- [x] Define retention periods for installation identifiers, accounts, matches, ranked history,
       currency ledgers, friendships, challenges, presence, and server logs.
 - [x] Enforce HTTPS/WSS for production API and WebSocket connections.
 - [x] Review public endpoints and require authentication wherever data does not
@@ -45,12 +45,12 @@ tested on the affected platforms, and documented where applicable.
 - [x] Create public support and privacy email addresses.
 - [x] Decide the intended minimum player age and release regions; complete the
       documented parental-consent review before a worldwide 13+ launch.
-- [ ] Publish an accurate Privacy Policy.
-- [ ] Publish Terms of Use.
-- [ ] Publish an Account Deletion page.
-- [ ] Publish a Support page.
-- [ ] Publish community/player-name rules.
-- [ ] Explain virtual stars and 1v1 star wagering accurately.
+- [x] Publish an accurate Privacy Policy.
+- [x] Publish Terms of Use.
+- [x] Publish an Account Deletion page.
+- [x] Publish a Support page.
+- [x] Publish community/player-name rules.
+- [x] Explain virtual stars and 1v1 star wagering accurately.
 - [ ] Document the final data-retention policy.
 
 ## 5. Content ownership
@@ -65,13 +65,14 @@ tested on the affected platforms, and documented where applicable.
 ## 6. Core product completion
 
 - [ ] Complete the deeper question-variety rewrite; avoid formula-heavy repetition.
-- [x] Verify guest progress transfers correctly when an account is linked.
+- [x] Verify the onboarding identity transfers correctly when an account is linked.
 - [x] Verify registered progress restores correctly on another device.
 - [ ] Test Ranked matchmaking, placements, LP, and ranked wins with four accounts.
 - [x] Fix Ranked and 1v1 matchmaking so players using different language packs
       can enter the same queue and be matched together.
 - [ ] Test Friends, Blessings, blocking, and challenges on unstable connections.
-- [ ] Decide whether Friends Mode is included in version 1 or remains unavailable.
+- [x] Include the current private Custom Mode in version 1; defer broader social
+      and team-mode expansion until after launch.
 - [x] Ensure unavailable/future features cannot be mistaken for working purchases.
 
 ## 7. Reliability and security
@@ -99,11 +100,11 @@ tested on the affected platforms, and documented where applicable.
 ## 9. Production configuration
 
 - [ ] Separate production services/data from development and testing where needed.
-- [ ] Verify production environment variables without committing secret values.
-- [ ] Confirm the final bundle ID, Android package name, app name, and URL scheme.
-- [ ] Set the release version and build-number strategy.
+- [x] Verify production environment variables without committing secret values.
+- [x] Confirm the final bundle ID, Android package name, app name, and URL scheme.
+- [x] Set the release version and build-number strategy.
 - [ ] Validate final app icon, adaptive icon, splash screen, and loading screen.
-- [ ] Confirm encryption/export-compliance configuration.
+- [x] Confirm encryption/export-compliance configuration.
 - [ ] Remove development-only configuration from production builds.
 - [ ] Ensure bots, test users, test news, and test transactions are absent from production.
 
@@ -116,12 +117,31 @@ tested on the affected platforms, and documented where applicable.
 - [ ] Complete a final security, privacy, legal-document, and content-rights review.
 - [ ] Resolve every remaining item above before preparing store metadata.
 
-## Explicitly deferred until after version 1
+## High importance immediately after launch
+
+- Create an isolated test Render service deployed from `master`; keep the
+  public service on `main` and move testing to a separate test database.
+- Add production monitoring and actionable client/server error reporting.
+- Configure automated database backups and complete a restoration drill.
+- Complete the full VoiceOver, TalkBack, dynamic-text, and screen-reader
+  navigation pass beyond the version-one minimum accessibility work.
+- Re-enable localization only after each language is complete and has native
+  speaker review; keep unavailable languages labelled **Coming Soon**.
+- Harden Ranked seasons, abandonment handling, reconnect behavior,
+  duplicate-account detection, boosting protection, and LP audit visibility.
+- Repeat multi-device concurrency, reconnection, timeout, and server-restart
+  tests using production-like infrastructure and real release builds.
+- Complete the deeper question-variety rewrite and ongoing content-rights
+  review before materially expanding the question catalogue.
+- Decide and implement the account-data export process if required by launch
+  regions or player demand.
+
+## Other features deferred until after version 1
 
 - Rewarded advertisements.
 - Real-money star purchases and platform billing.
 - Visual/image-question paid mode.
 - Avatar combat animations beyond the current implementation.
-- Expanded Friends Mode, unless promoted into the version-one scope later.
+- Expanded Custom/Friends team and social options beyond the launch feature set.
 
 Deferred features must remain disabled or be labelled clearly as unavailable.

@@ -49,6 +49,9 @@ export function ConfidenceScreen({ room, state }: { room: Room; state: any }) {
           return (
             <Pressable
               key={String(value)}
+              accessibilityRole="button"
+              accessibilityLabel={value === "none" ? t("confidence.none") : String(value)}
+              accessibilityState={{ selected: isSelected, disabled: isFinalized }}
               onPress={() => choose(value)}
               disabled={isFinalized}
               style={({ pressed }) => [

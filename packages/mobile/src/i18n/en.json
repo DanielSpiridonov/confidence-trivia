@@ -1,22 +1,12 @@
 {
   "home": {
-    "title": "Confidence Trivia",
+    "title": "Confivia",
     "tagline": "Knowing the answer is only half the game.",
     "createGame": "Create Game",
     "joinGame": "Join Game",
     "settings": "Settings",
     "profile": "Profile",
     "friends": "Friends",
-    "friendsPlayers": "Free-for-all or Duos",
-    "teamFormat": "Team format",
-    "ffa": "Free-for-all",
-    "duos": "Duos",
-    "categories": "Question categories",
-    "customQuestions": "Custom questions",
-    "addQuestion": "Add question",
-    "questionPlaceholder": "Question",
-    "answerPlaceholder": "Answer",
-    "customPrivateNote": "Rooms with custom questions are private.",
     "menu": "Menu",
     "ruleBook": "Rule Book",
     "dailyReward": "Daily Reward",
@@ -41,7 +31,7 @@
     "stars": { "title": "Stars and wagers", "body": "Stars are account currency, separate from match points. In 1v1, both players stake the selected wager and the winner receives the full pot; a drawn game refunds both stakes." },
     "dailyRewards": { "title": "Earning stars", "body": "Your first 5 eligible completed games each day award 10 stars. Claim the daily reward to build a 5-day streak worth 10, 20, 30, 50, then 75 stars." },
     "cosmetics": { "title": "Shop and inventory", "body": "Spend stars on name colors, avatars, and solid or animated frames. Owned items stay in your inventory, and your equipped look appears in rooms and results." },
-    "accounts": { "title": "Accounts and guests", "body": "Guests can play unranked games. Sign in to keep account progress and unlock Ranked, Friends, the Shop, and Inventory. Account names must be unique." },
+    "accounts": { "title": "Accounts", "body": "Connect a supported Apple or Google account before playing. Your account keeps progress, Ranked results, friends, stars, Shop items, and Inventory. Account names must be unique." },
     "friends": { "title": "Friends", "body": "Add up to 25 friends. Bless each friend once per UTC day; each claimed blessing gives them 2 stars. Online friends can be challenged to a wagered 1v1 match." }
   },
   "feedback": {
@@ -103,6 +93,7 @@
     "filters": {
       "all": "All",
       "classic": "Classic",
+      "friends": "Custom",
       "ranked": "Ranked",
       "damage": "1v1 Damage"
     },
@@ -116,7 +107,17 @@
     "rounds": "Rounds",
     "mode": "Game Mode",
     "classic": "Classic",
-    "friends": "Friends",
+    "friends": "Custom",
+    "friendsPlayers": "Build your own match",
+    "teamFormat": "Team format",
+    "ffa": "Free-for-all",
+    "duos": "Duos",
+    "categories": "Question categories",
+    "customQuestions": "Custom questions",
+    "addQuestion": "Add question",
+    "questionPlaceholder": "Question",
+    "answerPlaceholder": "Answer",
+    "customPrivateNote": "Rooms with custom questions are private.",
     "ranked": "Ranked",
     "rankedPlayers": "4 players",
     "damage": "Damage",
@@ -130,6 +131,18 @@
     "queue": "Join Queue",
     "queueing": "Joining Queue...",
     "creating": "Creating room..."
+  },
+  "categories": {
+    "general": "General",
+    "science": "Science",
+    "geography": "Geography",
+    "history": "History",
+    "movies": "Movies",
+    "music": "Music",
+    "sports": "Sports",
+    "animals": "Animals",
+    "technology": "Technology",
+    "food": "Food"
   },
   "lobby": {
     "roomCode": "ROOM CODE",
@@ -278,6 +291,7 @@
     "repairConfirmMessage": "This resets temporary room and question data, reconnects to the game services, and reloads your profile. Your account, stars, purchases, and server progress stay safe.",
     "repairConfirm": "Repair",
     "community": "Community",
+    "legal": "Legal",
     "account": "Account",
     "connectedAs": "Connected as {{name}}",
     "accountRequired": "Connected account required",
@@ -286,10 +300,10 @@
   },
   "account": {
     "title": "Profile",
-    "guest": "Guest account",
+    "guest": "Account required",
     "signedInWith": "Signed in with {{provider}}",
     "socialAccount": "social account",
-    "guestLimits": "Guests can play normal games, but Shop, Ranked, and friends require a linked account. Your current progress will transfer when you sign in.",
+    "guestLimits": "Connect a supported Apple or Google account to start playing and keep your progress.",
     "configurationTitle": "Sign-in setup required",
     "configurationRequired": "Google and Apple sign-in need the Supabase project URL, publishable key, and provider settings before they can be used.",
     "google": "Continue with Google",
@@ -301,7 +315,7 @@
     "rankedRequiresAccount": "Sign in with Google or Apple to play Ranked.",
     "friendsRequiresAccount": "Sign in with Google or Apple to use Friends and daily gifts.",
     "signInFailed": "Could not sign in",
-    "linkFailed": "Your account signed in, but the guest progress could not be linked.",
+    "linkFailed": "Your account signed in, but the local onboarding profile could not be linked.",
     "progressProtected": "Your stars, cosmetics, and game progress are linked to this account.",
     "signInMethods": "Sign-in methods",
     "hiddenEmail": "Hidden",
@@ -318,9 +332,11 @@
       "suspended": { "title": "Account temporarily suspended", "message": "Gameplay, social features, and the economy are unavailable during the suspension." },
       "banned": { "title": "Account banned", "message": "Gameplay, social features, and the economy are unavailable for this account." }
     },
-    "protected": "PROTECTED", "localOnly": "LOCAL GUEST", "unlockProfile": "Make your progress yours", "benefitProgress": "Protect progress", "benefitRanked": "Play Ranked", "benefitSocial": "Friends & gifts", "transferHint": "Your current guest progress transfers automatically.", "email": "Email", "namePlaceholder": "Permanent player name", "saveName": "Save", "nameRules": "Use 3-20 letters, numbers, spaces, _ or -.", "nameUpdated": "Player name updated", "nameUpdateFailed": "Could not update name", "stars": "Stars", "games": "Games", "wins": "Wins", "rank": "Rank", "signOut": "Sign out", "signOutConfirm": "Your linked progress will stay safe. This device will return to a new guest profile.", "deleteAccount": "Delete account", "deleteForever": "Delete forever", "deleteAccountConfirm": "This permanently removes your login, profile, friends, stars, and cosmetics. Completed match and transaction records remain only as anonymized Deleted User history. This cannot be undone.", "accountDeleted": "Account deleted", "deleteFailed": "Could not delete account", "sessionExpired": "Session expired", "sessionExpiredMessage": "Please sign in again. Your linked progress remains safe."
+    "protected": "PROTECTED", "localOnly": "NOT CONNECTED", "unlockProfile": "Connect your account", "benefitProgress": "Protect progress", "benefitRanked": "Play Ranked", "benefitSocial": "Friends & gifts", "transferHint": "Your onboarding profile connects automatically.", "email": "Email", "namePlaceholder": "Permanent player name", "saveName": "Save", "nameRules": "Use 3-20 letters, numbers, spaces, _ or -.", "nameUpdated": "Player name updated", "nameUpdateFailed": "Could not update name", "stars": "Stars", "games": "Games", "wins": "Wins", "rank": "Rank", "signOut": "Sign out", "signOutConfirm": "Your linked progress will stay safe. This device will return to the sign-in screen.", "deleteAccount": "Delete account", "deleteForever": "Delete forever", "deleteAccountConfirm": "This permanently removes your login, profile, friends, stars, and cosmetics. Completed match and transaction records remain only as anonymized Deleted User history. This cannot be undone.", "accountDeleted": "Account deleted", "deleteFailed": "Could not delete account", "sessionExpired": "Session expired", "sessionExpiredMessage": "Please sign in again. Your linked progress remains safe."
   },
   "shop": {
+    "starPurchasesUnavailable": "Unavailable",
+    "starPurchasesUnavailableMessage": "Star purchases are not available. Stars can still be earned through gameplay and rewards.",
     "title": "Customization Shop",
     "shortTitle": "Shop",
     "previewOnly": "Design preview — purchases disabled",
@@ -425,6 +441,10 @@
     "highContrast": "High contrast",
     "english": "English",
     "bulgarian": "Bulgarian",
+    "spanish": "Español",
+    "german": "Deutsch",
+    "french": "Français",
+    "comingSoon": "Coming Soon",
     "soundEffects": "Sound Effects",
     "music": "Music",
     "musicComingSoon": "Ready for future music"

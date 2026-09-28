@@ -11,13 +11,14 @@ values ('WELCOME100', 100, '2026-12-31 23:59:59+00', 1000);
 
 `expires_at` and `max_redemptions` may be `null`. Codes must use uppercase letters, numbers, `_`, or `-` and be 3–32 characters long. Redemption is limited to once per registered player and recorded in the star transaction ledger.
 
-Publish localized news posts separately so each language receives the correct copy:
+Version one is English-only. Publish launch news with the `en` locale:
 
 ```sql
 insert into public.news_posts (locale, title, body)
-values
-  ('en', 'Welcome!', 'The News screen is now live.'),
-  ('bg', 'Добре дошли!', 'Екранът с новини вече е активен.');
+values ('en', 'Welcome!', 'The News screen is now live.');
 ```
+
+When another language becomes available, publish a separately reviewed post
+for that locale rather than relying on automatic translation.
 
 Set `active = false` to hide a code or news post without deleting its history.

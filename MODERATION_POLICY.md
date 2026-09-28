@@ -1,4 +1,4 @@
-# Confidence Trivia Moderation Policy
+# Confivia Moderation Policy
 
 ## Report workflow
 
@@ -12,7 +12,7 @@
 
 - First confirmed offensive-name violation: set `moderation_status` to `rename_required`. A successful rename restores `active` status and bypasses the normal 30-day cooldown.
 - Repeated offensive-name violation: set `moderation_status` to `suspended` and `suspended_until` to 24 hours after the action.
-- Harassment or cheating: review manually before applying a penalty.
+- Harassment, cheating, or abusive Custom-room content: review manually before applying a penalty.
 - Severe or repeated abuse: set `moderation_status` to `banned`.
 - Clearly false reports: dismiss them. Repeated malicious reporting may be treated as abuse.
 

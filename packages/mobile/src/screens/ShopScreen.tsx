@@ -8,7 +8,7 @@ import { equipAvatar, equipFrame, equipNameColor, getPlayerCustomization } from 
 import { FeedbackPopup, useFeedbackPopup } from "../components/FeedbackPopup";
 import { GameDialog, useGameDialog } from "../components/GameDialog";
 
-type ShopTab = "featured" | "avatars" | "frames" | "inventory" | "stars";
+type ShopTab = "featured" | "avatars" | "frames" | "inventory";
 
 type CosmeticItem = { id: string; icon?: string; image?: number; name: string; price?: number; tag?: string; color?: string; free?: boolean };
 
@@ -18,7 +18,7 @@ const SHOP_TAB_IMAGES: Partial<Record<ShopTab, number>> = {
   frames: require("../../assets/shop-tabs/frames.png"),
 };
 
-const COSMETICS: Record<Exclude<ShopTab, "stars" | "inventory">, CosmeticItem[]> = {
+const COSMETICS: Record<Exclude<ShopTab, "inventory">, CosmeticItem[]> = {
   featured: [...NAME_COLOR_COSMETICS]
     .sort((left, right) => (getCosmeticStarPrice("name_color", left.id) ?? 0) - (getCosmeticStarPrice("name_color", right.id) ?? 0))
     .map((item) => ({ id: item.id, icon: "●", name: item.id.replace("name_", ""), color: item.color })),
@@ -46,26 +46,10 @@ const COSMETICS: Record<Exclude<ShopTab, "stars" | "inventory">, CosmeticItem[]>
   ],
 };
 
-const STAR_PACKS: Array<{ stars: number; price?: string; name: "handful" | "pouch" | "chest" | "vault" | "treasury"; bonus?: string; rewardedAd?: boolean }> = [
-  { stars: 100, name: "handful", rewardedAd: true },
-  { stars: 550, price: "€4.49", name: "pouch", bonus: "+10%" },
-  { stars: 1200, price: "€8.99", name: "chest", bonus: "+20%" },
-  { stars: 2600, price: "€17.99", name: "vault", bonus: "+30%" },
-  { stars: 6000, price: "€39.99", name: "treasury", bonus: "Best value" },
-];
-const STAR_PACK_IMAGES: Record<(typeof STAR_PACKS)[number]["name"], number> = {
-  handful: require("../../assets/star-packs/handful.png"),
-  pouch: require("../../assets/star-packs/pouch.png"),
-  chest: require("../../assets/star-packs/chest.png"),
-  vault: require("../../assets/star-packs/vault.png"),
-  treasury: require("../../assets/star-packs/treasury.png"),
-};
-
 const SHOP_AVATAR_IMAGES = COSMETICS.avatars.flatMap((item) => item.image ? [item.image] : []);
 const SHOP_PERSISTENT_IMAGES = [
   ...SHOP_AVATAR_IMAGES,
   ...Object.values(SHOP_TAB_IMAGES).filter((source): source is number => Boolean(source)),
-  ...Object.values(STAR_PACK_IMAGES),
 ];
 const customizationCache = new Map<string, { nameColorId: string; avatarId: string; frameId: string; stars?: number; rankKey?: string; ownedCosmeticIds?: string[] }>();
 
@@ -84,7 +68,7 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
   const colorRequest = React.useRef(0);
   const avatarRequest = React.useRef(0);
   const frameRequest = React.useRef(0);
-  const tabs: ShopTab[] = ["featured", "avatars", "frames", "stars"];
+  const tabs: ShopTab[] = ["featured", "avatars", "frames"];
 
   React.useLayoutEffect(() => {
     setTab(requestedTab);
@@ -261,19 +245,23 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
       <View style={styles.shopBody}>
         <View pointerEvents={tab === "inventory" ? "none" : "auto"} style={[styles.tabRail, Platform.OS === "ios" && styles.tabRailIos, tab === "inventory" && styles.tabRailHidden]}>
           {tabs.map((item) => (
-            <Pressable key={item} onPress={() => setTab(item)} style={[styles.tab, tab === item && styles.tabSelected]}>
+            <Pressable key={item} accessibilityRole="tab" accessibilityState={{ selected: tab === item }} onPress={() => setTab(item)} style={[styles.tab, tab === item && styles.tabSelected]}>
               <View style={styles.tabIconSlot}>
-                {item === "stars" ? <PointsIcon size={38} /> : <Image source={SHOP_TAB_IMAGES[item]} defaultSource={SHOP_TAB_IMAGES[item]} fadeDuration={0} resizeMode="contain" style={styles.tabIconImage} />}
+                <Image source={SHOP_TAB_IMAGES[item]} defaultSource={SHOP_TAB_IMAGES[item]} fadeDuration={0} resizeMode="contain" style={styles.tabIconImage} />
               </View>
               <Text numberOfLines={1} style={[styles.tabText, tab === item && styles.tabTextSelected]}>{t(`shop.tabs.${item}`)}</Text>
             </Pressable>
           ))}
+          <Pressable onPress={() => showFeedback(t("shop.starPurchasesUnavailable"), t("shop.starPurchasesUnavailableMessage"), "info")} style={({ pressed }) => [styles.tab, styles.unavailableTab, pressed && styles.unavailableTabPressed]}>
+            <View style={styles.tabIconSlot}><PointsIcon size={38} /></View>
+            <Text numberOfLines={1} style={styles.tabText}>{t("shop.tabs.stars")}</Text>
+          </Pressable>
         </View>
 
         <View style={[styles.catalogue, Platform.OS === "ios" && styles.catalogueIosWide, tab !== "inventory" && styles.catalogueWithTabRail, tab !== "inventory" && Platform.OS === "ios" && styles.catalogueWithTabRailIos]}>
           <View style={styles.catalogueHeader}>
             <Text style={styles.sectionTitle}>{t(`shop.tabs.${tab}`)}</Text>
-            <Text style={styles.previewBadge}>{tab === "inventory" ? t("shop.ownedItems") : tab === "stars" ? t("shop.previewOnly") : tab === "frames" ? t("shop.playerBordersPreview") : t("shop.starPricedCosmetics")}</Text>
+            <Text style={styles.previewBadge}>{tab === "inventory" ? t("shop.ownedItems") : tab === "frames" ? t("shop.playerBordersPreview") : t("shop.starPricedCosmetics")}</Text>
           </View>
           <View pointerEvents={tab === "avatars" ? "auto" : "none"} style={[styles.persistentAvatarCatalogue, tab !== "avatars" && styles.persistentCatalogueHidden]}>
             <FlatList data={COSMETICS.avatars} numColumns={3} keyExtractor={(item) => item.id} columnWrapperStyle={styles.cosmeticRow} contentContainerStyle={styles.cosmeticList} showsVerticalScrollIndicator={false} renderItem={({ item }) => {
@@ -288,20 +276,7 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
               );
             }} />
           </View>
-          <View pointerEvents={tab === "stars" ? "auto" : "none"} style={[styles.persistentStarCatalogue, tab !== "stars" && styles.persistentCatalogueHidden]}>
-            <FlatList key="star-packs" horizontal data={STAR_PACKS} keyExtractor={(item) => String(item.stars)} contentContainerStyle={styles.packList} showsHorizontalScrollIndicator={false} renderItem={({ item, index }) => (
-              <View style={[styles.starPack, item.stars === 6000 && styles.starPackBest]}>
-                {item.bonus ? <Text style={styles.packBonus}>{item.bonus}</Text> : null}
-                <Image source={STAR_PACK_IMAGES[item.name]} defaultSource={STAR_PACK_IMAGES[item.name]} fadeDuration={0} resizeMode="contain" style={[styles.packImage, { width: 79 + index * 4, height: 79 + index * 4 }]} />
-                <Text style={styles.packAmount}>{item.stars}</Text>
-                <Pressable disabled style={[styles.buyButton, item.rewardedAd && styles.watchAdButton]}>
-                  <Text style={styles.buyText}>{item.rewardedAd ? t("shop.watchAd") : item.price}</Text>
-                  {item.rewardedAd ? <Text style={styles.comingSoonText}>{t("shop.comingSoon")}</Text> : null}
-                </Pressable>
-              </View>
-            )} />
-          </View>
-          {tab === "avatars" || tab === "stars" ? null : tab === "frames" ? (
+          {tab === "avatars" ? null : tab === "frames" ? (
             <ScrollView style={styles.frameScroll} contentContainerStyle={styles.frameSections} showsVerticalScrollIndicator={false}>
               <Text style={styles.frameSectionTitle}>{t("shop.frameCategories.solid")}</Text>
               <View style={styles.frameGrid}>{COSMETICS.frames.slice(0, 6).map(renderFrameCard)}</View>
@@ -387,6 +362,8 @@ const styles = StyleSheet.create({
   tabRailHidden: { opacity: 0 },
   tab: { minHeight: 53, flexDirection: "row", alignItems: "center", gap: 9, paddingHorizontal: 11, borderRadius: 10, backgroundColor: "rgba(31,26,51,0.84)", borderWidth: 1, borderColor: "rgba(185,176,214,0.16)" },
   tabSelected: { backgroundColor: "rgba(124,92,255,0.25)", borderColor: theme.primary },
+  unavailableTab: { opacity: 0.55 },
+  unavailableTabPressed: { opacity: 0.38 },
   tabIconSlot: { width: 43, height: 43, alignItems: "center", justifyContent: "center" },
   tabIconImage: { width: 35, height: 35 },
   tabText: { flex: 1, color: theme.textDim, fontSize: 11, fontWeight: "800" },
@@ -396,7 +373,6 @@ const styles = StyleSheet.create({
   catalogueWithTabRail: { marginLeft: 136 },
   catalogueWithTabRailIos: { marginLeft: 150 },
   persistentAvatarCatalogue: { ...StyleSheet.absoluteFillObject, top: 43, paddingHorizontal: 11, paddingBottom: 11, opacity: 1 },
-  persistentStarCatalogue: { ...StyleSheet.absoluteFillObject, top: 43, paddingHorizontal: 11, paddingBottom: 11, opacity: 1 },
   persistentCatalogueHidden: { opacity: 0 },
   catalogueHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 7 },
   sectionTitle: { color: theme.text, fontSize: 17, fontWeight: "900" },
@@ -437,14 +413,4 @@ const styles = StyleSheet.create({
   inventoryItemName: { flex: 1, minWidth: 0, color: theme.text, fontSize: 10, fontWeight: "900" },
   inventoryItemState: { color: theme.textDim, fontSize: 7, fontWeight: "900", textTransform: "uppercase" },
   emptyInventory: { color: theme.textDim, fontSize: 10, fontWeight: "700", paddingVertical: 5 },
-  packList: { flexGrow: 1, alignItems: "center", gap: 9, paddingVertical: 5 },
-  starPack: { width: 124, height: 196, alignItems: "center", justifyContent: "center", borderRadius: 12, backgroundColor: "rgba(15,12,27,0.8)", borderWidth: 1, borderColor: "rgba(247,216,91,0.25)", padding: 10 },
-  starPackBest: { borderColor: "#F7D85B", backgroundColor: "rgba(72,58,20,0.45)" },
-  packBonus: { position: "absolute", top: 5, color: "#7CFFA0", fontSize: 8, fontWeight: "900", textTransform: "uppercase" },
-  packImage: { marginTop: 3, marginBottom: 2 },
-  packAmount: { color: "#F7D85B", fontSize: 18, fontWeight: "900", marginTop: 1 },
-  buyButton: { width: "100%", marginTop: 8, paddingVertical: 5, alignItems: "center", borderRadius: 7, backgroundColor: "rgba(124,92,255,0.7)" },
-  watchAdButton: { backgroundColor: "rgba(52,164,103,0.78)" },
-  comingSoonText: { color: "rgba(255,255,255,.72)", fontSize: 8, fontWeight: "800", marginTop: 1 },
-  buyText: { color: theme.text, fontSize: 11, fontWeight: "900" },
 });

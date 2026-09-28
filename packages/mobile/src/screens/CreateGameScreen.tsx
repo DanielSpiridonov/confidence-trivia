@@ -85,7 +85,7 @@ export function CreateGameScreen({ onCreate, deviceId, stars, registered, onSign
           <Text style={styles.sectionLabel}>{t("create.mode")}</Text>
           {modes.map((mode) => {
             const selected = gameMode === mode.id;
-            return <Pressable key={mode.id} onPress={() => selectMode(mode.id)} style={({ pressed }) => [styles.modeItem, selected && styles.modeItemSelected, pressed && styles.modeItemPressed]}>
+            return <Pressable key={mode.id} accessibilityRole="radio" accessibilityState={{ selected }} onPress={() => selectMode(mode.id)} style={({ pressed }) => [styles.modeItem, selected && styles.modeItemSelected, pressed && styles.modeItemPressed]}>
               <View style={[styles.modeIcon, selected && styles.modeIconSelected]}><MaterialCommunityIcons name={mode.icon} size={21} color={selected ? "#FFFFFF" : theme.textDim} /></View>
               <View style={styles.modeCopy}><Text style={styles.modeTitle}>{t(`create.${mode.id}`)}</Text><Text numberOfLines={1} style={styles.modeDetail}>{mode.detail}</Text></View>
               <MaterialCommunityIcons name="chevron-right" size={18} color={selected ? theme.primary : "rgba(185,176,214,0.42)"} />
@@ -104,14 +104,14 @@ export function CreateGameScreen({ onCreate, deviceId, stars, registered, onSign
               <View style={[styles.settingGroup, styles.classicFirstSetting]}>
                 <Text style={styles.fieldLabel}>{t("create.rounds")}</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.optionScroller}>
-                  {ROUND_OPTIONS.map((value) => <Pressable key={value} onPress={() => setRounds(value)} style={[styles.optionChip, rounds === value && styles.optionChipSelected]}><Text style={[styles.optionText, rounds === value && styles.optionTextSelected]}>{value}</Text></Pressable>)}
+                  {ROUND_OPTIONS.map((value) => <Pressable key={value} accessibilityRole="radio" accessibilityState={{ selected: rounds === value }} onPress={() => setRounds(value)} style={[styles.optionChip, rounds === value && styles.optionChipSelected]}><Text style={[styles.optionText, rounds === value && styles.optionTextSelected]}>{value}</Text></Pressable>)}
                 </ScrollView>
               </View>
               <View style={styles.settingGroup}>
                 <Text style={styles.fieldLabel}>{t("create.visibility")}</Text>
                 <View style={styles.segmentedControl}>{(["private", "public"] as const).map((value) => {
                   const selected = visibility === value;
-                  return <Pressable key={value} onPress={() => setVisibility(value)} style={[styles.segment, selected && styles.segmentSelected]}><MaterialCommunityIcons name={value === "private" ? "lock-outline" : "earth"} size={15} color={selected ? "#FFFFFF" : theme.textDim} /><Text style={[styles.segmentText, selected && styles.segmentTextSelected]}>{t(`create.${value}`)}</Text></Pressable>;
+                  return <Pressable key={value} accessibilityRole="radio" accessibilityState={{ selected }} onPress={() => setVisibility(value)} style={[styles.segment, selected && styles.segmentSelected]}><MaterialCommunityIcons name={value === "private" ? "lock-outline" : "earth"} size={15} color={selected ? "#FFFFFF" : theme.textDim} /><Text style={[styles.segmentText, selected && styles.segmentTextSelected]}>{t(`create.${value}`)}</Text></Pressable>;
                 })}</View>
               </View>
             </> : null}
@@ -123,7 +123,7 @@ export function CreateGameScreen({ onCreate, deviceId, stars, registered, onSign
               </ScrollView>
             </View> : null}
 
-            {gameMode === "friends" ? <ScrollView style={styles.friendsSettings} contentContainerStyle={styles.friendsSettingsContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            {gameMode === "friends" ? <View style={styles.friendsSettingsFrame}><ScrollView style={styles.friendsSettings} contentContainerStyle={styles.friendsSettingsContent} showsVerticalScrollIndicator persistentScrollbar keyboardShouldPersistTaps="handled">
               <View style={styles.friendsTopRow}>
                 <View style={styles.friendsTopGroup}>
                   <Text style={styles.fieldLabel}>{t("create.teamFormat")}</Text>
@@ -141,21 +141,21 @@ export function CreateGameScreen({ onCreate, deviceId, stars, registered, onSign
               <View style={[styles.segmentedControl, styles.friendsVisibility]}>{(["private", "public"] as const).map((value) => {
                 const selected = (customQuestions.length > 0 ? "private" : visibility) === value;
                 const disabled = customQuestions.length > 0 && value === "public";
-                return <Pressable key={value} disabled={disabled} onPress={() => setVisibility(value)} style={[styles.segment, selected && styles.segmentSelected, disabled && styles.disabledSegment]}><MaterialCommunityIcons name={value === "private" ? "lock-outline" : "earth"} size={14} color={selected ? "#FFFFFF" : theme.textDim} /><Text style={[styles.segmentText, selected && styles.segmentTextSelected]}>{t(`create.${value}`)}</Text></Pressable>;
+                return <Pressable key={value} accessibilityRole="radio" accessibilityState={{ selected, disabled }} disabled={disabled} onPress={() => setVisibility(value)} style={[styles.segment, selected && styles.segmentSelected, disabled && styles.disabledSegment]}><MaterialCommunityIcons name={value === "private" ? "lock-outline" : "earth"} size={14} color={selected ? "#FFFFFF" : theme.textDim} /><Text style={[styles.segmentText, selected && styles.segmentTextSelected]}>{t(`create.${value}`)}</Text></Pressable>;
               })}</View>
               <Text style={styles.fieldLabel}>{t("create.categories")}</Text>
               <View style={styles.categoryGrid}>{FRIEND_CATEGORIES.map((category) => {
                 const selected = friendCategories.includes(category);
-                return <Pressable key={category} onPress={() => setFriendCategories((current) => selected ? current.filter((item) => item !== category) : [...current, category])} style={[styles.categoryChip, selected && styles.categoryChipSelected]}><Text style={[styles.categoryText, selected && styles.categoryTextSelected]}>{t(`categories.${category}`, { defaultValue: category })}</Text></Pressable>;
+                return <Pressable key={category} accessibilityRole="checkbox" accessibilityState={{ checked: selected }} onPress={() => setFriendCategories((current) => selected ? current.filter((item) => item !== category) : [...current, category])} style={[styles.categoryChip, selected && styles.categoryChipSelected]}><Text style={[styles.categoryText, selected && styles.categoryTextSelected]}>{t(`categories.${category}`, { defaultValue: category })}</Text></Pressable>;
               })}</View>
-              <View style={styles.customHeader}><Text style={styles.fieldLabel}>{t("create.customQuestions")}</Text>{customQuestions.length < 5 ? <Pressable onPress={() => setCustomQuestions((current) => [...current, { question: "", answer: "" }])} style={styles.addQuestion}><MaterialCommunityIcons name="plus" size={16} color="#FFFFFF" /><Text style={styles.addQuestionText}>{t("create.addQuestion")}</Text></Pressable> : null}</View>
+              <View style={styles.customHeader}><Text style={styles.fieldLabel}>{t("create.customQuestions")}</Text>{customQuestions.length < 5 ? <Pressable accessibilityRole="button" onPress={() => setCustomQuestions((current) => [...current, { question: "", answer: "" }])} style={styles.addQuestion}><MaterialCommunityIcons name="plus" size={16} color="#FFFFFF" /><Text style={styles.addQuestionText}>{t("create.addQuestion")}</Text></Pressable> : null}</View>
               {customQuestions.map((item, index) => <View key={index} style={styles.customQuestionRow}>
                 <TextInput value={item.question} onChangeText={(question) => setCustomQuestions((current) => current.map((entry, itemIndex) => itemIndex === index ? { ...entry, question } : entry))} maxLength={160} placeholder={t("create.questionPlaceholder")} placeholderTextColor={theme.textDim} style={[styles.customInput, styles.questionInput]} />
                 <TextInput value={item.answer} onChangeText={(answer) => setCustomQuestions((current) => current.map((entry, itemIndex) => itemIndex === index ? { ...entry, answer } : entry))} maxLength={48} placeholder={t("create.answerPlaceholder")} placeholderTextColor={theme.textDim} style={styles.customInput} />
-                <Pressable accessibilityLabel={t("common.remove", { defaultValue: "Remove" })} onPress={() => setCustomQuestions((current) => current.filter((_, itemIndex) => itemIndex !== index))} style={styles.removeQuestion}><MaterialCommunityIcons name="close" size={17} color={theme.textDim} /></Pressable>
+                <Pressable accessibilityRole="button" accessibilityLabel={t("common.remove", { defaultValue: "Remove" })} onPress={() => setCustomQuestions((current) => current.filter((_, itemIndex) => itemIndex !== index))} style={styles.removeQuestion}><MaterialCommunityIcons name="close" size={17} color={theme.textDim} /></Pressable>
               </View>)}
               {customQuestions.length > 0 ? <Text style={styles.privateNote}>{t("create.customPrivateNote")}</Text> : null}
-            </ScrollView> : null}
+            </ScrollView><View pointerEvents="none" style={styles.scrollCue}><View style={styles.scrollCueTrack}><View style={styles.scrollCueThumb} /></View><MaterialCommunityIcons name="chevron-down" size={17} color="#B9AAFF" /></View></View> : null}
 
             {gameMode === "ranked" ? <View style={styles.rankedSummary}>
               {rankedLoading ? <Text style={styles.rankedLoading}>{t("ranked.loading")}</Text> : rankedProfile ? <>
@@ -167,7 +167,7 @@ export function CreateGameScreen({ onCreate, deviceId, stars, registered, onSign
             </View> : null}
           </View>
 
-          <BigButton label={gameMode === "ranked" || gameMode === "damage" ? (submitting ? t("create.queueing") : t("create.queue")) : (submitting ? t("create.creating") : t("create.create"))} onPress={handleSubmit} disabled={!trimmedName || submitting} style={styles.actionButton} />
+          <BigButton label={gameMode === "ranked" || gameMode === "damage" ? (submitting ? t("create.queueing") : t("create.queue")) : (submitting ? t("create.creating") : t("create.create"))} onPress={handleSubmit} disabled={!trimmedName || submitting} style={[styles.actionButton, gameMode === "friends" && styles.customActionButton]} />
         </View>
       </View>
       <FeedbackPopup notice={notice} onDismiss={clearFeedback} />
@@ -189,57 +189,62 @@ const styles = StyleSheet.create({
   modeTitle: { color: theme.text, fontSize: 14, fontWeight: "900" },
   modeDetail: { color: theme.textDim, fontSize: 9, fontWeight: "700", marginTop: 2 },
   configurationPanel: { flex: 1, minWidth: 0, paddingLeft: 2 },
-  playerRow: { minHeight: 45, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
+  playerRow: { minHeight: Platform.OS === "android" ? 49 : 45, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
   playerIdentity: { flex: 1, minWidth: 0 },
-  fieldLabel: { color: theme.textDim, fontSize: 10, fontWeight: "900", textTransform: "uppercase", marginBottom: 4 },
-  playerName: { color: theme.text, fontSize: 18, fontWeight: "900" },
-  modePill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 7, backgroundColor: "rgba(124,92,255,0.18)", borderWidth: 1, borderColor: "rgba(124,92,255,0.55)" },
-  modePillText: { color: "#C8BCFF", fontSize: 11, fontWeight: "900" },
+  fieldLabel: { color: theme.textDim, fontSize: Platform.OS === "android" ? 11 : 10, fontWeight: "900", textTransform: "uppercase", marginBottom: 4 },
+  playerName: { color: theme.text, fontSize: Platform.OS === "android" ? 20 : 18, fontWeight: "900" },
+  modePill: { paddingHorizontal: Platform.OS === "android" ? 14 : 12, paddingVertical: Platform.OS === "android" ? 7 : 6, borderRadius: 7, backgroundColor: "rgba(124,92,255,0.18)", borderWidth: 1, borderColor: "rgba(124,92,255,0.55)" },
+  modePillText: { color: "#C8BCFF", fontSize: Platform.OS === "android" ? 12 : 11, fontWeight: "900" },
   divider: { width: "100%", height: 1, backgroundColor: "rgba(185,176,214,0.2)", marginVertical: 8 },
   settingsArea: { flex: 1, minHeight: 0, justifyContent: "center" },
   friendsSettings: { flex: 1, minHeight: 0 },
-  friendsSettingsContent: { paddingVertical: 3, paddingRight: 4 },
+  friendsSettingsFrame: { flex: 1, minHeight: 0, position: "relative", paddingRight: 15 },
+  friendsSettingsContent: { paddingVertical: 3, paddingRight: 5, paddingBottom: 22 },
+  scrollCue: { position: "absolute", top: 2, right: 0, bottom: 1, width: 12, alignItems: "center" },
+  scrollCueTrack: { flex: 1, width: 3, borderRadius: 2, backgroundColor: "rgba(185,176,214,0.2)", overflow: "hidden" },
+  scrollCueThumb: { width: 3, height: 32, borderRadius: 2, backgroundColor: "#8E75FF" },
   friendsTopRow: { flexDirection: "row", gap: 12, marginBottom: 10 },
   friendsTopGroup: { width: "48%" },
   friendsRoundsGroup: { flex: 1, minWidth: 0 },
   friendsVisibility: { maxWidth: 280, marginBottom: 10 },
   disabledSegment: { opacity: 0.35 },
-  miniOption: { minWidth: 31, height: 32, marginRight: 5, borderRadius: 6, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(185,176,214,0.16)", backgroundColor: theme.surface },
-  miniOptionText: { color: theme.text, fontSize: 11, fontWeight: "900" },
+  miniOption: { minWidth: Platform.OS === "android" ? 34 : 31, height: Platform.OS === "android" ? 35 : 32, marginRight: 5, borderRadius: 6, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(185,176,214,0.16)", backgroundColor: theme.surface },
+  miniOptionText: { color: theme.text, fontSize: Platform.OS === "android" ? 12 : 11, fontWeight: "900" },
   categoryGrid: { flexDirection: "row", flexWrap: "wrap", gap: 5, marginBottom: 10 },
   categoryChip: { paddingHorizontal: 9, paddingVertical: 5, borderRadius: 6, borderWidth: 1, borderColor: "rgba(185,176,214,0.2)", backgroundColor: theme.surface },
   categoryChipSelected: { borderColor: theme.primary, backgroundColor: "#342A59" },
-  categoryText: { color: theme.textDim, fontSize: 9, fontWeight: "800", textTransform: "capitalize" },
+  categoryText: { color: theme.textDim, fontSize: Platform.OS === "android" ? 10 : 9, fontWeight: "800", textTransform: "capitalize" },
   categoryTextSelected: { color: "#C8BCFF" },
   customHeader: { minHeight: 27, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   addQuestion: { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: theme.primary },
   addQuestionText: { color: "#FFFFFF", fontSize: 9, fontWeight: "900" },
   customQuestionRow: { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 5 },
-  customInput: { width: "31%", height: 34, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 6, color: theme.text, fontSize: 10, fontWeight: "700", backgroundColor: "rgba(18,14,30,0.9)", borderWidth: 1, borderColor: "rgba(185,176,214,0.2)" },
+  customInput: { width: "31%", height: Platform.OS === "android" ? 38 : 34, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 6, color: theme.text, fontSize: Platform.OS === "android" ? 11 : 10, fontWeight: "700", backgroundColor: "rgba(18,14,30,0.9)", borderWidth: 1, borderColor: "rgba(185,176,214,0.2)" },
   questionInput: { flex: 1, width: undefined },
   removeQuestion: { width: 28, height: 28, alignItems: "center", justifyContent: "center" },
   privateNote: { color: "#D6C86A", fontSize: 9, fontWeight: "700", marginTop: 2 },
   settingGroup: { width: "100%", marginBottom: 13 },
   classicFirstSetting: { marginTop: 8 },
   optionScroller: { paddingRight: 8 },
-  optionChip: { minWidth: 45, height: 38, marginRight: 7, paddingHorizontal: 11, alignItems: "center", justifyContent: "center", borderRadius: 7, borderWidth: 1, borderColor: "rgba(185,176,214,0.16)", backgroundColor: theme.surface },
+  optionChip: { minWidth: Platform.OS === "android" ? 49 : 45, height: Platform.OS === "android" ? 42 : 38, marginRight: 7, paddingHorizontal: 11, alignItems: "center", justifyContent: "center", borderRadius: 7, borderWidth: 1, borderColor: "rgba(185,176,214,0.16)", backgroundColor: theme.surface },
   optionChipSelected: { borderColor: theme.primary, backgroundColor: "#342A59" },
-  optionText: { color: theme.text, fontSize: 13, fontWeight: "900" },
+  optionText: { color: theme.text, fontSize: Platform.OS === "android" ? 15 : 13, fontWeight: "900" },
   optionTextSelected: { color: "#B9AAFF" },
   wagerChipSelected: { borderColor: "#F7D85B", backgroundColor: "#342D20" },
   wagerTextSelected: { color: "#F7D85B" },
-  segmentedControl: { width: "100%", maxWidth: 310, height: 40, flexDirection: "row", padding: 3, borderRadius: 8, backgroundColor: "rgba(18,14,30,0.86)", borderWidth: 1, borderColor: "rgba(185,176,214,0.16)" },
+  segmentedControl: { width: "100%", maxWidth: 310, height: Platform.OS === "android" ? 44 : 40, flexDirection: "row", padding: 3, borderRadius: 8, backgroundColor: "rgba(18,14,30,0.86)", borderWidth: 1, borderColor: "rgba(185,176,214,0.16)" },
   segment: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: 6 },
   segmentSelected: { backgroundColor: theme.primary },
-  segmentText: { color: theme.textDim, fontSize: 12, fontWeight: "800" },
+  segmentText: { color: theme.textDim, fontSize: Platform.OS === "android" ? 13 : 12, fontWeight: "800" },
   segmentTextSelected: { color: "#FFFFFF" },
   rankedSummary: { width: "100%", minHeight: 80, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 16, paddingHorizontal: 16 },
   rankedBlock: { minWidth: 92, alignItems: "center" },
   rankedIdentity: { flexDirection: "row", alignItems: "center", gap: 5 },
-  rankedRank: { fontSize: 16, fontWeight: "900" },
-  rankedLp: { color: "#F7D85B", fontSize: 18, fontWeight: "900" },
+  rankedRank: { fontSize: Platform.OS === "android" ? 18 : 16, fontWeight: "900" },
+  rankedLp: { color: "#F7D85B", fontSize: Platform.OS === "android" ? 20 : 18, fontWeight: "900" },
   rankedDivider: { width: 1, height: 42, backgroundColor: "rgba(255,255,255,0.14)" },
   placements: { color: theme.textDim, fontSize: 10, fontWeight: "700", textAlign: "center" },
   rankedLoading: { color: theme.textDim, fontSize: 12, fontWeight: "700" },
   actionButton: { width: "100%", minHeight: Platform.OS === "android" ? 48 : 50, paddingVertical: Platform.OS === "android" ? 12 : 14, marginTop: 5 },
+  customActionButton: { transform: [{ translateY: 14 }] },
 });

@@ -99,6 +99,9 @@ export function BigButton({
 
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled }}
       onPress={handlePress}
       disabled={disabled}
       style={({ pressed }) => [
@@ -110,7 +113,7 @@ export function BigButton({
         pressed && !disabled && styles.buttonPressed,
       ]}
     >
-      <Text style={[styles.buttonText, variant === "secondary" && styles.buttonTextSecondary, textStyle]}>
+      <Text maxFontSizeMultiplier={1.35} style={[styles.buttonText, variant === "secondary" && styles.buttonTextSecondary, textStyle]}>
         {label}
       </Text>
     </Pressable>
@@ -118,11 +121,11 @@ export function BigButton({
 }
 
 export function Title({ children }: { children: React.ReactNode }) {
-  return <Text style={styles.title}>{children}</Text>;
+  return <Text maxFontSizeMultiplier={1.3} style={styles.title}>{children}</Text>;
 }
 
 export function Subtitle({ children }: { children: React.ReactNode }) {
-  return <Text style={styles.subtitle}>{children}</Text>;
+  return <Text maxFontSizeMultiplier={1.4} style={styles.subtitle}>{children}</Text>;
 }
 
 export function BackIconButton({ label, onPress, disabled = false }: { label: string; onPress: () => void; disabled?: boolean }) {
@@ -130,6 +133,7 @@ export function BackIconButton({ label, onPress, disabled = false }: { label: st
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={{ disabled }}
       disabled={disabled}
       hitSlop={10}
       onPress={onPress}

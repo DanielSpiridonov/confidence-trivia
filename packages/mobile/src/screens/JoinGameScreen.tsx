@@ -18,7 +18,7 @@ export function JoinGameScreen({
   const { t } = useTranslation();
   const [code, setCode] = useState("");
   const [search, setSearch] = useState("");
-  const [modeFilter, setModeFilter] = useState<"all" | "classic" | "ranked" | "damage">("all");
+  const [modeFilter, setModeFilter] = useState<"all" | "classic" | "friends" | "ranked" | "damage">("all");
   const [rooms, setRooms] = useState<PublicRoomListing[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [joiningRoomId, setJoiningRoomId] = useState<string | null>(null);
@@ -110,10 +110,10 @@ export function JoinGameScreen({
             onChangeText={setSearch}
           />
           <View style={styles.filterRow}>
-            {(["all", "classic"] as const).map((mode) => {
+            {(["all", "classic", "friends"] as const).map((mode) => {
               const selected = modeFilter === mode;
               return (
-                <Pressable key={mode} onPress={() => setModeFilter(mode)} style={[styles.filterChip, selected && styles.filterChipSelected]}>
+                <Pressable key={mode} accessibilityRole="radio" accessibilityState={{ selected }} onPress={() => setModeFilter(mode)} style={[styles.filterChip, selected && styles.filterChipSelected]}>
                   <Text numberOfLines={1} style={[styles.filterText, selected && styles.filterTextSelected]}>{t(`join.filters.${mode}`)}</Text>
                 </Pressable>
               );

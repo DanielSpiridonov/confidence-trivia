@@ -94,12 +94,10 @@ export function VolumeControl({
 }
 
 export function SettingsScreen({
-  locale,
   soundEffectsVolume,
   musicVolume,
   hapticsEnabled,
   highContrastEnabled,
-  onChangeLocale,
   onChangeSoundEffectsVolume,
   onChangeMusicVolume,
   onChangeHapticsEnabled,
@@ -110,12 +108,10 @@ export function SettingsScreen({
   onFeedback,
   onBack,
 }: {
-  locale: "en" | "bg";
   soundEffectsVolume: number;
   musicVolume: number;
   hapticsEnabled: boolean;
   highContrastEnabled: boolean;
-  onChangeLocale: (locale: "en" | "bg") => void;
   onChangeSoundEffectsVolume: (volume: number) => void;
   onChangeMusicVolume: (volume: number) => void;
   onChangeHapticsEnabled: (enabled: boolean) => void;
@@ -174,8 +170,20 @@ export function SettingsScreen({
       case "language":
         return (
           <View style={styles.panelContent}>
-            <BigButton label={t("settings.english")} onPress={() => onChangeLocale("en")} variant={locale === "en" ? "primary" : "secondary"} style={styles.languageButton} />
-            <BigButton label={t("settings.bulgarian")} onPress={() => onChangeLocale("bg")} variant={locale === "bg" ? "primary" : "secondary"} style={styles.languageButton} />
+            <BigButton label={t("settings.english")} onPress={() => undefined} variant="primary" style={styles.languageButton} />
+            <Text style={styles.languageGroupLabel}>{t("settings.comingSoon")}</Text>
+            <View style={styles.comingSoonLanguages}>
+              {["bulgarian", "spanish", "german", "french"].map((language) => (
+                <BigButton
+                  key={language}
+                  label={t(`settings.${language}`)}
+                  onPress={() => undefined}
+                  disabled
+                  variant="secondary"
+                  style={styles.comingSoonLanguageButton}
+                />
+              ))}
+            </View>
           </View>
         );
       case "accessibility":
@@ -196,6 +204,8 @@ export function SettingsScreen({
           {(["sounds", "haptics", "language", "accessibility", "redeem", "report"] as const).map((value) => (
             <Pressable
               key={value}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: section === value }}
               onPress={() => setSection(value)}
               style={[styles.sectionButton, section === value && styles.sectionButtonSelected]}
             >
@@ -226,6 +236,9 @@ const styles = StyleSheet.create({
   panelTitle: { color: theme.text, fontSize: 18, fontWeight: "800", marginBottom: 8 },
   panelContent: { width: "100%", maxWidth: 520 },
   languageButton: { width: "100%", minWidth: 0 },
+  languageGroupLabel: { color: theme.textDim, fontSize: 13, fontWeight: "800", marginTop: 14, marginBottom: 7, textTransform: "uppercase" },
+  comingSoonLanguages: { width: "100%", flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  comingSoonLanguageButton: { width: "48%", minWidth: 0, flexGrow: 1, marginVertical: 0 },
   toggleRow: { width: "100%", minHeight: 54, backgroundColor: theme.surface, borderRadius: 8, paddingHorizontal: 16, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   toggleLabel: { color: theme.text, fontSize: 15, fontWeight: "800", flexShrink: 1, marginRight: 12 },
   toggleTrack: { width: 46, height: 26, borderRadius: 13, padding: 3, backgroundColor: "rgba(185, 176, 214, 0.3)" },
