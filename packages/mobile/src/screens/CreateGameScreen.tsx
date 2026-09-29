@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Animated, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { DAMAGE_WAGER_OPTIONS, DEFAULT_DAMAGE_WAGER, DEFAULT_ROUND_COUNT, getRankedDivision, RANKED_PLACEMENT_MATCHES } from "@confidence-trivia/shared";
@@ -38,6 +38,20 @@ export function CreateGameScreen({ onCreate, deviceId, stars, registered, onSign
   const { notice, showFeedback, clearFeedback } = useFeedbackPopup();
   const { dialog, showDialog, dismissDialog, confirmDialog } = useGameDialog();
   const trimmedName = initialName.trim();
+  const customScrollY = React.useRef(new Animated.Value(0)).current;
+  const [customViewportHeight, setCustomViewportHeight] = React.useState(0);
+  const [customContentHeight, setCustomContentHeight] = React.useState(0);
+  const [customTrackHeight, setCustomTrackHeight] = React.useState(0);
+  const customMaxScroll = Math.max(0, customContentHeight - customViewportHeight);
+  const customThumbHeight = customContentHeight > 0
+    ? Math.max(28, Math.min(customTrackHeight, customTrackHeight * customViewportHeight / customContentHeight))
+    : 28;
+  const customThumbTravel = Math.max(0, customTrackHeight - customThumbHeight);
+  const customThumbTranslate = customScrollY.interpolate({
+    inputRange: [0, Math.max(1, customMaxScroll)],
+    outputRange: [0, customThumbTravel],
+    extrapolate: "clamp",
+  });
 
   React.useEffect(() => {
     if (gameMode !== "ranked") return;
@@ -123,7 +137,16 @@ export function CreateGameScreen({ onCreate, deviceId, stars, registered, onSign
               </ScrollView>
             </View> : null}
 
-            {gameMode === "friends" ? <View style={styles.friendsSettingsFrame}><ScrollView style={styles.friendsSettings} contentContainerStyle={styles.friendsSettingsContent} showsVerticalScrollIndicator persistentScrollbar keyboardShouldPersistTaps="handled">
+            {gameMode === "friends" ? <View style={styles.friendsSettingsFrame}><ScrollView
+              style={styles.friendsSettings}
+              contentContainerStyle={styles.friendsSettingsContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              scrollEventThrottle={16}
+              onLayout={(event) => setCustomViewportHeight(event.nativeEvent.layout.height)}
+              onContentSizeChange={(_, height) => setCustomContentHeight(height)}
+              onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: customScrollY } } }], { useNativeDriver: false })}
+            >
               <View style={styles.friendsTopRow}>
                 <View style={styles.friendsTopGroup}>
                   <Text style={styles.fieldLabel}>{t("create.teamFormat")}</Text>
@@ -155,7 +178,7 @@ export function CreateGameScreen({ onCreate, deviceId, stars, registered, onSign
                 <Pressable accessibilityRole="button" accessibilityLabel={t("common.remove", { defaultValue: "Remove" })} onPress={() => setCustomQuestions((current) => current.filter((_, itemIndex) => itemIndex !== index))} style={styles.removeQuestion}><MaterialCommunityIcons name="close" size={17} color={theme.textDim} /></Pressable>
               </View>)}
               {customQuestions.length > 0 ? <Text style={styles.privateNote}>{t("create.customPrivateNote")}</Text> : null}
-            </ScrollView><View pointerEvents="none" style={styles.scrollCue}><View style={styles.scrollCueTrack}><View style={styles.scrollCueThumb} /></View><MaterialCommunityIcons name="chevron-down" size={17} color="#B9AAFF" /></View></View> : null}
+            </ScrollView>{customMaxScroll > 1 ? <View pointerEvents="none" style={styles.scrollCue}><View onLayout={(event) => setCustomTrackHeight(event.nativeEvent.layout.height)} style={styles.scrollCueTrack}><Animated.View style={[styles.scrollCueThumb, { height: customThumbHeight, transform: [{ translateY: customThumbTranslate }] }]} /></View></View> : null}</View> : null}
 
             {gameMode === "ranked" ? <View style={styles.rankedSummary}>
               {rankedLoading ? <Text style={styles.rankedLoading}>{t("ranked.loading")}</Text> : rankedProfile ? <>

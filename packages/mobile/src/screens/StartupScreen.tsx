@@ -1,10 +1,10 @@
 import React from "react";
-import { ActivityIndicator, Image, Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Image, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { Ionicons } from "@expo/vector-icons";
 import { ANDROID_MENU_UI_SCALE, BigButton, Screen, theme } from "../components/ui";
 
-const EMBLEM = require("../../assets/startup-emblem-fast.png");
+const EMBLEM = require("../../assets/emblem-logo.png");
 
 export type StartupState = "idle" | "loading" | "error";
 
@@ -15,10 +15,10 @@ export function StartupScreen({
   state,
   stage,
   error,
-  communityUrl,
-  legalUrl,
   onStart,
   onRepair,
+  onCommunity,
+  onLegal,
   onAccount,
 }: {
   accountName: string;
@@ -27,10 +27,10 @@ export function StartupScreen({
   state: StartupState;
   stage: "assets" | "connecting" | null;
   error: string | null;
-  communityUrl: string | null;
-  legalUrl: string | null;
   onStart: () => void;
   onRepair: () => void;
+  onCommunity: () => void;
+  onLegal: () => void;
   onAccount: () => void;
 }) {
   const { t } = useTranslation();
@@ -49,14 +49,14 @@ export function StartupScreen({
         <UtilityButton
           icon="logo-discord"
           label={t("startup.community")}
-          onPress={() => communityUrl && void Linking.openURL(communityUrl)}
-          disabled={!communityUrl || loading}
+          onPress={onCommunity}
+          disabled={loading}
         />
         <UtilityButton
           icon="document-text-outline"
           label={t("startup.legal")}
-          onPress={() => legalUrl && void Linking.openURL(legalUrl)}
-          disabled={!legalUrl || loading}
+          onPress={onLegal}
+          disabled={loading}
         />
         <UtilityButton icon="person-circle-outline" label={t("startup.account")} onPress={onAccount} disabled={loading} />
       </View>

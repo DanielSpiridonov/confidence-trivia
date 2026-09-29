@@ -14,7 +14,7 @@ const RANKED_TROPHY_IMAGE: number = require("../../assets/ui-thumbnails/trophy.p
 const SHOP_IMAGE: number = require("../../assets/ui-thumbnails/shop.png");
 const INVENTORY_MENU_IMAGE: number = require("../../assets/inventory-icon.png");
 const FRIENDS_MENU_IMAGE: number = require("../../assets/friends-icon.png");
-const NEWS_MENU_IMAGE: number = require("../../assets/news-icon.png");
+const INBOX_MENU_IMAGE: number = require("../../assets/news-icon.png");
 const DEFAULT_AVATAR_HEAD_IMAGE: number = require("../../assets/avatar-heads/smart-owl.png");
 const AVATAR_HEAD_IMAGES: Record<string, number> = {
   smart_owl: DEFAULT_AVATAR_HEAD_IMAGE,
@@ -95,10 +95,10 @@ export function HomeScreen({
   onJoin,
   onProfile,
   onFriends,
-  onNews,
+  onInbox,
   onInventory,
   friendRequestCount,
-  unreadNewsCount,
+  unreadInboxCount,
   deviceId,
   onRanked,
   onShop,
@@ -112,10 +112,10 @@ export function HomeScreen({
   onJoin: () => void;
   onProfile: () => void;
   onFriends: () => void;
-  onNews: () => void;
+  onInbox: () => void;
   onInventory: () => void;
   friendRequestCount: number;
-  unreadNewsCount: number;
+  unreadInboxCount: number;
   deviceId: string | null;
   onRanked: () => void;
   onShop: () => void;
@@ -135,7 +135,7 @@ export function HomeScreen({
   const celebrationScale = React.useRef(new Animated.Value(0.94)).current;
   const menuProgress = React.useRef(new Animated.Value(0)).current;
   const isAndroid = Platform.OS === "android";
-  const totalNotifications = friendRequestCount + unreadNewsCount;
+  const totalNotifications = friendRequestCount + unreadInboxCount;
 
   function toggleMenu() {
     const nextOpen = !menuOpen;
@@ -260,7 +260,7 @@ export function HomeScreen({
           ? [{ translateX: menuProgress.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }) }]
           : [{ translateX: menuProgress.interpolate({ inputRange: [0, 1], outputRange: [44, 0] }) }, { scale: menuProgress.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] }) }]
         }]}>
-          <Pressable accessibilityRole="button" accessibilityLabel={t("news.title")} onPress={() => openFromMenu(onNews)} style={({ pressed }) => [styles.menuItemButton, pressed && styles.profileButtonPressed]}><Image source={NEWS_MENU_IMAGE} defaultSource={NEWS_MENU_IMAGE} fadeDuration={0} resizeMode="contain" style={styles.menuItemIcon} /><Text numberOfLines={1} style={styles.profileLabel}>{t("news.shortTitle")}</Text><NotificationBadge count={unreadNewsCount} /></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel={t("inbox.title")} onPress={() => openFromMenu(onInbox)} style={({ pressed }) => [styles.menuItemButton, pressed && styles.profileButtonPressed]}><Image source={INBOX_MENU_IMAGE} defaultSource={INBOX_MENU_IMAGE} fadeDuration={0} resizeMode="contain" style={styles.menuItemIcon} /><Text numberOfLines={1} style={styles.profileLabel}>{t("inbox.shortTitle")}</Text><NotificationBadge count={unreadInboxCount} /></Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel={t("home.friends")} onPress={() => openFromMenu(onFriends)} style={({ pressed }) => [styles.menuItemButton, pressed && styles.profileButtonPressed]}><Image source={FRIENDS_MENU_IMAGE} defaultSource={FRIENDS_MENU_IMAGE} fadeDuration={0} resizeMode="contain" style={styles.menuItemIcon} /><Text numberOfLines={1} style={styles.profileLabel}>{t("home.friends")}</Text><NotificationBadge count={friendRequestCount} /></Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel={t("shop.tabs.inventory")} onPress={() => openFromMenu(onInventory)} style={({ pressed }) => [styles.menuItemButton, pressed && styles.profileButtonPressed]}><Image source={INVENTORY_MENU_IMAGE} defaultSource={INVENTORY_MENU_IMAGE} fadeDuration={0} resizeMode="contain" style={styles.menuItemIcon} /><Text numberOfLines={1} style={styles.profileLabel}>{t("shop.tabs.inventory")}</Text></Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel={t("home.profile")} onPress={() => openFromMenu(onProfile)} style={({ pressed }) => [styles.menuItemButton, pressed && styles.profileButtonPressed]}><Image source={avatarHead} defaultSource={avatarHead} fadeDuration={0} resizeMode="contain" style={styles.profileAvatar} /><Text numberOfLines={1} style={styles.profileLabel}>{t("home.profile")}</Text></Pressable>

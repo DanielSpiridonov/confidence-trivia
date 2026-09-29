@@ -312,8 +312,8 @@ export async function createPlayerChallenge(challengerId: string, challengedId: 
     if (!eligible) return { ok: false, error: "Player is not online" };
     await sql`update public.player_challenges set status = 'expired' where status = 'pending' and expires_at <= now()`;
     const [challenge] = await sql<{ id: string }[]>`
-      insert into public.player_challenges (challenger_id, challenged_id, damage_wager)
-      values (${challengerId}, ${challengedId}, ${damageWager}) returning id
+      insert into public.player_challenges (challenger_id, challenged_id, damage_wager, expires_at)
+      values (${challengerId}, ${challengedId}, ${damageWager}, now() + interval '1 minute') returning id
     `;
     return { ok: true, challengeId: challenge.id };
   } catch (error) { logServerError("Could not create challenge", error); return { ok: false, error: "Could not send challenge" }; }

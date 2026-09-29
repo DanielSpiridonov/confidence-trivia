@@ -293,6 +293,11 @@
     "community": "Community",
     "legal": "Legal",
     "account": "Account",
+    "leaveGameTitle": "Leave Confivia?",
+    "leaveGameMessage": "You are about to leave the game and open an external website or app.",
+    "stayInGame": "Stay",
+    "continueOutside": "Continue",
+    "externalOpenFailed": "Could not open the external link",
     "connectedAs": "Connected as {{name}}",
     "accountRequired": "Connected account required",
     "connectHint": "Open Account to connect before starting.",
@@ -449,10 +454,19 @@
     "music": "Music",
     "musicComingSoon": "Ready for future music"
   },
-  "news": {
-    "title": "News",
-    "shortTitle": "News",
-    "empty": "There are no updates yet.",
+  "inbox": {
+    "title": "Inbox",
+    "shortTitle": "Inbox",
+    "challenges": "Challenges",
+    "news": "News",
+    "emptyChallenges": "You have no pending challenges.",
+    "emptyNews": "There are no updates yet.",
+    "delete": "Delete",
+    "readAll": "Read All",
+    "deleteAll": "Delete All",
+    "markRead": "Mark {{title}} as read",
+    "deleteFailed": "This Inbox item could not be deleted.",
+    "deleteSomeFailed": "Some challenges could not be deleted.",
     "retry": "Try Again"
   },
   "common": {

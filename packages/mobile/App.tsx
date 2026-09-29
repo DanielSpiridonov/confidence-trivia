@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Animated, AppState, Image, Keyboard, Platform, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
+import { Animated, AppState, Image, Keyboard, Linking, Platform, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import { FontAwesome5 } from "@expo/vector-icons";
 import * as NavigationBar from "expo-navigation-bar";
 import { useKeepAwake } from "expo-keep-awake";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -29,7 +30,7 @@ import { ShopScreen } from "./src/screens/ShopScreen";
 import { ProfileScreen } from "./src/screens/ProfileScreen";
 import { RulesScreen } from "./src/screens/RulesScreen";
 import { FriendsScreen } from "./src/screens/FriendsScreen";
-import { NewsScreen } from "./src/screens/NewsScreen";
+import { InboxScreen } from "./src/screens/InboxScreen";
 import { StartupScreen, StartupState } from "./src/screens/StartupScreen";
 import { AccountProfile, claimDailyReward, createRoom, DailyRewardStatus, deleteAccount, getAccountProfile, getChallenges, getDailyRewardStatus, getFriends, getNews, getPlayerStars, joinPublicRoom, joinRoom, linkPlayerAccount, NewsPost, PlayerChallenge, reconnectRoom, respondChallenge, updateAccountName, updatePresence, useRoomState } from "./src/network/client";
 import { prepareSoundEffects, setSoundEffectsVolume, stopAllSoundEffects } from "./src/audio/sounds";
@@ -52,7 +53,7 @@ const MINIMUM_STARTUP_CHECK_MS = 3_000;
 const MINIMUM_ASSET_STAGE_MS = 900;
 const RECENT_QUESTION_LIMIT = 40;
 const UI_PRELOAD_IMAGES = [
-  require("./assets/startup-emblem-fast.png"),
+  require("./assets/emblem-logo.png"),
   ...RANK_IMAGE_SOURCES,
   require("./assets/avatar-thumbnails/smart-owl.png"),
   require("./assets/avatar-thumbnails/fox.png"),
@@ -202,9 +203,10 @@ export default function App() {
   const [startupState, setStartupState] = useState<StartupState>("idle");
   const [startupStage, setStartupStage] = useState<"assets" | "connecting" | null>(null);
   const [startupError, setStartupError] = useState<string | null>(null);
-  const [newsOpen, setNewsOpen] = useState(false);
+  const [inboxOpen, setInboxOpen] = useState(false);
   const [friendRequestCount, setFriendRequestCount] = useState(0);
   const [unreadNewsCount, setUnreadNewsCount] = useState(0);
+  const [pendingChallengeCount, setPendingChallengeCount] = useState(0);
   const [shopRequest, setShopRequest] = useState<{ tab: "featured" | "inventory"; id: number }>({ tab: "featured", id: 0 });
   const [room, setRoom] = useState<Room | null>(null);
   const [locale, setLocale] = useState<"en" | "bg">("en");
@@ -270,11 +272,22 @@ export default function App() {
     return () => clearInterval(interval);
   }, [deviceId, hasEnteredApp, nav, refreshNotificationCounts, registeredAccount]);
 
-  const handleNewsViewed = React.useCallback((posts: NewsPost[]) => {
+  const handleNewsViewed = React.useCallback(async (posts: NewsPost[]) => {
     if (!deviceId) return;
     const postIds = posts.map((post) => post.id);
-    setUnreadNewsCount(0);
-    void AsyncStorage.setItem(`${NEWS_READ_STORAGE_PREFIX}:${deviceId}:${locale}`, JSON.stringify(postIds));
+    const key = `${NEWS_READ_STORAGE_PREFIX}:${deviceId}:${locale}`;
+    let readIds = new Set<string>();
+    try {
+      const saved = await AsyncStorage.getItem(key);
+      const parsed = saved ? JSON.parse(saved) : [];
+      if (Array.isArray(parsed)) readIds = new Set(parsed.filter((id): id is string => typeof id === "string"));
+    } catch {
+      // Replace invalid local read history.
+    }
+    const newlyReadCount = postIds.filter((id) => !readIds.has(id)).length;
+    postIds.forEach((id) => readIds.add(id));
+    setUnreadNewsCount((count) => Math.max(0, count - newlyReadCount));
+    await AsyncStorage.setItem(key, JSON.stringify([...readIds])).catch(() => undefined);
   }, [deviceId, locale]);
 
   useEffect(() => {
@@ -480,6 +493,18 @@ export default function App() {
     await AsyncStorage.removeItem(RECENT_QUESTIONS_STORAGE_KEY).catch(() => undefined);
     intentionalLeaveRef.current = false;
     await runStartupChecks(false);
+  }
+
+  function confirmExternalNavigation(url: string) {
+    showDialog({
+      title: i18n.t("startup.leaveGameTitle"),
+      message: i18n.t("startup.leaveGameMessage"),
+      cancelLabel: i18n.t("startup.stayInGame"),
+      confirmLabel: i18n.t("startup.continueOutside"),
+      onConfirm: () => void Linking.openURL(url).catch(() => {
+        showFeedback(i18n.t("startup.externalOpenFailed"));
+      }),
+    });
   }
 
   async function handleSocialSignIn(provider: "google" | "apple") {
@@ -818,6 +843,7 @@ export default function App() {
   useEffect(() => {
     if (!hasEnteredApp || !registeredAccount || !deviceId) {
       setIncomingChallenge(null);
+      setPendingChallengeCount(0);
       return;
     }
     if (nav === "in-room") {
@@ -834,8 +860,10 @@ export default function App() {
         await updatePresence(deviceId, true);
         const challenges = await getChallenges(deviceId);
         if (cancelled) return;
-        const incoming = challenges.find((challenge) => challenge.status === "pending" && challenge.challengedId === deviceId) ?? null;
+        const pendingChallenges = challenges.filter((challenge) => challenge.status === "pending" && challenge.challengedId === deviceId);
+        const incoming = pendingChallenges[0] ?? null;
         setIncomingChallenge(incoming);
+        setPendingChallengeCount(pendingChallenges.length);
         const accepted = challenges.find((challenge) => challenge.status === "accepted" && !handledChallengeIds.current.has(challenge.id));
         if (accepted) await enterChallengeLobby(accepted);
       } catch {
@@ -860,6 +888,7 @@ export default function App() {
       setRoomRecovery(null);
       setRoomRecoveryMessage(null);
       setIncomingChallenge(null);
+      setPendingChallengeCount((count) => Math.max(0, count - 1));
       setNav("in-room");
     } catch (error) {
       showFeedback(i18n.t("friends.challengeFailed"), error instanceof Error ? error.message : i18n.t("feedback.tryAgain"));
@@ -916,8 +945,6 @@ export default function App() {
           state={startupState}
           stage={startupStage}
           error={startupError}
-          communityUrl={COMMUNITY_URL}
-          legalUrl={LEGAL_URL}
           onStart={() => void runStartupChecks(true)}
           onRepair={() => showDialog({
             title: i18n.t("startup.repairConfirmTitle"),
@@ -926,6 +953,8 @@ export default function App() {
             confirmLabel: i18n.t("startup.repairConfirm"),
             onConfirm: () => void handleRepairClient(),
           })}
+          onCommunity={() => confirmExternalNavigation(COMMUNITY_URL)}
+          onLegal={() => confirmExternalNavigation(LEGAL_URL)}
           onAccount={() => setNav("profile")}
         />
       ) : null}
@@ -941,9 +970,9 @@ export default function App() {
           onJoin={() => setNav("join")}
           onProfile={() => setNav("profile")}
           onFriends={() => openRegisteredFeature("friends", () => setNav("friends"))}
-          onNews={() => setNewsOpen(true)}
+          onInbox={() => setInboxOpen(true)}
           friendRequestCount={friendRequestCount}
-          unreadNewsCount={unreadNewsCount}
+          unreadInboxCount={unreadNewsCount + pendingChallengeCount}
           onInventory={() => openRegisteredFeature("shop", () => openShop("inventory"))}
           deviceId={deviceId}
           onRanked={() => openRegisteredFeature("ranked", () => setNav("ranked"))}
@@ -1028,15 +1057,15 @@ export default function App() {
       {nav === "home" ? (
         <>
           <Pressable accessibilityRole="button" accessibilityLabel={i18n.t("home.ruleBook")} onPress={() => setNav("rules")} style={({ pressed }) => [styles.homeSettingsButton, styles.homeRulesButton, { right: rulesButtonRight }, pressed && styles.homeSettingsButtonPressed]}>
-            <Text style={styles.homeRulesIcon}>?</Text>
+            <FontAwesome5 name="book" solid size={19} color={theme.text} style={styles.homeRulesIcon} />
           </Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel={i18n.t("home.settings")} onPress={() => setNav("settings")} style={({ pressed }) => [styles.homeSettingsButton, { right: settingsButtonRight }, pressed && styles.homeSettingsButtonPressed]}>
             <Text style={styles.homeSettingsIcon}>{"\u2699"}</Text>
           </Pressable>
         </>
       ) : null}
-      {nav === "home" && newsOpen ? <NewsScreen onPostsViewed={handleNewsViewed} onBack={() => setNewsOpen(false)} /> : null}
-      {incomingChallenge && deviceId ? (
+      {nav === "home" && inboxOpen ? <InboxScreen playerId={deviceId} initialCategory={pendingChallengeCount > 0 ? "challenges" : "news"} onPostsViewed={handleNewsViewed} onChallengeCountChange={setPendingChallengeCount} onAcceptChallenge={(challenge) => { setInboxOpen(false); setIncomingChallenge(null); void enterChallengeLobby(challenge); }} onBack={() => setInboxOpen(false)} /> : null}
+      {incomingChallenge && deviceId && !inboxOpen ? (
         <Animated.View style={[styles.challengePopup, { opacity: challengeOpacity }]}>
           <Text style={styles.challengePopupTitle}>{i18n.t("friends.challengeIncoming", { player: incomingChallenge.challengerName })}</Text>
           <Text style={styles.challengePopupMode}>{i18n.t("friends.challengeMode", { wager: incomingChallenge.damageWager })}</Text>
@@ -1294,7 +1323,7 @@ const styles = StyleSheet.create({
   },
   homeSettingsButtonPressed: { opacity: 0.7, transform: [{ scale: 0.96 }] },
   homeRulesButton: { right: 190 },
-  homeRulesIcon: { color: theme.text, fontSize: 23, lineHeight: 26, fontWeight: "900" },
+  homeRulesIcon: { transform: [{ rotate: "-12deg" }] },
   homeSettingsIcon: { color: theme.text, fontSize: 24, lineHeight: 27, fontWeight: "800" },
   challengePopup: { position: "absolute", top: 68, right: 18, zIndex: 60, width: 270, borderRadius: 13, padding: 12, backgroundColor: "rgba(31,26,51,0.98)", borderWidth: 1, borderColor: "rgba(185,176,214,0.5)", shadowColor: "#000", shadowOpacity: 0.35, shadowRadius: 8, elevation: 8 },
   challengePopupTitle: { color: theme.text, fontSize: 13, fontWeight: "900" },

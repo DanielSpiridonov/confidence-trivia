@@ -18,7 +18,7 @@
       "backgroundColor": "#14101F"
     },
     "splash": {
-      "image": "./assets/loading-emblem.png",
+      "image": "./assets/emblem-logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#14101F"
     },
@@ -33,7 +33,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/loading-emblem.png",
+        "foregroundImage": "./assets/emblem-logo.png",
         "backgroundColor": "#32105F"
       },
       "permissions": ["android.permission.MODIFY_AUDIO_SETTINGS"],

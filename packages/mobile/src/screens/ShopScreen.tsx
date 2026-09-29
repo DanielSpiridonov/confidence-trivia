@@ -263,7 +263,7 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
             <Text style={styles.sectionTitle}>{t(`shop.tabs.${tab}`)}</Text>
             <Text style={styles.previewBadge}>{tab === "inventory" ? t("shop.ownedItems") : tab === "frames" ? t("shop.playerBordersPreview") : t("shop.starPricedCosmetics")}</Text>
           </View>
-          <View pointerEvents={tab === "avatars" ? "auto" : "none"} style={[styles.persistentAvatarCatalogue, tab !== "avatars" && styles.persistentCatalogueHidden]}>
+          <View pointerEvents={tab === "avatars" ? "auto" : "none"} style={[styles.persistentCatalogue, tab !== "avatars" && styles.persistentCatalogueHidden]}>
             <FlatList data={COSMETICS.avatars} numColumns={3} keyExtractor={(item) => item.id} columnWrapperStyle={styles.cosmeticRow} contentContainerStyle={styles.cosmeticList} showsVerticalScrollIndicator={false} renderItem={({ item }) => {
               const price = getCosmeticStarPrice("avatar", item.id);
               const locked = item.id === "omniscient_avatar" && rankKey !== "omniscient";
@@ -276,14 +276,25 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
               );
             }} />
           </View>
-          {tab === "avatars" ? null : tab === "frames" ? (
+          <View pointerEvents={tab === "frames" ? "auto" : "none"} style={[styles.persistentCatalogue, tab !== "frames" && styles.persistentCatalogueHidden]}>
             <ScrollView style={styles.frameScroll} contentContainerStyle={styles.frameSections} showsVerticalScrollIndicator={false}>
               <Text style={styles.frameSectionTitle}>{t("shop.frameCategories.solid")}</Text>
               <View style={styles.frameGrid}>{COSMETICS.frames.slice(0, 6).map(renderFrameCard)}</View>
               <Text style={styles.frameSectionTitle}>{t("shop.frameCategories.animated")}</Text>
               <View style={styles.frameGrid}>{COSMETICS.frames.slice(6).map(renderFrameCard)}</View>
             </ScrollView>
-          ) : tab === "inventory" ? (
+          </View>
+          <View pointerEvents={tab === "featured" ? "auto" : "none"} style={[styles.persistentCatalogue, tab !== "featured" && styles.persistentCatalogueHidden]}>
+            <FlatList data={COSMETICS.featured} numColumns={3} keyExtractor={(item) => item.id} columnWrapperStyle={styles.cosmeticRow} contentContainerStyle={styles.cosmeticList} showsVerticalScrollIndicator={false} renderItem={({ item }) => (
+              <Pressable onPress={() => void equipColor(item.id)} style={[styles.cosmeticCard, item.id === equippedNameColorId && styles.cosmeticCardEquipped]}>
+                {item.tag ? <Text style={styles.itemTag}>{item.tag}</Text> : null}
+                <View style={[styles.shopColorDot, { backgroundColor: item.color }]} />
+                <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={[styles.cosmeticName, { color: item.color }]}>{displayName || t("ranked.player")}</Text>
+                <CosmeticStatus equipped={item.id === equippedNameColorId} equipping={equippingIds.has(item.id)} owned={ownedCosmeticIds.has(item.id)} price={getCosmeticStarPrice("name_color", item.id)} locked={false} />
+              </Pressable>
+            )} />
+          </View>
+          {tab === "inventory" ? (
             <ScrollView style={styles.inventoryScroll} contentContainerStyle={styles.inventoryContent} showsVerticalScrollIndicator={false}>
               <InventoryCategory title={t("shop.inventoryCategories.nameColors")}>
                 <View style={styles.inventoryItems}>
@@ -319,16 +330,7 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
                 </View>
               </InventoryCategory>
             </ScrollView>
-          ) : (
-            <FlatList key={`cosmetics-${tab}`} data={COSMETICS[tab]} numColumns={3} keyExtractor={(item) => item.id} columnWrapperStyle={styles.cosmeticRow} contentContainerStyle={styles.cosmeticList} showsVerticalScrollIndicator={false} renderItem={({ item }) => (
-              <Pressable onPress={() => void equipColor(item.id)} style={[styles.cosmeticCard, item.id === equippedNameColorId && styles.cosmeticCardEquipped]}>
-                {item.tag ? <Text style={styles.itemTag}>{item.tag}</Text> : null}
-                <View style={[styles.shopColorDot, { backgroundColor: item.color }]} />
-                <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={[styles.cosmeticName, { color: item.color }]}>{displayName || t("ranked.player")}</Text>
-                <CosmeticStatus equipped={item.id === equippedNameColorId} equipping={equippingIds.has(item.id)} owned={ownedCosmeticIds.has(item.id)} price={getCosmeticStarPrice("name_color", item.id)} locked={false} />
-              </Pressable>
-            )} />
-          )}
+          ) : null}
         </View>
       </View>
       <FeedbackPopup notice={notice} onDismiss={clearFeedback} />
@@ -372,7 +374,7 @@ const styles = StyleSheet.create({
   catalogueIosWide: { marginRight: -10 },
   catalogueWithTabRail: { marginLeft: 136 },
   catalogueWithTabRailIos: { marginLeft: 150 },
-  persistentAvatarCatalogue: { ...StyleSheet.absoluteFillObject, top: 43, paddingHorizontal: 11, paddingBottom: 11, opacity: 1 },
+  persistentCatalogue: { ...StyleSheet.absoluteFillObject, top: 43, paddingHorizontal: 11, paddingBottom: 11, opacity: 1 },
   persistentCatalogueHidden: { opacity: 0 },
   catalogueHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 7 },
   sectionTitle: { color: theme.text, fontSize: 17, fontWeight: "900" },

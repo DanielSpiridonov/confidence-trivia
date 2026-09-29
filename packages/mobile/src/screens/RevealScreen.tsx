@@ -7,16 +7,10 @@ import { PhaseTimer } from "../components/PhaseTimer";
 import { LeaderboardStrip } from "./LeaderboardScreen";
 import { DamageHud } from "../components/DamageHud";
 
-const FULL_DAMAGE_AVATARS: Record<string, ImageSourcePropType> = {
-  smart_owl: require("../../assets/avatars/smart-owl.png"),
-  clever_fox: require("../../assets/avatars/fox.png"),
-  quiz_bot: require("../../assets/avatars/quiz-bot.png"),
-  omniscient_avatar: require("../../assets/avatars/omniscient.png"),
-  trivia_wizard: require("../../assets/avatars/trivia-wizard.png"),
-  detective_avatar: require("../../assets/avatars/detective.png"),
-  living_globe: require("../../assets/avatars/globe.png"),
-};
-const IOS_DAMAGE_AVATARS: Record<string, ImageSourcePropType> = {
+// These combat-sized assets avoid decoding and compositing the much larger
+// profile artwork during the reveal animation. This is especially important
+// on Android, where an attack can render several projectile layers at once.
+const DAMAGE_AVATARS: Record<string, ImageSourcePropType> = {
   smart_owl: require("../../assets/combat-ios/smart-owl.png"),
   clever_fox: require("../../assets/combat-ios/fox.png"),
   quiz_bot: require("../../assets/combat-ios/quiz-bot.png"),
@@ -25,7 +19,7 @@ const IOS_DAMAGE_AVATARS: Record<string, ImageSourcePropType> = {
   detective_avatar: require("../../assets/combat-ios/detective.png"),
   living_globe: require("../../assets/combat-ios/globe.png"),
 };
-const IOS_DEFEATED_AVATARS: Record<string, ImageSourcePropType> = {
+const DEFEATED_DAMAGE_AVATARS: Record<string, ImageSourcePropType> = {
   smart_owl: require("../../assets/combat-ios-defeated/smart-owl.png"),
   clever_fox: require("../../assets/combat-ios-defeated/fox.png"),
   quiz_bot: require("../../assets/combat-ios-defeated/quiz-bot.png"),
@@ -34,7 +28,6 @@ const IOS_DEFEATED_AVATARS: Record<string, ImageSourcePropType> = {
   detective_avatar: require("../../assets/combat-ios-defeated/detective.png"),
   living_globe: require("../../assets/combat-ios-defeated/globe.png"),
 };
-const DAMAGE_AVATARS = Platform.OS === "ios" ? IOS_DAMAGE_AVATARS : FULL_DAMAGE_AVATARS;
 const DAMAGE_AVATAR_PLACEHOLDERS: Record<string, number> = {
   smart_owl: require("../../assets/avatar-thumbnails/smart-owl.png"),
   clever_fox: require("../../assets/avatar-thumbnails/fox.png"),
@@ -44,27 +37,13 @@ const DAMAGE_AVATAR_PLACEHOLDERS: Record<string, number> = {
   detective_avatar: require("../../assets/avatar-thumbnails/detective.png"),
   living_globe: require("../../assets/avatar-thumbnails/globe.png"),
 };
-const QUIZ_BOT_CALCULATOR: ImageSourcePropType = Platform.OS === "ios"
-  ? require("../../assets/combat-ios/quiz-bot-calculator.png")
-  : require("../../assets/combat/quiz-bot-calculator.png");
-const SMART_OWL_BOOK: ImageSourcePropType = Platform.OS === "ios"
-  ? require("../../assets/combat-ios/smart-owl-book.png")
-  : require("../../assets/combat/smart-owl-book.png");
-const FOX_LIGHTBULB: ImageSourcePropType = Platform.OS === "ios"
-  ? require("../../assets/combat-ios/fox-lightbulb.png")
-  : require("../../assets/combat/fox-lightbulb.png");
-const OMNISCIENT_EYE: ImageSourcePropType = Platform.OS === "ios"
-  ? require("../../assets/combat-ios/omniscient-eye.png")
-  : require("../../assets/combat/omniscient-eye.png");
-const WIZARD_SPELL: ImageSourcePropType = Platform.OS === "ios"
-  ? require("../../assets/combat-ios/wizard-spell.png")
-  : require("../../assets/combat/wizard-spell.png");
-const DETECTIVE_MAGNIFIER: ImageSourcePropType = Platform.OS === "ios"
-  ? require("../../assets/combat-ios/detective-magnifier.png")
-  : require("../../assets/combat/detective-magnifier.png");
-const GLOBE_EARTH: ImageSourcePropType = Platform.OS === "ios"
-  ? require("../../assets/combat-ios/globe-earth.png")
-  : require("../../assets/combat/globe-earth.png");
+const QUIZ_BOT_CALCULATOR: ImageSourcePropType = require("../../assets/combat-ios/quiz-bot-calculator.png");
+const SMART_OWL_BOOK: ImageSourcePropType = require("../../assets/combat-ios/smart-owl-book.png");
+const FOX_LIGHTBULB: ImageSourcePropType = require("../../assets/combat-ios/fox-lightbulb.png");
+const OMNISCIENT_EYE: ImageSourcePropType = require("../../assets/combat-ios/omniscient-eye.png");
+const WIZARD_SPELL: ImageSourcePropType = require("../../assets/combat-ios/wizard-spell.png");
+const DETECTIVE_MAGNIFIER: ImageSourcePropType = require("../../assets/combat-ios/detective-magnifier.png");
+const GLOBE_EARTH: ImageSourcePropType = require("../../assets/combat-ios/globe-earth.png");
 const PROJECTILE_BY_AVATAR: Record<string, ImageSourcePropType> = {
   quiz_bot: QUIZ_BOT_CALCULATOR,
   smart_owl: SMART_OWL_BOOK,
@@ -322,8 +301,8 @@ function DamageAvatarPane({ state, results, myPlayerId, active }: { state: any; 
           return (
             <DamageFighter key={player.id} isHit={isHit} defeated={defeated} fallDirection={index === 0 ? -1 : 1} deathDelay={0}>
               <Image
-                source={defeated && Platform.OS === "ios"
-                  ? IOS_DEFEATED_AVATARS[player.avatarId] ?? IOS_DEFEATED_AVATARS.smart_owl
+                source={defeated
+                  ? DEFEATED_DAMAGE_AVATARS[player.avatarId] ?? DEFEATED_DAMAGE_AVATARS.smart_owl
                   : DAMAGE_AVATARS[player.avatarId] ?? DAMAGE_AVATARS.smart_owl}
                 defaultSource={DAMAGE_AVATAR_PLACEHOLDERS[player.avatarId] ?? DAMAGE_AVATAR_PLACEHOLDERS.smart_owl}
                 fadeDuration={0}
@@ -331,7 +310,6 @@ function DamageAvatarPane({ state, results, myPlayerId, active }: { state: any; 
                 style={[
                   styles.damageAvatar,
                   index === 1 && styles.damageAvatarFacingLeft,
-                  defeated && Platform.OS !== "ios" && styles.damageAvatarDefeated,
                 ]}
               />
               {isHit && !defeated ? <Image source={DAMAGE_AVATARS[player.avatarId] ?? DAMAGE_AVATARS.smart_owl} resizeMode="contain" style={[styles.damageAvatarHitOverlay, index === 1 && styles.damageAvatarFacingLeft]} /> : null}
@@ -467,7 +445,6 @@ const styles = StyleSheet.create({
   damageFighterHit: { backgroundColor: "transparent" },
   damageAvatar: { width: "100%", height: "86%" },
   damageAvatarFacingLeft: { transform: [{ scaleX: -1 }] },
-  damageAvatarDefeated: { filter: [{ grayscale: 1 }], opacity: .78 },
   damageAvatarHitOverlay: { position: "absolute", top: 0, width: "100%", height: "86%", tintColor: "#FF405F", opacity: 0.78, zIndex: 2 },
   damageTaken: { position: "absolute", top: "42%", color: "#FFFFFF", fontSize: 18, fontWeight: "900", textShadowColor: "#8F1028", textShadowRadius: 5, zIndex: 3 },
   quizBotProjectile: { position: "absolute", top: "39%", width: 82, height: 82, zIndex: 8 },
