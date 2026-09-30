@@ -5,9 +5,9 @@ import { getAccessToken } from "../auth/supabase";
 // Set this through EXPO_PUBLIC_SERVER_URL. Use the Docker host's LAN IP when
 // testing on a physical device; localhost only reaches the device itself.
 export const SERVER_URL = process.env.EXPO_PUBLIC_SERVER_URL ?? "ws://localhost:2567";
-if (!__DEV__ && !/^wss:\/\//i.test(SERVER_URL)) {
-  throw new Error("Production EXPO_PUBLIC_SERVER_URL must use wss://");
-}
+export const SERVER_CONFIGURATION_ERROR = !__DEV__ && !/^wss:\/\//i.test(SERVER_URL)
+  ? "This build is missing a secure server URL. Please contact support."
+  : null;
 const HTTP_SERVER_URL = SERVER_URL.replace(/^ws/, "http").replace(/\/$/, "");
 const ROOM_REQUEST_TIMEOUT_MS = 10_000;
 
@@ -92,6 +92,7 @@ export async function linkPlayerAccount(guestPlayerId: string, displayName: stri
 
 let client: Client | null = null;
 export function getClient(): Client {
+  if (SERVER_CONFIGURATION_ERROR) throw new Error(SERVER_CONFIGURATION_ERROR);
   if (!client) client = new Client(SERVER_URL);
   return client;
 }

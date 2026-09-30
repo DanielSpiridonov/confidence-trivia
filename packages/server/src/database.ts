@@ -310,12 +310,26 @@ export async function createPlayerChallenge(challengerId: string, challengedId: 
         )
     `;
     if (!eligible) return { ok: false, error: "Player is not online" };
-    await sql`update public.player_challenges set status = 'expired' where status = 'pending' and expires_at <= now()`;
-    const [challenge] = await sql<{ id: string }[]>`
-      insert into public.player_challenges (challenger_id, challenged_id, damage_wager, expires_at)
-      values (${challengerId}, ${challengedId}, ${damageWager}, now() + interval '1 minute') returning id
-    `;
-    return { ok: true, challengeId: challenge.id };
+    return await sql.begin(async (transaction) => {
+      // Serialize sends from the same player so simultaneous requests cannot
+      // both pass the cooldown check before either insert becomes visible.
+      await transaction`select pg_advisory_xact_lock(hashtextextended(${challengerId}, 0))`;
+      const [recentChallenge] = await transaction<{ id: string }[]>`
+        select id from public.player_challenges
+        where challenger_id = ${challengerId} and created_at > now() - interval '1 minute'
+        order by created_at desc limit 1
+      `;
+      if (recentChallenge) {
+        return { ok: false, error: "You can send one challenge per minute" } as FriendActionResult;
+      }
+
+      await transaction`update public.player_challenges set status = 'expired' where status = 'pending' and expires_at <= now()`;
+      const [challenge] = await transaction<{ id: string }[]>`
+        insert into public.player_challenges (challenger_id, challenged_id, damage_wager, expires_at)
+        values (${challengerId}, ${challengedId}, ${damageWager}, now() + interval '1 minute') returning id
+      `;
+      return { ok: true, challengeId: challenge.id };
+    });
   } catch (error) { logServerError("Could not create challenge", error); return { ok: false, error: "Could not send challenge" }; }
 }
 

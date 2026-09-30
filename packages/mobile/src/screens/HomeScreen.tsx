@@ -256,7 +256,7 @@ export function HomeScreen({
         </View>
       </View>
       <View style={styles.homeMenuDock}>
-        <Animated.View pointerEvents={menuOpen ? "auto" : "none"} style={[styles.homeMenuItems, { opacity: menuProgress, transform: isAndroid
+        <Animated.View renderToHardwareTextureAndroid={isAndroid} pointerEvents={menuOpen ? "auto" : "none"} style={[styles.homeMenuItems, { opacity: menuProgress, transform: isAndroid
           ? [{ translateX: menuProgress.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }) }]
           : [{ translateX: menuProgress.interpolate({ inputRange: [0, 1], outputRange: [44, 0] }) }, { scale: menuProgress.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] }) }]
         }]}>
@@ -321,11 +321,11 @@ const styles = StyleSheet.create({
   homeActionLabel: { flex: 1, color: "#FFFFFF", fontSize: Platform.OS === "android" ? 17 : 18, fontWeight: "900", textAlign: "center", textTransform: "uppercase" },
   homeActionArrow: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(188,169,238,0.18)", borderWidth: 1, borderColor: "rgba(202,188,242,0.42)" },
   homeActionArrowSecondary: { backgroundColor: "rgba(151,137,190,0.12)", borderColor: "rgba(177,163,216,0.3)" },
-  homeMenuDock: { position: "absolute", right: Platform.OS === "android" ? 34 : 8, bottom: Platform.OS === "android" ? 26 : 4, height: 44, zIndex: 12 },
+  homeMenuDock: { position: "absolute", right: Platform.OS === "android" ? 44 : 8, bottom: Platform.OS === "android" ? 26 : 4, height: 44, zIndex: 12 },
   homeMenuItems: { position: "absolute", right: 72, bottom: 0, height: 44, flexDirection: "row", gap: 6 },
   menuItemButton: { minWidth: 106, height: 44, paddingHorizontal: 10, borderRadius: 14, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, borderWidth: 2, borderColor: "#A982FF", backgroundColor: "rgba(42,25,72,0.97)", shadowColor: "#7C5CFF", shadowOpacity: 0.42, shadowRadius: 5, shadowOffset: { width: 0, height: 2 }, elevation: 5 },
   hamburgerButton: { width: 44, height: 44, borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#7C5CFF", backgroundColor: "rgba(12,9,23,0.96)" },
-  hamburgerIcon: { color: "#B9AAFF", fontSize: 27, lineHeight: 30, fontWeight: "900" },
+  hamburgerIcon: { width: 32, color: "#B9AAFF", fontSize: 27, lineHeight: 30, fontWeight: "900", textAlign: "center", includeFontPadding: false },
   menuItemIcon: { width: 32, height: 32 },
   notificationBadge: { position: "absolute", top: -7, right: -7, minWidth: 20, height: 20, paddingHorizontal: 5, borderRadius: 10, alignItems: "center", justifyContent: "center", backgroundColor: "#F04464", borderWidth: 2, borderColor: "#171025", zIndex: 20, elevation: 10 },
   notificationBadgeText: { color: "#FFFFFF", fontSize: 10, lineHeight: 12, fontWeight: "900", textAlign: "center" },

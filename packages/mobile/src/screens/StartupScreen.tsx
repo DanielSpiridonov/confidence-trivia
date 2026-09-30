@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Ionicons } from "@expo/vector-icons";
 import { ANDROID_MENU_UI_SCALE, BigButton, Screen, theme } from "../components/ui";
 
-const EMBLEM = require("../../assets/emblem-logo.png");
+const EMBLEM = require("../../assets/emblem-logo-android.png");
 
 export type StartupState = "idle" | "loading" | "error";
 

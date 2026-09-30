@@ -264,7 +264,7 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
             <Text style={styles.previewBadge}>{tab === "inventory" ? t("shop.ownedItems") : tab === "frames" ? t("shop.playerBordersPreview") : t("shop.starPricedCosmetics")}</Text>
           </View>
           <View pointerEvents={tab === "avatars" ? "auto" : "none"} style={[styles.persistentCatalogue, tab !== "avatars" && styles.persistentCatalogueHidden]}>
-            <FlatList data={COSMETICS.avatars} numColumns={3} keyExtractor={(item) => item.id} columnWrapperStyle={styles.cosmeticRow} contentContainerStyle={styles.cosmeticList} showsVerticalScrollIndicator={false} renderItem={({ item }) => {
+            <FlatList removeClippedSubviews={Platform.OS === "android"} data={COSMETICS.avatars} numColumns={3} keyExtractor={(item) => item.id} columnWrapperStyle={styles.cosmeticRow} contentContainerStyle={styles.cosmeticList} showsVerticalScrollIndicator={false} renderItem={({ item }) => {
               const price = getCosmeticStarPrice("avatar", item.id);
               const locked = item.id === "omniscient_avatar" && rankKey !== "omniscient";
               return (
@@ -285,7 +285,7 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
             </ScrollView>
           </View>
           <View pointerEvents={tab === "featured" ? "auto" : "none"} style={[styles.persistentCatalogue, tab !== "featured" && styles.persistentCatalogueHidden]}>
-            <FlatList data={COSMETICS.featured} numColumns={3} keyExtractor={(item) => item.id} columnWrapperStyle={styles.cosmeticRow} contentContainerStyle={styles.cosmeticList} showsVerticalScrollIndicator={false} renderItem={({ item }) => (
+            <FlatList removeClippedSubviews={Platform.OS === "android"} data={COSMETICS.featured} numColumns={3} keyExtractor={(item) => item.id} columnWrapperStyle={styles.cosmeticRow} contentContainerStyle={styles.cosmeticList} showsVerticalScrollIndicator={false} renderItem={({ item }) => (
               <Pressable onPress={() => void equipColor(item.id)} style={[styles.cosmeticCard, item.id === equippedNameColorId && styles.cosmeticCardEquipped]}>
                 {item.tag ? <Text style={styles.itemTag}>{item.tag}</Text> : null}
                 <View style={[styles.shopColorDot, { backgroundColor: item.color }]} />
@@ -375,7 +375,7 @@ const styles = StyleSheet.create({
   catalogueWithTabRail: { marginLeft: 136 },
   catalogueWithTabRailIos: { marginLeft: 150 },
   persistentCatalogue: { ...StyleSheet.absoluteFillObject, top: 43, paddingHorizontal: 11, paddingBottom: 11, opacity: 1 },
-  persistentCatalogueHidden: { opacity: 0 },
+  persistentCatalogueHidden: Platform.OS === "android" ? { display: "none", opacity: 0 } : { opacity: 0 },
   catalogueHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 7 },
   sectionTitle: { color: theme.text, fontSize: 17, fontWeight: "900" },
   previewBadge: { color: theme.textDim, fontSize: 9, fontWeight: "800", textTransform: "uppercase" },

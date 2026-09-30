@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Animated, AppState, Image, Keyboard, Linking, Platform, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
+import { Animated, AppState, Image, InteractionManager, Keyboard, Linking, Platform, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { FontAwesome5 } from "@expo/vector-icons";
 import * as NavigationBar from "expo-navigation-bar";
@@ -11,7 +11,6 @@ import "./src/i18n";
 import i18n from "./src/i18n";
 import { BigButton, GAME_BACKGROUND, theme } from "./src/components/ui";
 import { PointsIcon } from "./src/components/PointsIcon";
-import { RANK_IMAGE_SOURCES } from "./src/components/RankIcon";
 import { FeedbackPopup, useFeedbackPopup } from "./src/components/FeedbackPopup";
 import { GameDialog, useGameDialog } from "./src/components/GameDialog";
 
@@ -32,7 +31,7 @@ import { RulesScreen } from "./src/screens/RulesScreen";
 import { FriendsScreen } from "./src/screens/FriendsScreen";
 import { InboxScreen } from "./src/screens/InboxScreen";
 import { StartupScreen, StartupState } from "./src/screens/StartupScreen";
-import { AccountProfile, claimDailyReward, createRoom, DailyRewardStatus, deleteAccount, getAccountProfile, getChallenges, getDailyRewardStatus, getFriends, getNews, getPlayerStars, joinPublicRoom, joinRoom, linkPlayerAccount, NewsPost, PlayerChallenge, reconnectRoom, respondChallenge, updateAccountName, updatePresence, useRoomState } from "./src/network/client";
+import { AccountProfile, claimDailyReward, createRoom, DailyRewardStatus, deleteAccount, getAccountProfile, getChallenges, getDailyRewardStatus, getFriends, getNews, getPlayerStars, joinPublicRoom, joinRoom, linkPlayerAccount, NewsPost, PlayerChallenge, reconnectRoom, respondChallenge, SERVER_CONFIGURATION_ERROR, updateAccountName, updatePresence, useRoomState } from "./src/network/client";
 import { prepareSoundEffects, setSoundEffectsVolume, stopAllSoundEffects } from "./src/audio/sounds";
 import { pauseMusicForBackground, prepareMusic, setMusicVolume as applyMusicVolume, startMenuMusic, stopMenuMusic } from "./src/audio/music";
 import { createFreshGuestIdentity, getOrCreateDeviceId, getOrCreateGuestName } from "./src/utils/deviceId";
@@ -49,56 +48,9 @@ const RECENT_QUESTIONS_STORAGE_KEY = "confidence-trivia:recent-question-ids";
 const NEWS_READ_STORAGE_PREFIX = "confidence-trivia:read-news";
 const COMMUNITY_URL = "https://discord.gg/BjcjJGSyxv";
 const LEGAL_URL = "https://daniel-portfolio-pied.vercel.app/projects/confivia/privacy";
-const MINIMUM_STARTUP_CHECK_MS = 3_000;
-const MINIMUM_ASSET_STAGE_MS = 900;
+const MINIMUM_STARTUP_CHECK_MS = 900;
 const RECENT_QUESTION_LIMIT = 40;
-const UI_PRELOAD_IMAGES = [
-  require("./assets/emblem-logo.png"),
-  ...RANK_IMAGE_SOURCES,
-  require("./assets/avatar-thumbnails/smart-owl.png"),
-  require("./assets/avatar-thumbnails/fox.png"),
-  require("./assets/avatar-thumbnails/quiz-bot.png"),
-  require("./assets/avatar-thumbnails/omniscient.png"),
-  require("./assets/avatar-thumbnails/trivia-wizard.png"),
-  require("./assets/avatar-thumbnails/detective.png"),
-  require("./assets/avatar-thumbnails/globe.png"),
-  require("./assets/avatar-heads/smart-owl.png"),
-  require("./assets/avatar-heads/fox.png"),
-  require("./assets/avatar-heads/quiz-bot.png"),
-  require("./assets/avatar-heads/omniscient.png"),
-  require("./assets/avatar-heads/trivia-wizard.png"),
-  require("./assets/avatar-heads/detective.png"),
-  require("./assets/avatar-heads/globe.png"),
-  require("./assets/inventory-icon.png"),
-  require("./assets/friends-icon.png"),
-  require("./assets/news-icon.png"),
-  require("./assets/popup-platform.png"),
-  require("./assets/stars-gift.png"),
-  require("./assets/ui-thumbnails/gift-opened.png"),
-  require("./assets/ui-thumbnails/trophy.png"),
-  require("./assets/ui-thumbnails/shop.png"),
-  require("./assets/shop-tabs/colors.png"),
-  require("./assets/shop-tabs/avatars.png"),
-  require("./assets/shop-tabs/frames.png"),
-  require("./assets/star-currency-icon.png"),
-] as const;
-const FULL_COMBAT_PRELOAD_IMAGES = [
-  require("./assets/avatars/smart-owl.png"),
-  require("./assets/avatars/fox.png"),
-  require("./assets/avatars/quiz-bot.png"),
-  require("./assets/avatars/omniscient.png"),
-  require("./assets/avatars/trivia-wizard.png"),
-  require("./assets/avatars/detective.png"),
-  require("./assets/avatars/globe.png"),
-  require("./assets/combat/quiz-bot-calculator.png"),
-  require("./assets/combat/smart-owl-book.png"),
-  require("./assets/combat/fox-lightbulb.png"),
-  require("./assets/combat/omniscient-eye.png"),
-  require("./assets/combat/wizard-spell.png"),
-  require("./assets/combat/detective-magnifier.png"),
-  require("./assets/combat/globe-earth.png"),
-] as const;
-const IOS_COMBAT_PRELOAD_IMAGES = [
+const COMBAT_PRELOAD_IMAGES = [
   require("./assets/combat-ios/smart-owl.png"),
   require("./assets/combat-ios/fox.png"),
   require("./assets/combat-ios/quiz-bot.png"),
@@ -121,7 +73,6 @@ const IOS_COMBAT_PRELOAD_IMAGES = [
   require("./assets/combat-ios/detective-magnifier.png"),
   require("./assets/combat-ios/globe-earth.png"),
 ] as const;
-const COMBAT_PRELOAD_IMAGES = Platform.OS === "ios" ? IOS_COMBAT_PRELOAD_IMAGES : FULL_COMBAT_PRELOAD_IMAGES;
 
 function AssetPreloader({ sources, onReady }: { sources: readonly number[]; onReady?: () => void }) {
   const loaded = useRef(new Set<number>());
@@ -202,7 +153,7 @@ export default function App() {
   const [sessionReady, setSessionReady] = useState(false);
   const [startupState, setStartupState] = useState<StartupState>("idle");
   const [startupStage, setStartupStage] = useState<"assets" | "connecting" | null>(null);
-  const [startupError, setStartupError] = useState<string | null>(null);
+  const [startupError, setStartupError] = useState<string | null>(SERVER_CONFIGURATION_ERROR);
   const [inboxOpen, setInboxOpen] = useState(false);
   const [friendRequestCount, setFriendRequestCount] = useState(0);
   const [unreadNewsCount, setUnreadNewsCount] = useState(0);
@@ -211,10 +162,8 @@ export default function App() {
   const [room, setRoom] = useState<Room | null>(null);
   const [locale, setLocale] = useState<"en" | "bg">("en");
   const [localeReady, setLocaleReady] = useState(false);
-  const [uiImagesReady, setUiImagesReady] = useState(false);
   const [combatImagesReady, setCombatImagesReady] = useState(false);
-  const visualAssetsReadyRef = useRef(false);
-  visualAssetsReadyRef.current = uiImagesReady && combatImagesReady;
+  const [combatPreloadStarted, setCombatPreloadStarted] = useState(false);
   const [soundEffectsVolume, setSoundEffectsVolumeState] = useState(1);
   const [musicVolume, setMusicVolume] = useState(0.5);
   const [defaultPlayerName, setDefaultPlayerName] = useState("");
@@ -421,6 +370,10 @@ export default function App() {
   }, [applyAuthenticatedSession, guestPlayerId]);
 
   const runStartupChecks = React.useCallback(async (enterHome: boolean) => {
+    if (SERVER_CONFIGURATION_ERROR) {
+      setStartupError(SERVER_CONFIGURATION_ERROR);
+      return;
+    }
     if (!registeredAccount || !deviceId) {
       setStartupError(i18n.t("startup.accountRequired"));
       return;
@@ -430,16 +383,6 @@ export default function App() {
     setStartupError(null);
     try {
       const startedAt = Date.now();
-      const waitForVisualAssets = async () => {
-        if (visualAssetsReadyRef.current) return;
-        await new Promise<void>((resolve) => {
-          const interval = setInterval(() => {
-            if (!visualAssetsReadyRef.current) return;
-            clearInterval(interval);
-            resolve();
-          }, 50);
-        });
-      };
       const serverRequest = Promise.all([
         getAccountProfile(deviceId),
         getPlayerStars(deviceId),
@@ -449,10 +392,6 @@ export default function App() {
         (error: unknown) => ({ profile: null, storedStars: null, rewardStatus: null, error }),
       );
       if (enterHome) {
-        await Promise.all([
-          waitForVisualAssets(),
-          new Promise<void>((resolve) => setTimeout(resolve, MINIMUM_ASSET_STAGE_MS)),
-        ]);
         setStartupStage("connecting");
       }
       const { profile, storedStars, rewardStatus, error } = await serverRequest;
@@ -479,6 +418,14 @@ export default function App() {
       setStartupError(error instanceof Error ? error.message : i18n.t("startup.serverUnavailable"));
     }
   }, [deviceId, registeredAccount]);
+
+  useEffect(() => {
+    if (nav !== "in-room" || combatPreloadStarted) return;
+    const interaction = InteractionManager.runAfterInteractions(() => {
+      setCombatPreloadStarted(true);
+    });
+    return () => interaction.cancel();
+  }, [combatPreloadStarted, nav]);
 
   async function handleRepairClient() {
     setStartupState("loading");
@@ -934,8 +881,7 @@ export default function App() {
 
   return (
     <AppFrame highContrast={highContrastEnabled}>
-      <AssetPreloader sources={UI_PRELOAD_IMAGES} onReady={() => setUiImagesReady(true)} />
-      <AssetPreloader sources={COMBAT_PRELOAD_IMAGES} onReady={() => setCombatImagesReady(true)} />
+      {combatPreloadStarted && !combatImagesReady ? <AssetPreloader sources={COMBAT_PRELOAD_IMAGES} onReady={() => setCombatImagesReady(true)} /> : null}
       <StatusBar style="light" hidden={Platform.OS === "android"} animated />
       {nav === "startup" ? (
         <StartupScreen
@@ -1295,7 +1241,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   persistentScreen: { ...StyleSheet.absoluteFillObject, opacity: 1 },
-  persistentScreenHidden: { opacity: 0 },
+  // Opacity alone leaves hidden screens in Android's layout and composition
+  // work. Preserve their React state while removing their native view trees.
+  persistentScreenHidden: Platform.OS === "android" ? { display: "none", opacity: 0 } : { opacity: 0 },
   starsPersistentLayer: { ...StyleSheet.absoluteFillObject, zIndex: 20 },
   combatPreloader: { position: "absolute", left: 0, top: 0, width: 192, height: 192, opacity: 0.001, overflow: "hidden" },
   combatPreloadImage: { position: "absolute", width: 192, height: 192 },

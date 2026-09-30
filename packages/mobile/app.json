@@ -5,7 +5,7 @@
     "scheme": "confidence-trivia",
     "version": "1.0.0",
     "orientation": "landscape",
-    "icon": "./assets/app-icon.png",
+    "icon": "./assets/app-icon-ios.png",
     "backgroundColor": "#14101F",
     "androidStatusBar": {
       "hidden": true,
@@ -18,7 +18,7 @@
       "backgroundColor": "#14101F"
     },
     "splash": {
-      "image": "./assets/emblem-logo.png",
+      "image": "./assets/emblem-logo-android.png",
       "resizeMode": "contain",
       "backgroundColor": "#14101F"
     },
@@ -33,7 +33,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/emblem-logo.png",
+        "foregroundImage": "./assets/emblem-logo-android.png",
         "backgroundColor": "#32105F"
       },
       "permissions": ["android.permission.MODIFY_AUDIO_SETTINGS"],
