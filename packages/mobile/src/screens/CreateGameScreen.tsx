@@ -1,5 +1,6 @@
+import { Pressable } from "../components/menuHaptics";
 import React, { useState } from "react";
-import { Animated, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Animated, Platform, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { DAMAGE_WAGER_OPTIONS, DEFAULT_DAMAGE_WAGER, DEFAULT_ROUND_COUNT, getRankedDivision, RANKED_PLACEMENT_MATCHES } from "@confidence-trivia/shared";

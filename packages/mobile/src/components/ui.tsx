@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, Pressable, StyleSheet, TextStyle, ViewStyle, StyleProp, Keyboard, Platform, useWindowDimensions } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { playSound, SoundEffect } from "../audio/sounds";
+import { menuTap } from "./menuHaptics";
 
 const CONTROL_WIDTH = "100%";
 const CONTENT_WIDTH = "100%";
@@ -83,6 +84,7 @@ export function BigButton({
   style,
   textStyle,
   soundEffect = "button",
+  lobbyHaptic = false,
 }: {
   label: string;
   onPress: () => void;
@@ -91,8 +93,10 @@ export function BigButton({
   style?: StyleProp<ViewStyle>;
   textStyle?: StyleProp<TextStyle>;
   soundEffect?: SoundEffect;
+  lobbyHaptic?: boolean;
 }) {
   function handlePress() {
+    menuTap(lobbyHaptic);
     playSound(soundEffect);
     onPress();
   }
@@ -136,7 +140,7 @@ export function BackIconButton({ label, onPress, disabled = false }: { label: st
       accessibilityState={{ disabled }}
       disabled={disabled}
       hitSlop={10}
-      onPress={onPress}
+      onPress={() => { menuTap(); onPress(); }}
       style={({ pressed }) => [
         styles.backIconButton,
         disabled && styles.buttonDisabled,

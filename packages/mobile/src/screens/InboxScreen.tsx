@@ -1,5 +1,6 @@
 import React from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable } from "../components/menuHaptics";
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { theme } from "../components/ui";
@@ -30,6 +31,7 @@ export function InboxScreen({
   const [challenges, setChallenges] = React.useState<PlayerChallenge[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [loadErrors, setLoadErrors] = React.useState<Record<InboxCategory, string | null>>({ challenges: null, news: null });
   const [respondingId, setRespondingId] = React.useState<string | null>(null);
   const [deletingNewsId, setDeletingNewsId] = React.useState<string | null>(null);
   const [selectedNewsId, setSelectedNewsId] = React.useState<string | null>(null);
@@ -47,9 +49,9 @@ export function InboxScreen({
     try {
       const dismissedNewsKey = `${DISMISSED_NEWS_STORAGE_PREFIX}:${playerId ?? "local"}:${i18n.language}`;
       const readNewsKey = `${READ_NEWS_STORAGE_PREFIX}:${playerId ?? "local"}:${i18n.language}`;
-      const [loadedPosts, loadedChallenges, savedDismissedIds, savedReadIds] = await Promise.all([
-        getNews(i18n.language === "bg" ? "bg" : "en"),
-        playerId ? getChallenges(playerId) : Promise.resolve([]),
+      const [newsResult, challengeResult, savedDismissedIds, savedReadIds] = await Promise.all([
+        getNews(i18n.language === "bg" ? "bg" : "en").then((value) => ({ value, error: null }), (loadError: unknown) => ({ value: null, error: loadError instanceof Error ? loadError.message : t("feedback.tryAgain") })),
+        (playerId ? getChallenges(playerId) : Promise.resolve([])).then((value) => ({ value, error: null }), (loadError: unknown) => ({ value: null, error: loadError instanceof Error ? loadError.message : t("feedback.tryAgain") })),
         AsyncStorage.getItem(dismissedNewsKey).catch(() => null),
         AsyncStorage.getItem(readNewsKey).catch(() => null),
       ]);
@@ -67,11 +69,16 @@ export function InboxScreen({
       } catch {
         // Ignore invalid local read history.
       }
-      const pending = loadedChallenges.filter((challenge) => challenge.status === "pending" && challenge.challengedId === playerId);
-      setPosts(loadedPosts.filter((post) => !dismissedIds.has(post.id)));
-      setReadNewsIds(readIds);
-      setChallenges(pending);
-      onChallengeCountChange(pending.length);
+      if (newsResult.value) {
+        setPosts(newsResult.value.filter((post) => !dismissedIds.has(post.id)));
+        setReadNewsIds(readIds);
+      }
+      if (challengeResult.value) {
+        const pending = challengeResult.value.filter((challenge) => challenge.status === "pending" && challenge.challengedId === playerId);
+        setChallenges(pending);
+        onChallengeCountChange(pending.length);
+      }
+      setLoadErrors({ news: newsResult.error, challenges: challengeResult.error });
       setError(null);
     } catch (loadError) {
       if (showLoading) setError(loadError instanceof Error ? loadError.message : t("feedback.tryAgain"));
@@ -181,24 +188,26 @@ export function InboxScreen({
     setBulkBusy(false);
   }
 
+  const activeError = error ?? loadErrors[category];
+
   return <View style={styles.overlay}>
     <Pressable accessibilityRole="button" accessibilityLabel={t("common.close")} onPress={onBack} style={StyleSheet.absoluteFillObject} />
     <View style={styles.panel}>
       <View style={styles.header}><Text style={styles.title}>{t("inbox.title")}</Text><Pressable accessibilityRole="button" accessibilityLabel={t("common.close")} onPress={onBack} style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}><Text style={styles.closeText}>×</Text></Pressable></View>
       <View style={styles.body}>
         <View style={styles.tabs}>
-          {(["news", "challenges"] as const).map((tab) => <Pressable key={tab} accessibilityRole="tab" accessibilityState={{ selected: category === tab }} onPress={() => setCategory(tab)} style={({ pressed }) => [styles.tab, category === tab && styles.activeTab, pressed && styles.pressed]}><Text numberOfLines={1} style={[styles.tabText, category === tab && styles.activeTabText]}>{t(`inbox.${tab}`)}</Text>{tab === "challenges" && challenges.length > 0 ? <View style={styles.badge}><Text style={styles.badgeText}>{challenges.length}</Text></View> : null}</Pressable>)}
+          {(["news", "challenges"] as const).map((tab) => <Pressable key={tab} accessibilityRole="tab" accessibilityLabel={t(`inbox.${tab}`)} accessibilityState={{ selected: category === tab }} onPress={() => { setCategory(tab); setError(null); }} style={({ pressed }) => [styles.tab, category === tab && styles.activeTab, pressed && styles.pressed]}><Text numberOfLines={1} style={[styles.tabText, category === tab && styles.activeTabText]}>{t(`inbox.${tab}`)}</Text>{tab === "challenges" && challenges.length > 0 ? <View style={styles.badge}><Text style={styles.badgeText}>{challenges.length}</Text></View> : null}</Pressable>)}
         </View>
         <View style={styles.contentColumn}>
           <View style={styles.content}>
           {loading ? <ActivityIndicator color={theme.primary} /> : null}
-          {!loading && error ? <View style={styles.center}><Text style={styles.error}>{error}</Text><Pressable onPress={() => void load()} style={styles.reload}><Text style={styles.reloadText}>{t("inbox.retry")}</Text></Pressable></View> : null}
-          {!loading && !error && category === "challenges" && challenges.length === 0 ? <Text style={styles.empty}>{t("inbox.emptyChallenges")}</Text> : null}
-          {!loading && !error && category === "challenges" && challenges.length > 0 ? <ScrollView style={styles.list} contentContainerStyle={styles.items}>{challenges.map((challenge) => <View key={challenge.id} style={[styles.item, styles.challengeItem]}><Text numberOfLines={1} style={[styles.itemTitle, styles.challengeTitle]}>{t("friends.challengeIncoming", { player: challenge.challengerName })}</Text><Text numberOfLines={1} style={[styles.itemBody, styles.challengeBody]}>{t("friends.challengeMode", { wager: challenge.damageWager })}</Text><View style={[styles.actions, styles.challengeActions]}><Pressable disabled={respondingId === challenge.id} onPress={() => void answerChallenge(challenge, "decline")} style={[styles.actionButton, styles.compactChallengeButton, styles.deleteButton]}><Text style={styles.actionText}>{t("inbox.delete")}</Text></Pressable><Pressable disabled={respondingId === challenge.id} onPress={() => void answerChallenge(challenge, "accept")} style={[styles.actionButton, styles.compactChallengeButton]}><Text style={styles.actionText}>{respondingId === challenge.id ? t("startup.loading") : t("friends.accept")}</Text></Pressable></View></View>)}</ScrollView> : null}
-          {!loading && !error && category === "news" && posts.length === 0 ? <Text style={styles.empty}>{t("inbox.emptyNews")}</Text> : null}
-          {!loading && !error && category === "news" && posts.length > 0 ? <ScrollView style={styles.list} contentContainerStyle={styles.items}>{posts.map((post) => <Pressable key={post.id} accessibilityRole="button" accessibilityLabel={readNewsIds.has(post.id) ? post.title : t("inbox.markRead", { title: post.title })} onPress={() => { setSelectedNewsId((selectedId) => selectedId === post.id ? null : post.id); markNewsRead(post); }} style={({ pressed }) => [styles.item, styles.newsItem, !readNewsIds.has(post.id) && styles.unreadItem, pressed && styles.pressed]}><View style={styles.postHeader}><View style={styles.newsTitleRow}>{!readNewsIds.has(post.id) ? <View style={styles.unreadDot} /> : null}<Text numberOfLines={1} style={[styles.itemTitle, styles.newsTitle]}>{post.title}</Text></View><Text style={styles.date}>{new Date(post.publishedAt).toLocaleDateString(i18n.language)}</Text></View><Text numberOfLines={selectedNewsId === post.id ? 4 : 2} style={[styles.itemBody, styles.newsBody]}>{post.body}</Text>{selectedNewsId === post.id ? <View style={styles.newsActions}><Pressable disabled={deletingNewsId === post.id} onPress={(event) => { event.stopPropagation(); void deleteNewsPost(post.id); }} style={[styles.actionButton, styles.deleteButton, styles.compactDeleteButton]}><Text style={styles.actionText}>{t("inbox.delete")}</Text></Pressable></View> : null}</Pressable>)}</ScrollView> : null}
+          {!loading && activeError ? <View style={styles.center}><Text style={styles.error}>{activeError}</Text><Pressable onPress={() => void load()} style={styles.reload}><Text style={styles.reloadText}>{t("inbox.retry")}</Text></Pressable></View> : null}
+          {!loading && !activeError && category === "challenges" && challenges.length === 0 ? <Text style={styles.empty}>{t("inbox.emptyChallenges")}</Text> : null}
+          {!loading && !activeError && category === "challenges" && challenges.length > 0 ? <ScrollView style={styles.list} contentContainerStyle={styles.items}>{challenges.map((challenge) => <View key={challenge.id} style={[styles.item, styles.challengeItem]}><Text numberOfLines={1} style={[styles.itemTitle, styles.challengeTitle]}>{t("friends.challengeIncoming", { player: challenge.challengerName })}</Text><Text numberOfLines={1} style={[styles.itemBody, styles.challengeBody]}>{t("friends.challengeMode", { wager: challenge.damageWager })}</Text><View style={[styles.actions, styles.challengeActions]}><Pressable disabled={respondingId === challenge.id} onPress={() => void answerChallenge(challenge, "decline")} style={[styles.actionButton, styles.compactChallengeButton, styles.deleteButton]}><Text style={styles.actionText}>{t("inbox.delete")}</Text></Pressable><Pressable disabled={respondingId === challenge.id} onPress={() => void answerChallenge(challenge, "accept")} style={[styles.actionButton, styles.compactChallengeButton]}><Text style={styles.actionText}>{respondingId === challenge.id ? t("startup.loading") : t("friends.accept")}</Text></Pressable></View></View>)}</ScrollView> : null}
+          {!loading && !activeError && category === "news" && posts.length === 0 ? <Text style={styles.empty}>{t("inbox.emptyNews")}</Text> : null}
+          {!loading && !activeError && category === "news" && posts.length > 0 ? <ScrollView style={styles.list} contentContainerStyle={styles.items}>{posts.map((post) => <Pressable key={post.id} accessibilityRole="button" accessibilityLabel={readNewsIds.has(post.id) ? post.title : t("inbox.markRead", { title: post.title })} onPress={() => { setSelectedNewsId((selectedId) => selectedId === post.id ? null : post.id); markNewsRead(post); }} style={({ pressed }) => [styles.item, styles.newsItem, !readNewsIds.has(post.id) && styles.unreadItem, pressed && styles.pressed]}><View style={styles.postHeader}><View style={styles.newsTitleRow}>{!readNewsIds.has(post.id) ? <View style={styles.unreadDot} /> : null}<Text numberOfLines={1} style={[styles.itemTitle, styles.newsTitle]}>{post.title}</Text></View><Text style={styles.date}>{new Date(post.publishedAt).toLocaleDateString(i18n.language)}</Text></View><Text numberOfLines={selectedNewsId === post.id ? 4 : 2} style={[styles.itemBody, styles.newsBody]}>{post.body}</Text>{selectedNewsId === post.id ? <View style={styles.newsActions}><Pressable disabled={deletingNewsId === post.id} onPress={(event) => { event.stopPropagation(); void deleteNewsPost(post.id); }} style={[styles.actionButton, styles.deleteButton, styles.compactDeleteButton]}><Text style={styles.actionText}>{t("inbox.delete")}</Text></Pressable></View> : null}</Pressable>)}</ScrollView> : null}
           </View>
-          {!loading && !error ? <View style={styles.bulkActions}>{category === "news" ? <Pressable disabled={bulkBusy || posts.every((post) => readNewsIds.has(post.id))} onPress={readAllNews} style={[styles.bulkButton, (bulkBusy || posts.every((post) => readNewsIds.has(post.id))) && styles.disabled]}><Text style={styles.bulkButtonText}>{t("inbox.readAll")}</Text></Pressable> : null}<Pressable disabled={bulkBusy || (category === "news" ? posts.length === 0 : challenges.length === 0)} onPress={() => void (category === "news" ? deleteAllNews() : deleteAllChallenges())} style={[styles.bulkButton, styles.deleteAllButton, (bulkBusy || (category === "news" ? posts.length === 0 : challenges.length === 0)) && styles.disabled]}><Text style={styles.bulkButtonText}>{t("inbox.deleteAll")}</Text></Pressable></View> : null}
+          {!loading && !activeError ? <View style={styles.bulkActions}>{category === "news" ? <Pressable disabled={bulkBusy || posts.every((post) => readNewsIds.has(post.id))} onPress={readAllNews} style={[styles.bulkButton, (bulkBusy || posts.every((post) => readNewsIds.has(post.id))) && styles.disabled]}><Text style={styles.bulkButtonText}>{t("inbox.readAll")}</Text></Pressable> : null}<Pressable disabled={bulkBusy || (category === "news" ? posts.length === 0 : challenges.length === 0)} onPress={() => void (category === "news" ? deleteAllNews() : deleteAllChallenges())} style={[styles.bulkButton, styles.deleteAllButton, (bulkBusy || (category === "news" ? posts.length === 0 : challenges.length === 0)) && styles.disabled]}><Text style={styles.bulkButtonText}>{t("inbox.deleteAll")}</Text></Pressable></View> : null}
         </View>
       </View>
     </View>

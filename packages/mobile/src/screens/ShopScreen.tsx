@@ -1,5 +1,6 @@
 import React from "react";
-import { FlatList, Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable } from "../components/menuHaptics";
+import { FlatList, Image, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { ANDROID_MENU_UI_SCALE, BackIconButton, Screen, Title, theme } from "../components/ui";
 import { PointsIcon } from "../components/PointsIcon";

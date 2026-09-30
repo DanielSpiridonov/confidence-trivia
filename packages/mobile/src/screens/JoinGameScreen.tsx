@@ -1,5 +1,6 @@
+import { Pressable } from "../components/menuHaptics";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { FlatList, StyleSheet, Text, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { ANDROID_MENU_UI_SCALE, BackIconButton, Screen, Title, BigButton, theme } from "../components/ui";
 import { listPublicRooms, PublicRoomListing } from "../network/client";

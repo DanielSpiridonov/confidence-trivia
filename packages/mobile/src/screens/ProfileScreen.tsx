@@ -1,5 +1,6 @@
 import React from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable } from "../components/menuHaptics";
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import * as AppleAuthentication from "expo-apple-authentication";
 import { isOffensivePlayerName } from "@confidence-trivia/shared";
 import { useTranslation } from "react-i18next";

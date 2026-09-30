@@ -1,5 +1,6 @@
+import { Pressable } from "../components/menuHaptics";
 import React, { useEffect, useRef, useState } from "react";
-import { View, Text, FlatList, Platform, StyleSheet, Pressable } from "react-native";
+import { View, Text, FlatList, Platform, StyleSheet } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { useTranslation } from "react-i18next";
 import { Room } from "colyseus.js";
@@ -120,7 +121,7 @@ export function LobbyScreen({ room, state, mySessionId }: { room: Room; state: a
               <View style={[styles.visibilityTrack, state.isPublic && styles.visibilityTrackEnabled]}><View style={[styles.visibilityThumb, state.isPublic && styles.visibilityThumbEnabled]} /></View>
             </Pressable> : null}
             <View style={styles.actionArea}>
-              {!isMatchmade && !isStarting && (isHost ? <BigButton label={t("lobby.start")} onPress={() => { setStartError(null); room.send("startGame"); }} disabled={!canStart} /> : <BigButton label={me?.ready ? t("lobby.notReady") : t("lobby.ready")} onPress={() => room.send("toggleReady")} variant="secondary" />)}
+              {!isMatchmade && !isStarting && (isHost ? <BigButton label={t("lobby.start")} onPress={() => { setStartError(null); room.send("startGame"); }} disabled={!canStart} lobbyHaptic /> : <BigButton label={me?.ready ? t("lobby.notReady") : t("lobby.ready")} onPress={() => room.send("toggleReady")} variant="secondary" lobbyHaptic />)}
               {!isStarting && startError ? <Text style={styles.startError}>{startError}</Text> : null}
             </View>
             </View>

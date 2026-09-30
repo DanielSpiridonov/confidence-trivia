@@ -1,5 +1,6 @@
 import React from "react";
-import { ActivityIndicator, Image, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable } from "../components/menuHaptics";
+import { ActivityIndicator, Image, Platform, StyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { Ionicons } from "@expo/vector-icons";
 import { ANDROID_MENU_UI_SCALE, BigButton, Screen, theme } from "../components/ui";

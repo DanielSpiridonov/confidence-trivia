@@ -1,5 +1,6 @@
 import React from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable } from "../components/menuHaptics";
+import { ActivityIndicator, StyleSheet, Text, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { ANDROID_COMPACT_MENU_UI_SCALE, BackIconButton, Screen, Title, BigButton, theme } from "../components/ui";
 import { redeemPromoCode, submitPlayerReport } from "../network/client";

@@ -1,5 +1,6 @@
 import React from "react";
-import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable } from "../components/menuHaptics";
+import { ActivityIndicator, Image, Modal, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { DAMAGE_WAGER_OPTIONS, DEFAULT_DAMAGE_WAGER } from "@confidence-trivia/shared";
 import { ANDROID_MENU_UI_SCALE, BackIconButton, Screen, Title, theme } from "../components/ui";

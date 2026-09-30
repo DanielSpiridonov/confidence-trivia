@@ -13,6 +13,7 @@ import { BigButton, GAME_BACKGROUND, theme } from "./src/components/ui";
 import { PointsIcon } from "./src/components/PointsIcon";
 import { FeedbackPopup, useFeedbackPopup } from "./src/components/FeedbackPopup";
 import { GameDialog, useGameDialog } from "./src/components/GameDialog";
+import { configureMenuHaptics, menuTap } from "./src/components/menuHaptics";
 
 import { HomeScreen } from "./src/screens/HomeScreen";
 import { CreateGameScreen } from "./src/screens/CreateGameScreen";
@@ -181,6 +182,7 @@ export default function App() {
   const challengeOpacity = useRef(new Animated.Value(0)).current;
   const challengeSentOpacity = useRef(new Animated.Value(0)).current;
   const handledChallengeIds = useRef(new Set<string>());
+  const dismissedChallengePopupIds = useRef(new Set<string>());
   const joiningChallengeId = useRef<string | null>(null);
   const [dailyRewardCelebration, setDailyRewardCelebration] = useState<{ id: number; amount: number; streakDay: number } | null>(null);
   const [dailyReward, setDailyReward] = useState<DailyRewardStatus | null>(null);
@@ -808,7 +810,7 @@ export default function App() {
         const challenges = await getChallenges(deviceId);
         if (cancelled) return;
         const pendingChallenges = challenges.filter((challenge) => challenge.status === "pending" && challenge.challengedId === deviceId);
-        const incoming = pendingChallenges[0] ?? null;
+        const incoming = pendingChallenges.find((challenge) => !dismissedChallengePopupIds.current.has(challenge.id)) ?? null;
         setIncomingChallenge(incoming);
         setPendingChallengeCount(pendingChallenges.length);
         const accepted = challenges.find((challenge) => challenge.status === "accepted" && !handledChallengeIds.current.has(challenge.id));
@@ -850,14 +852,15 @@ export default function App() {
       return;
     }
     challengeOpacity.setValue(1);
-    const remaining = Math.max(0, new Date(incomingChallenge.expiresAt).getTime() - Date.now());
     const animation = Animated.sequence([
-      Animated.delay(Math.max(0, remaining - 800)),
-      Animated.timing(challengeOpacity, { toValue: 0, duration: Math.min(800, remaining), useNativeDriver: true }),
+      Animated.delay(2_600),
+      Animated.timing(challengeOpacity, { toValue: 0, duration: 400, useNativeDriver: true }),
     ]);
     animation.start(({ finished }) => {
       if (finished) {
-        void respondChallenge(deviceId, incomingChallenge.id, "decline").catch(() => undefined);
+        // Hide the notice only. The challenge stays actionable in Inbox until
+        // the server's one-minute expiry, and polling must not show it again.
+        dismissedChallengePopupIds.current.add(incomingChallenge.id);
         setIncomingChallenge((current) => current?.id === incomingChallenge.id ? null : current);
       }
     });
@@ -878,6 +881,8 @@ export default function App() {
   const starsBadgeWidth = Math.max(88, 70 + String(Math.max(0, stars)).length * 10);
   const settingsButtonRight = 18 + starsBadgeWidth + 8;
   const rulesButtonRight = settingsButtonRight + 48;
+
+  configureMenuHaptics(hapticsEnabled, nav !== "in-room");
 
   return (
     <AppFrame highContrast={highContrastEnabled}>
@@ -1002,22 +1007,22 @@ export default function App() {
       )}
       {nav === "home" ? (
         <>
-          <Pressable accessibilityRole="button" accessibilityLabel={i18n.t("home.ruleBook")} onPress={() => setNav("rules")} style={({ pressed }) => [styles.homeSettingsButton, styles.homeRulesButton, { right: rulesButtonRight }, pressed && styles.homeSettingsButtonPressed]}>
+          <Pressable accessibilityRole="button" accessibilityLabel={i18n.t("home.ruleBook")} onPress={() => { menuTap(); setNav("rules"); }} style={({ pressed }) => [styles.homeSettingsButton, styles.homeRulesButton, { right: rulesButtonRight }, pressed && styles.homeSettingsButtonPressed]}>
             <FontAwesome5 name="book" solid size={19} color={theme.text} style={styles.homeRulesIcon} />
           </Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel={i18n.t("home.settings")} onPress={() => setNav("settings")} style={({ pressed }) => [styles.homeSettingsButton, { right: settingsButtonRight }, pressed && styles.homeSettingsButtonPressed]}>
+          <Pressable accessibilityRole="button" accessibilityLabel={i18n.t("home.settings")} onPress={() => { menuTap(); setNav("settings"); }} style={({ pressed }) => [styles.homeSettingsButton, { right: settingsButtonRight }, pressed && styles.homeSettingsButtonPressed]}>
             <Text style={styles.homeSettingsIcon}>{"\u2699"}</Text>
           </Pressable>
         </>
       ) : null}
-      {nav === "home" && inboxOpen ? <InboxScreen playerId={deviceId} initialCategory={pendingChallengeCount > 0 ? "challenges" : "news"} onPostsViewed={handleNewsViewed} onChallengeCountChange={setPendingChallengeCount} onAcceptChallenge={(challenge) => { setInboxOpen(false); setIncomingChallenge(null); void enterChallengeLobby(challenge); }} onBack={() => setInboxOpen(false)} /> : null}
+      {nav === "home" && inboxOpen ? <InboxScreen playerId={deviceId} initialCategory={pendingChallengeCount > 0 ? "challenges" : "news"} onPostsViewed={handleNewsViewed} onChallengeCountChange={setPendingChallengeCount} onAcceptChallenge={(challenge) => { dismissedChallengePopupIds.current.add(challenge.id); setInboxOpen(false); setIncomingChallenge(null); void enterChallengeLobby(challenge); }} onBack={() => setInboxOpen(false)} /> : null}
       {incomingChallenge && deviceId && !inboxOpen ? (
         <Animated.View style={[styles.challengePopup, { opacity: challengeOpacity }]}>
           <Text style={styles.challengePopupTitle}>{i18n.t("friends.challengeIncoming", { player: incomingChallenge.challengerName })}</Text>
           <Text style={styles.challengePopupMode}>{i18n.t("friends.challengeMode", { wager: incomingChallenge.damageWager })}</Text>
           <View style={styles.challengePopupActions}>
-            <Pressable onPress={() => { const challenge = incomingChallenge; setIncomingChallenge(null); void respondChallenge(deviceId, challenge.id, "decline").catch(() => undefined); }} style={[styles.challengePopupButton, styles.challengeDecline]}><Text style={styles.challengePopupButtonText}>{i18n.t("friends.decline")}</Text></Pressable>
-            <Pressable onPress={() => { const challenge = incomingChallenge; setIncomingChallenge(null); void (async () => { try { await respondChallenge(deviceId, challenge.id, "accept"); await enterChallengeLobby({ ...challenge, status: "accepted" }); } catch (error) { showFeedback(i18n.t("friends.challengeFailed"), error instanceof Error ? error.message : i18n.t("feedback.tryAgain")); } })(); }} style={styles.challengePopupButton}><Text style={styles.challengePopupButtonText}>{i18n.t("friends.accept")}</Text></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel={`${i18n.t("friends.decline")}: ${incomingChallenge.challengerName}`} onPress={() => { const challenge = incomingChallenge; dismissedChallengePopupIds.current.add(challenge.id); setIncomingChallenge(null); void respondChallenge(deviceId, challenge.id, "decline").catch(() => undefined); }} style={[styles.challengePopupButton, styles.challengeDecline]}><Text style={styles.challengePopupButtonText}>{i18n.t("friends.decline")}</Text></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel={`${i18n.t("friends.accept")}: ${incomingChallenge.challengerName}`} onPress={() => { const challenge = incomingChallenge; dismissedChallengePopupIds.current.add(challenge.id); setIncomingChallenge(null); void (async () => { try { await respondChallenge(deviceId, challenge.id, "accept"); await enterChallengeLobby({ ...challenge, status: "accepted" }); } catch (error) { showFeedback(i18n.t("friends.challengeFailed"), error instanceof Error ? error.message : i18n.t("feedback.tryAgain")); } })(); }} style={styles.challengePopupButton}><Text style={styles.challengePopupButtonText}>{i18n.t("friends.accept")}</Text></Pressable>
           </View>
         </Animated.View>
       ) : null}
