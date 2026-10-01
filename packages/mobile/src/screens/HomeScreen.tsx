@@ -10,8 +10,8 @@ import { playSound } from "../audio/sounds";
 
 const DAILY_REWARD_PLATFORM_IMAGE: number = require("../../assets/popup-platform.png");
 const DAILY_REWARD_PRESENT_IMAGE: number = require("../../assets/stars-gift.png");
-const CLAIMED_REWARD_PRESENT_IMAGE: number = require("../../assets/ui-thumbnails/gift-opened.png");
-const RANKED_TROPHY_IMAGE: number = require("../../assets/ui-thumbnails/trophy.png");
+const CLAIMED_REWARD_PRESENT_IMAGE: number = require("../../assets/gift-opened-transparent.png");
+const RANKED_TROPHY_IMAGE: number = require("../../assets/trophy-transparent.png");
 const SHOP_IMAGE: number = require("../../assets/ui-thumbnails/shop.png");
 const INVENTORY_MENU_IMAGE: number = require("../../assets/inventory-icon.png");
 const FRIENDS_MENU_IMAGE: number = require("../../assets/friends-icon.png");
@@ -220,6 +220,7 @@ export function HomeScreen({
             claimed={!dailyReward.available}
             claimedLabel={t("home.claimed")}
             countdown={countdown}
+            platformImage={DAILY_REWARD_PLATFORM_IMAGE}
             featureImage={dailyReward.available ? DAILY_REWARD_PRESENT_IMAGE : CLAIMED_REWARD_PRESENT_IMAGE}
             disabled={dailyRewardClaiming}
             onPress={() => {
