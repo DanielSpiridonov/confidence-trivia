@@ -36,7 +36,7 @@ import { AccountProfile, claimDailyReward, createRoom, DailyRewardStatus, delete
 import { prepareSoundEffects, setSoundEffectsVolume, stopAllSoundEffects } from "./src/audio/sounds";
 import { pauseMusicForBackground, prepareMusic, setMusicVolume as applyMusicVolume, startMenuMusic, stopMenuMusic } from "./src/audio/music";
 import { createFreshGuestIdentity, getOrCreateDeviceId, getOrCreateGuestName } from "./src/utils/deviceId";
-import { authConfigured, getLinkedProviders, getStoredSession, linkAppleIdentity, linkGoogleIdentity, signInWithApple, signInWithSocialProvider, signOutAccount, subscribeToAuthChanges } from "./src/auth/supabase";
+import { authConfigured, getAppleDeletionAuthorizationCode, getLinkedProviders, getStoredSession, linkAppleIdentity, linkGoogleIdentity, signInWithApple, signInWithSocialProvider, signOutAccount, subscribeToAuthChanges } from "./src/auth/supabase";
 
 type Nav = "startup" | "home" | "create" | "join" | "ranked" | "shop" | "settings" | "profile" | "friends" | "rules" | "in-room";
 type RoomRecoveryState = "reconnecting" | "failed";
@@ -548,7 +548,10 @@ export default function App() {
     showDialog({ title: i18n.t("account.deleteAccount"), message: i18n.t("account.deleteAccountConfirm"), cancelLabel: i18n.t("validation.cancel"), confirmLabel: i18n.t("account.deleteForever"), destructive: true, onConfirm: () => void (async () => {
       setAuthBusy(true);
       try {
-        await deleteAccount(registeredAccount.playerId);
+        const appleAuthorizationCode = linkedProviders.includes("apple")
+          ? await getAppleDeletionAuthorizationCode()
+          : undefined;
+        await deleteAccount(registeredAccount.playerId, appleAuthorizationCode);
         intentionalSignOutRef.current = true;
         await signOutAccount();
         const guest = await createFreshGuestIdentity();

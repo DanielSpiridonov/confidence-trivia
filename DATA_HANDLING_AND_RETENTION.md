@@ -26,17 +26,44 @@ The app does not require microphone access and does not intentionally collect co
 
 ## Retention baseline
 
-The default operational retention target is 30 days unless persistent account functionality or security integrity requires a longer period.
+The following separates implemented behavior from retention targets that still
+need configuration or a manual operating procedure.
 
-- Presence records: delete after 30 days of inactivity.
-- Completed/expired challenges and claimed Blessings: delete after 30 days.
-- Resolved or dismissed reports and their descriptions: delete 30 days after resolution. Pending reports remain until reviewed.
-- Detailed ordinary match records: retain for 30 days. Keep only the account aggregates required for progression afterward.
-- Application logs: retain for no more than 30 days and never intentionally log tokens, email addresses or report descriptions.
+- Presence records: 30-day inactivity cleanup is a target, not implemented for
+  registered players. The guest job removes presence for stale guest records.
+- Temporary, unlinked installation records: sweep daily once inactive for 30
+  days, provided no match, currency, safety, or social record references them.
+  `supabase/migrations/021_cleanup_inactive_guest_installations.sql` installs
+  this job. The owner reported applying it on 1 October 2026; its first
+  successful execution still needs confirmation in Supabase Cron History.
+- Completed/expired challenges and claimed Blessings: 30-day cleanup is a
+  target; no scheduled cleanup currently exists in the repository.
+- Resolved or dismissed reports: deletion 30 days after resolution is a target;
+  no scheduled cleanup currently exists. Pending reports remain until reviewed.
+- Completed matches: the server writes `matches` and `match_players` on match
+  completion, plus `ranked_match_results` for Ranked. These records currently
+  have no automatic expiry. Player names in match results are replaced on
+  account deletion; account aggregates and integrity records are retained.
+- Application logs: the server writes startup and error messages to standard
+  output/error. Production errors contain a context, error name, and optional
+  database error code. Render captures these messages and applies its workspace
+  plan retention (Hobby: 7 days; Pro: 14 days; Scale/Enterprise: 30 days).
+  The production plan and any external log streams have not been inspected.
+  Source: https://render.com/docs/logging.
 - Custom-room questions and expected answers: discard when the active room ends; do not include them in application logs.
 - Registered profile, stars, inventory, friends, rank and aggregate progression: retain while the account exists because they provide the requested persistent service.
 - Promo redemption records and star/wager ledger entries: retain while the account exists where necessary to prevent duplicate rewards and preserve currency integrity.
-- On account deletion: remove authentication, profile, social and cosmetic data immediately; retain only anonymized integrity/history records as documented in the deletion flow.
+- On account deletion: remove authentication, profile, social and cosmetic data
+  immediately. Migration `022_purge_deleted_accounts_after_30_days.sql` records
+  `deleted_at` and schedules a daily purge after 30 days. The purge removes the
+  player row, its match/Ranked result rows and promo redemption rows; it clears
+  player references in retained star transactions and wagers. Other players'
+  results, balances, transactions and promo redemption counts are preserved.
+  This migration must be applied before publishing this new retention promise.
+- For an account linked to Apple, the iOS deletion flow requests fresh Apple
+  authorization and the server attempts to revoke it through Apple's REST API
+  before deleting the Supabase identity. Failure to contact Apple does not block
+  the user's deletion request.
 
 ## Access and transport
 
@@ -49,3 +76,10 @@ The default operational retention target is 30 days unless persistent account fu
 ## Operational review
 
 Before store submission, confirm the Render log-retention setting is no more than 30 days and record the selected Supabase and Render hosting regions in the Privacy Policy. Re-run this inventory when advertisements, payments, analytics, crash reporting or new social features are introduced.
+
+The owner reported applying the guest cleanup migration to Supabase on
+1 October 2026. Check that the
+`cleanup-inactive-guest-installations` Cron job is active and inspect its first
+run in Supabase Cron History. Guest rows with integrity or moderation references
+are deliberately retained for individual review. This job does not implement
+the separate 30-day match, support, or log retention commitments above.

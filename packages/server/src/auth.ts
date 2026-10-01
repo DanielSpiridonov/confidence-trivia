@@ -1,4 +1,14 @@
-export async function verifySupabaseIdentity(authorization: string | undefined): Promise<{ userId: string; provider: string; email: string | null } | null> {
+import { createPrivateKey, createSign } from "crypto";
+import { readFileSync } from "fs";
+
+export interface VerifiedIdentity {
+  userId: string;
+  provider: string;
+  email: string | null;
+  appleUserId: string | null;
+}
+
+export async function verifySupabaseIdentity(authorization: string | undefined): Promise<VerifiedIdentity | null> {
   const accessToken = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
   const supabaseUrl = process.env.SUPABASE_URL;
   const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_ANON_KEY;
@@ -8,13 +18,84 @@ export async function verifySupabaseIdentity(authorization: string | undefined):
       headers: { Authorization: `Bearer ${accessToken}`, apikey: publishableKey },
     });
     if (!response.ok) return null;
-    const user = await response.json() as { id?: unknown; email?: unknown; app_metadata?: { provider?: unknown } };
+    const user = await response.json() as {
+      id?: unknown;
+      email?: unknown;
+      app_metadata?: { provider?: unknown };
+      identities?: Array<{ provider?: unknown; id?: unknown; identity_data?: { sub?: unknown } }>;
+    };
+    const appleIdentity = user.identities?.find((identity) => identity.provider === "apple");
+    const appleUserId = typeof appleIdentity?.identity_data?.sub === "string"
+      ? appleIdentity.identity_data.sub
+      : typeof appleIdentity?.id === "string" ? appleIdentity.id : null;
     return typeof user.id === "string"
-      ? { userId: user.id, provider: typeof user.app_metadata?.provider === "string" ? user.app_metadata.provider : "social", email: typeof user.email === "string" ? user.email : null }
+      ? { userId: user.id, provider: typeof user.app_metadata?.provider === "string" ? user.app_metadata.provider : "social", email: typeof user.email === "string" ? user.email : null, appleUserId }
       : null;
   } catch {
     return null;
   }
+}
+
+function base64Url(value: string | Buffer): string {
+  return Buffer.from(value).toString("base64url");
+}
+
+function readApplePrivateKey(): string | null {
+  if (process.env.APPLE_PRIVATE_KEY) return process.env.APPLE_PRIVATE_KEY.replace(/\\n/g, "\n");
+  if (!process.env.APPLE_PRIVATE_KEY_PATH) return null;
+  try { return readFileSync(process.env.APPLE_PRIVATE_KEY_PATH, "utf8"); }
+  catch { return null; }
+}
+
+function createAppleClientSecret(): string | null {
+  const teamId = process.env.APPLE_TEAM_ID;
+  const keyId = process.env.APPLE_KEY_ID;
+  const clientId = process.env.APPLE_CLIENT_ID;
+  const privateKey = readApplePrivateKey();
+  if (!teamId || !keyId || !clientId || !privateKey) return null;
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const header = base64Url(JSON.stringify({ alg: "ES256", kid: keyId, typ: "JWT" }));
+  const claims = base64Url(JSON.stringify({ iss: teamId, iat: issuedAt, exp: issuedAt + 300, aud: "https://appleid.apple.com", sub: clientId }));
+  const signingInput = `${header}.${claims}`;
+  try {
+    const signer = createSign("SHA256");
+    signer.update(signingInput);
+    signer.end();
+    const signature = signer.sign({ key: createPrivateKey(privateKey), dsaEncoding: "ieee-p1363" });
+    return `${signingInput}.${base64Url(signature)}`;
+  } catch { return null; }
+}
+
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  const payload = token.split(".")[1];
+  if (!payload) return null;
+  try { return JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as Record<string, unknown>; }
+  catch { return null; }
+}
+
+export async function revokeAppleAuthorization(authorizationCode: string, expectedAppleUserId: string): Promise<boolean> {
+  const clientId = process.env.APPLE_CLIENT_ID;
+  const clientSecret = createAppleClientSecret();
+  if (!clientId || !clientSecret || !authorizationCode || !expectedAppleUserId) return false;
+  try {
+    const tokenResponse = await fetch("https://appleid.apple.com/auth/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, code: authorizationCode, grant_type: "authorization_code" }),
+    });
+    if (!tokenResponse.ok) return false;
+    const tokens = await tokenResponse.json() as { access_token?: unknown; refresh_token?: unknown; id_token?: unknown };
+    const idTokenClaims = typeof tokens.id_token === "string" ? decodeJwtPayload(tokens.id_token) : null;
+    if (idTokenClaims?.sub !== expectedAppleUserId || idTokenClaims?.aud !== clientId) return false;
+    const token = typeof tokens.refresh_token === "string" ? tokens.refresh_token : typeof tokens.access_token === "string" ? tokens.access_token : null;
+    if (!token) return false;
+    const revokeResponse = await fetch("https://appleid.apple.com/auth/revoke", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, token, token_type_hint: typeof tokens.refresh_token === "string" ? "refresh_token" : "access_token" }),
+    });
+    return revokeResponse.ok;
+  } catch { return false; }
 }
 
 export async function deleteSupabaseIdentity(userId: string): Promise<boolean> {

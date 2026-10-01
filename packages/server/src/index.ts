@@ -6,9 +6,10 @@ import { GameRoom } from "./rooms/GameRoom";
 import { MATCHMAKING_FILTERS } from "./rooms/matchmaking";
 import { canAccessPlayerData } from "./database";
 import { anonymizePlayerAccount, canPlayerEnterGame, claimAllFriendGifts, claimDailyReward, claimFriendGift, createPlayerChallenge, equipFreeAvatar, equipFreeFrame, equipFreeNameColor, getAccountProfile, getDailyRewardStatus, getDatabaseStatus, getNewsPosts, getPlayerChallenges, getPlayerCustomization, getPlayerStars, getRankedLeaderboard, isAuthenticatedPlayer, linkPlayerAccount, listFriends, ownsRegisteredPlayer, redeemPromoCode, respondToFriendRequest, respondToPlayerChallenge, searchFriendPlayers, sendFriendGift, sendFriendRequest, submitPlayerReport, suggestFriendPlayers, updateAccountDisplayName, updateFriendRelationship, updatePlayerPresence } from "./database";
-import { deleteSupabaseIdentity, verifySupabaseIdentity } from "./auth";
+import { deleteSupabaseIdentity, revokeAppleAuthorization, verifySupabaseIdentity } from "./auth";
 import { isDamageWager, isOffensivePlayerName } from "@confidence-trivia/shared";
 import { authenticatedActorOrIpKey, createRateLimiter } from "./rateLimit";
+import { logServerError } from "./logging";
 
 const port = Number(process.env.PORT ?? 2567);
 const app = express();
@@ -101,9 +102,14 @@ app.patch("/accounts/me/name", accountLimit, async (req, res) => {
 });
 app.delete("/accounts/me", async (req, res) => {
   const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
+  const appleAuthorizationCode = typeof req.body?.appleAuthorizationCode === "string" ? req.body.appleAuthorizationCode : "";
   const identity = await verifySupabaseIdentity(req.headers.authorization);
   if (!isDeviceId(playerId) || !identity || !await ownsRegisteredPlayer(playerId, identity.userId)) { res.status(401).json({ error: "Invalid or expired account session" }); return; }
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) { res.status(503).json({ error: "Account deletion is not configured" }); return; }
+  if (identity.appleUserId && appleAuthorizationCode) {
+    const revoked = await revokeAppleAuthorization(appleAuthorizationCode, identity.appleUserId);
+    if (!revoked) logServerError("Could not revoke Sign in with Apple authorization", new Error("Apple revocation failed"));
+  }
   if (!await deleteSupabaseIdentity(identity.userId)) { res.status(503).json({ error: "Could not delete the authentication account" }); return; }
   if (!await anonymizePlayerAccount(playerId)) { res.status(503).json({ error: "Authentication was deleted, but game data cleanup needs support" }); return; }
   res.status(204).end();

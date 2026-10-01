@@ -11,7 +11,7 @@ of the chosen release regions.
 - Privacy and support email: spiridonovdaniels@gmail.com.
 - Intended minimum age: 16+.
 - Intended initial availability: worldwide, subject to store and legal availability.
-- `[EFFECTIVE DATE]` and `[LAST UPDATED DATE]`.
+- Effective date: 5 October 2026. Privacy Policy last updated: 1 October 2026.
 - Supabase database region: Central EU (Frankfurt).
 - Render server region: Oregon, United States.
 - Public document base URL: `https://daniel-portfolio-pied.vercel.app/projects/confivia`.

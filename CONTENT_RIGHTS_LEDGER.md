@@ -26,10 +26,10 @@ the final bundle is assembled.
 | --- | --- | --- |
 | `buttons_click.mp3` | Unverified | Source URL/creator, licence, proof |
 | `confidence_choosing.mp3` | Unverified | Source URL/creator, licence, proof |
-| `game_music.mp3` | Unverified | Source URL/creator, licence, proof |
+| `game_music.mp3` | Source candidate: [“Roblox Minecraft Fortnite Video Game Music” by MaksymMalko](https://pixabay.com/music/video-games-roblox-minecraft-fortnite-video-game-music-358426/), listed under the Pixabay Content License. Local file match and download proof unverified. | Confirm this is the actual file, then save the source page, licence, and download record. The source page marks this track as Content ID registered. |
 | `room_countdown.mp3` | Unverified | Source URL/creator, licence, proof |
 | `timer_countdown_gameroom.mp3` | Unverified | Source URL/creator, licence, proof |
-| `virtual_vibes-light-bubble-pop-383738.mp3` | Unverified | Source URL/creator, licence, proof; filename alone does not establish a licence |
+| `virtual_vibes-light-bubble-pop-383738.mp3` | Source candidate: [“Light Bubble Pop” by Virtual_Vibes](https://pixabay.com/sound-effects/film-special-effects-light-bubble-pop-383738/), listed under the Pixabay Content License. Local file match and download proof unverified. | Confirm this is the actual file, then save the source page, licence, and download record. |
 
 ## Question content
 

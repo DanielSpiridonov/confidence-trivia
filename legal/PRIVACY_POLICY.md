@@ -1,12 +1,12 @@
 # Privacy Policy for Confivia
 
-**Effective date:** [LAUNCH DATE]
-**Last updated:** 28 September 2026
+**Effective date:** 5 October 2026
+**Last updated:** 1 October 2026
 
 Confivia is provided by Daniel Spiridonov, an independent developer established
 in Bulgaria ("we", "us", or "our"). We are the controller of the personal data
 described in this policy. You can contact us at spiridonovdaniels@gmail.com or
-at [PUBLIC CONTACT ADDRESS].
+at Oborishte 108, Bulgaria.
 
 This policy explains what information Confivia processes, why it is processed,
 how long it is kept, who receives it, and the rights available to you.
@@ -113,17 +113,22 @@ We keep personal data only for as long as needed for the purposes above:
 
 - registered profile, progression, stars, inventory, and account data are kept
   while the account remains active;
+- temporary, unlinked installation records are removed after 30 days without
+  activity, unless a record must be kept for match, currency, safety, or other
+  integrity reasons;
 - friendships, blocks, unclaimed Blessings, challenges, and presence data are
   kept while operationally needed or until the associated account is deleted;
 - Custom-room questions and expected answers ordinarily remain only in active
   room memory and are not intentionally retained after the room ends;
-- detailed ordinary match records are kept for up to 30 days, after which only
-  necessary aggregate progression or de-identified integrity information may
-  remain;
+- completed match results and Ranked progression audit records are stored to
+  maintain progression, fair rankings, and reward integrity. They currently
+  have no automatic expiry. On account deletion, player names in match results
+  are replaced and limited integrity records may remain as described below;
 - support and safety correspondence is ordinarily kept for up to 30 days after
   the request is closed, unless longer retention is needed for a dispute,
   enforcement action, or legal obligation;
-- application logs are kept for no more than 30 days; and
+- application runtime logs held by Render expire after 7 to 30 days depending
+  on the hosting workspace plan; and
 - transaction-ledger and promotional-redemption records may be kept while the
   account exists, and for a limited period afterward where necessary to protect
   currency integrity, prevent duplicate rewards, resolve disputes, or comply
@@ -135,7 +140,10 @@ necessary for security, fraud prevention, legal compliance, dispute resolution,
 or the establishment, exercise, or defence of legal claims.
 
 When an account is deleted, directly identifying account, profile, and cosmetic
-data are removed. Limited match or transaction records may remain only where
+data are removed immediately. A daily cleanup removes the remaining
+deleted-account database row and its player-linked match and Ranked result rows
+once 30 days have elapsed. Retained currency and wager audit records have their
+reference to that player cleared. Limited match or transaction records may remain only where
 there is a valid reason above and will be de-identified where identification is
 no longer necessary. De-identified data is not described as anonymous unless it
 can no longer reasonably be linked back to a person.
@@ -193,6 +201,6 @@ material change takes effect where required.
 
 Daniel Spiridonov
 Independent developer
-[PUBLIC CONTACT ADDRESS]
+Oborishte 108
 Bulgaria
 spiridonovdaniels@gmail.com

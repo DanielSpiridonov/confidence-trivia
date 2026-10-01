@@ -1,6 +1,6 @@
 # Terms of Use for Confivia
 
-**Effective date:** [LAUNCH DATE]
+**Effective date:** 5 October 2026
 
 These Terms govern your use of Confivia, provided by Daniel Spiridonov, an
 independent developer established in Bulgaria. By using Confivia, you agree to

@@ -106,6 +106,18 @@ export async function linkAppleIdentity(): Promise<void> {
   }
 }
 
+export async function getAppleDeletionAuthorizationCode(): Promise<string> {
+  if (!await AppleAuthentication.isAvailableAsync()) throw new Error("apple_auth_unavailable");
+  try {
+    const credential = await AppleAuthentication.signInAsync({ requestedScopes: [] });
+    if (!credential.authorizationCode) throw new Error("apple_authorization_code_missing");
+    return credential.authorizationCode;
+  } catch (error) {
+    if (typeof error === "object" && error && "code" in error && error.code === "ERR_REQUEST_CANCELED") throw new Error("auth_cancelled");
+    throw error;
+  }
+}
+
 export async function getStoredSession(): Promise<Session | null> {
   if (!authConfigured) return null;
   const { data } = await supabase.auth.getSession();

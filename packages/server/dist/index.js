@@ -14,6 +14,7 @@ const database_2 = require("./database");
 const auth_1 = require("./auth");
 const shared_1 = require("@confidence-trivia/shared");
 const rateLimit_1 = require("./rateLimit");
+const logging_1 = require("./logging");
 const port = Number(process.env.PORT ?? 2567);
 const app = (0, express_1.default)();
 app.set("trust proxy", 1);
@@ -143,6 +144,7 @@ app.patch("/accounts/me/name", accountLimit, async (req, res) => {
 });
 app.delete("/accounts/me", async (req, res) => {
     const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
+    const appleAuthorizationCode = typeof req.body?.appleAuthorizationCode === "string" ? req.body.appleAuthorizationCode : "";
     const identity = await (0, auth_1.verifySupabaseIdentity)(req.headers.authorization);
     if (!isDeviceId(playerId) || !identity || !await (0, database_2.ownsRegisteredPlayer)(playerId, identity.userId)) {
         res.status(401).json({ error: "Invalid or expired account session" });
@@ -151,6 +153,11 @@ app.delete("/accounts/me", async (req, res) => {
     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
         res.status(503).json({ error: "Account deletion is not configured" });
         return;
+    }
+    if (identity.appleUserId && appleAuthorizationCode) {
+        const revoked = await (0, auth_1.revokeAppleAuthorization)(appleAuthorizationCode, identity.appleUserId);
+        if (!revoked)
+            (0, logging_1.logServerError)("Could not revoke Sign in with Apple authorization", new Error("Apple revocation failed"));
     }
     if (!await (0, auth_1.deleteSupabaseIdentity)(identity.userId)) {
         res.status(503).json({ error: "Could not delete the authentication account" });

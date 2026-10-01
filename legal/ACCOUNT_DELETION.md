@@ -13,10 +13,16 @@ data associated with it.
 This removes its authentication link and email association and removes or
 de-identifies the profile, progression, social relationships, star balance,
 inventory, and equipped cosmetics associated with the account.
+If Sign in with Apple is linked, the iOS app asks you to confirm your Apple
+identity and attempts to revoke Confivia's Apple sign-in authorization.
+The remaining deleted-account database row and its player-linked match and
+Ranked result rows are removed by a daily cleanup once 30 days have elapsed.
 Limited match, security, or transaction records may be retained only when
 needed for fraud prevention, currency integrity, dispute resolution, or a legal
 obligation. Where identification is no longer necessary, those records are
 de-identified and are no longer displayed as belonging to the deleted player.
+Currency and wager audit records may remain with the removed player's database
+reference cleared; other players' records are preserved.
 
 Deletion is permanent and cannot be undone. Deleting the mobile app by itself
 does not delete a registered account.
