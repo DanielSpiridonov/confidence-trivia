@@ -325,7 +325,7 @@ const styles = StyleSheet.create({
   homeActionArrowSecondary: { backgroundColor: "rgba(151,137,190,0.12)", borderColor: "rgba(177,163,216,0.3)" },
   homeMenuDock: { position: "absolute", right: Platform.OS === "android" ? 44 : 8, bottom: Platform.OS === "android" ? 26 : 4, height: 44, zIndex: 12 },
   homeMenuItems: { position: "absolute", right: 72, bottom: 0, width: Platform.OS === "android" ? 482 : undefined, height: 44, flexDirection: "row", gap: 6 },
-  menuItemButton: { minWidth: 106, width: Platform.OS === "android" ? 116 : undefined, height: 44, paddingHorizontal: 10, borderRadius: 14, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, borderWidth: 2, borderColor: "#A982FF", backgroundColor: "rgba(42,25,72,0.97)", shadowColor: "#7C5CFF", shadowOpacity: 0.42, shadowRadius: 5, shadowOffset: { width: 0, height: 2 }, elevation: 5 },
+  menuItemButton: { minWidth: 106, width: Platform.OS === "android" ? 116 : undefined, height: 44, paddingHorizontal: 10, borderRadius: 14, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, borderWidth: 2, borderColor: "#7C5CFF", backgroundColor: "rgba(42,25,72,0.97)" },
   hamburgerButton: { width: 44, height: 44, borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#7C5CFF", backgroundColor: "rgba(12,9,23,0.96)" },
   hamburgerIcon: { width: 32, color: "#B9AAFF", fontSize: 27, lineHeight: 30, fontWeight: "900", textAlign: "center", includeFontPadding: false },
   menuItemIcon: { width: 32, height: 32 },

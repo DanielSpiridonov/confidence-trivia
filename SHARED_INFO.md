@@ -91,8 +91,8 @@ building.
   address and final launch/effective date.
 - [ ] Verify all five public legal URLs load without authentication and match the
   repository drafts.
-- [ ] Add Sign in with Apple token revocation to account deletion, or complete
-  the documented compliant fallback before App Store submission.
+- [x] Add and verify Sign in with Apple token revocation during account deletion
+  on a real iPhone.
 - [ ] Implement/configure the retention behavior claimed by the Privacy Policy,
   including 30-day cleanup and infrastructure log retention, or revise the
   policy so it exactly matches production.

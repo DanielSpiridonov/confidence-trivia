@@ -12,7 +12,7 @@ tested on the affected platforms, and documented where applicable.
 - [x] Define which records are deleted, anonymized, or retained for account deletion.
 - [x] Remove or anonymize all personal and social data during deletion.
 - [x] Delete the linked Supabase Auth identity safely.
-- [ ] Deploy and verify Sign in with Apple authorization revocation during iOS
+- [x] Deploy and verify Sign in with Apple authorization revocation during iOS
       account deletion.
 - [x] Publish a public account-deletion/request page.
 - [x] Complete the full account-lifecycle test, including account creation,
