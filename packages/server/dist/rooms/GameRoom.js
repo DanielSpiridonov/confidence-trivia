@@ -8,6 +8,7 @@ const schema_1 = require("../state/schema");
 const questions_1 = require("../content/questions");
 const database_1 = require("../database");
 const auth_1 = require("../auth");
+const logging_1 = require("../logging");
 const PLAYER_NAME_PATTERN = /^[\p{L}\p{N} ]+$/u;
 const DEVICE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 function isValidPlayerName(name) {
@@ -51,6 +52,7 @@ class GameRoom extends colyseus_1.Room {
         this.damageKnockout = false;
         this.damageWagerReserved = false;
         this.gameStartPending = false;
+        this.lobbyWasPublic = false;
         this.hasCustomQuestions = false;
     }
     async onCreate(options = {}) {
@@ -172,11 +174,19 @@ class GameRoom extends colyseus_1.Room {
         }
         this.state.players.set(client.sessionId, player);
         this.challengeRoles.delete(client.sessionId);
+        // Return the join handshake immediately; database work must not hold the
+        // second player's queue screen behind profile loading or wager reservation.
+        void this.finishJoining(player, deviceId).catch((error) => (0, logging_1.logServerError)("Could not finish joining room", error));
+        void this.updateLobbyMetadata();
+    }
+    async finishJoining(player, deviceId) {
         const [stars, customization] = await Promise.all([
             (0, database_1.upsertPlayer)(deviceId, player.name),
             (0, database_1.getPlayerCustomization)(deviceId),
         ]);
-        if (stars !== null)
+        if (this.state.players.get(player.id) !== player)
+            return;
+        if (stars !== null && !this.damageWagerReserved)
             player.stars = stars;
         if (customization) {
             player.nameColor = customization.nameColor;
@@ -199,6 +209,12 @@ class GameRoom extends colyseus_1.Room {
         if (!player)
             return;
         player.connected = false;
+        // Final standings remain authoritative even as clients exit the room.
+        if (this.state.gameEnded)
+            return;
+        if (this.state.phase === "starting" && !this.hasEnoughPlayers()) {
+            await this.cancelStarting();
+        }
         this.shortenConfidencePhaseIfEveryoneDecided();
         this.shortenSideBetPhaseIfEveryoneDecided();
         if (consented) {
@@ -238,8 +254,19 @@ class GameRoom extends colyseus_1.Room {
             await this.allowReconnection(client, shared_1.RECONNECT_GRACE_MS / 1000);
             player.connected = true;
             void this.updateLobbyMetadata();
+            if (this.state.phase === "lobby" && this.hasEnoughPlayers()) {
+                if (this.state.gameMode === "ranked")
+                    this.beginGame();
+                else if (this.state.gameMode === "damage" && !this.state.isChallenge) {
+                    const host = this.clients.find((candidate) => candidate.sessionId === this.state.hostId);
+                    if (host)
+                        void this.handleStartGame(host);
+                }
+            }
         }
         catch {
+            if (this.state.gameEnded)
+                return;
             if (this.state.gameMode === "damage" && this.state.gameStarted && !this.state.gameEnded) {
                 player.health = 0;
                 this.damageKnockout = true;
@@ -302,16 +329,7 @@ class GameRoom extends colyseus_1.Room {
             return; // only host may start
         if (this.state.gameStarted || this.gameStartPending)
             return;
-        const requiredPlayerCount = this.state.gameMode === "damage"
-            ? 2
-            : this.state.gameMode === "ranked"
-                ? shared_1.RANKED_PLAYER_COUNT
-                : shared_1.MIN_PLAYERS_TO_START;
-        if (this.state.gameMode === "friends" && this.state.friendsTeamMode === "duos" && (this.state.players.size < 4 || this.state.players.size % 2 !== 0))
-            return;
-        if (this.state.gameMode === "damage" || this.state.gameMode === "ranked"
-            ? this.state.players.size !== requiredPlayerCount
-            : this.state.players.size < requiredPlayerCount)
+        if (!this.hasEnoughPlayers())
             return;
         if (this.state.gameMode === "damage") {
             this.gameStartPending = true;
@@ -319,9 +337,12 @@ class GameRoom extends colyseus_1.Room {
                 const deviceId = this.deviceIds.get(player.id);
                 return deviceId ? [{ player, deviceId }] : [];
             });
+            // A cancelled countdown may already have a refunded wager, so each new
+            // attempt needs a fresh match id while keeping the wager linked to it.
+            this.matchId = (0, crypto_1.randomUUID)();
             const reservation = await (0, database_1.reserveDamageWager)(this.matchId, playerEntries.map(({ deviceId }) => deviceId), this.state.damageWager);
-            this.gameStartPending = false;
             if (!reservation.ok) {
+                this.gameStartPending = false;
                 const insufficientNames = playerEntries.filter(({ deviceId }) => reservation.insufficientPlayerIds.includes(deviceId)).map(({ player }) => player.name);
                 this.broadcast("gameStartError", { code: "insufficient_stars", names: insufficientNames, stake: this.state.damageWager });
                 return;
@@ -332,12 +353,19 @@ class GameRoom extends colyseus_1.Room {
                     player.stars = balance;
             });
             this.damageWagerReserved = true;
+            if (!this.hasEnoughPlayers() || playerEntries.some(({ player }) => this.state.players.get(player.id) !== player)) {
+                await this.refundStartingWager();
+                this.gameStartPending = false;
+                return;
+            }
+            this.gameStartPending = false;
         }
         this.beginGame();
     }
     beginGame() {
-        if (this.state.gameStarted)
+        if (this.state.gameStarted || !this.hasEnoughPlayers())
             return;
+        this.lobbyWasPublic = this.isPublic;
         this.state.gameStarted = true;
         this.gameStartedAt = new Date();
         this.isPublic = false;
@@ -345,6 +373,41 @@ class GameRoom extends colyseus_1.Room {
         void this.setPrivate(true);
         this.state.currentRoundIndex = -1;
         this.setPhase("starting", shared_1.GAME_START_COUNTDOWN_MS);
+    }
+    hasEnoughPlayers() {
+        const count = [...this.state.players.values()].filter((player) => player.connected).length;
+        if (this.state.gameMode === "damage")
+            return count === 2;
+        if (this.state.gameMode === "ranked")
+            return count === shared_1.RANKED_PLAYER_COUNT;
+        if (this.state.gameMode === "friends" && this.state.friendsTeamMode === "duos")
+            return count >= 4 && count % 2 === 0;
+        return count >= shared_1.MIN_PLAYERS_TO_START;
+    }
+    async refundStartingWager() {
+        if (!this.damageWagerReserved)
+            return;
+        const balances = await (0, database_1.settleDamageWager)(this.matchId, null);
+        this.damageWagerReserved = false;
+        for (const player of this.state.players.values()) {
+            const balance = balances.get(this.deviceIds.get(player.id) ?? "");
+            if (balance !== undefined)
+                player.stars = balance;
+        }
+    }
+    async cancelStarting() {
+        if (this.phaseTimeout)
+            clearTimeout(this.phaseTimeout);
+        this.gameStartPending = true;
+        this.state.phase = "lobby";
+        this.state.phaseEndsAt = 0;
+        this.state.gameStarted = false;
+        await this.refundStartingWager();
+        this.isPublic = this.lobbyWasPublic;
+        this.state.isPublic = this.isPublic;
+        await this.setPrivate(!this.isPublic);
+        await this.unlock();
+        this.gameStartPending = false;
     }
     // ---------------------------------------------------------------------
     // Round flow
@@ -392,6 +455,10 @@ class GameRoom extends colyseus_1.Room {
     advancePhase() {
         switch (this.state.phase) {
             case "starting":
+                if (!this.hasEnoughPlayers()) {
+                    void this.cancelStarting();
+                    break;
+                }
                 this.advanceToNextRound();
                 break;
             case "question":
@@ -451,6 +518,15 @@ class GameRoom extends colyseus_1.Room {
         if (this.state.phase !== "question" || this.roundAnswers.has(client.sessionId))
             return;
         const questionType = this.state.currentQuestion.qType;
+        if (questionType === "ordering") {
+            const value = msg?.value;
+            const count = this.state.currentQuestion.options.length;
+            if (!Array.isArray(value) || value.length !== count || new Set(value).size !== count
+                || !value.every((index) => Number.isInteger(index) && index >= 0 && index < count))
+                return;
+            this.roundAnswerDrafts.set(client.sessionId, [...value]);
+            return;
+        }
         if (!["word", "estimate", "closest_answer"].includes(questionType))
             return;
         if (typeof msg?.value !== "string")
@@ -462,11 +538,11 @@ class GameRoom extends colyseus_1.Room {
         for (const [playerId, draft] of this.roundAnswerDrafts) {
             if (this.roundAnswers.has(playerId))
                 continue;
-            const trimmed = draft.trim();
+            const trimmed = typeof draft === "string" ? draft.trim() : draft;
             if (!trimmed)
                 continue;
-            const value = questionType === "word" ? trimmed : Number(trimmed.replace(",", "."));
-            if (questionType !== "word" && !Number.isFinite(value))
+            const value = Array.isArray(trimmed) ? trimmed : questionType === "word" ? trimmed : Number(trimmed.replace(",", "."));
+            if (questionType !== "word" && questionType !== "ordering" && !Number.isFinite(value))
                 continue;
             this.roundAnswers.set(playerId, {
                 playerId,
@@ -730,6 +806,8 @@ class GameRoom extends colyseus_1.Room {
         this.state.correctAnswerText = (0, questions_1.localizeAnswer)(record, this.locale, correctAnswer);
     }
     endGame() {
+        if (this.state.gameEnded)
+            return;
         this.state.phase = "final_results";
         this.state.gameEnded = true;
         if (this.phaseTimeout)

@@ -3,7 +3,7 @@ import { Animated, LayoutChangeEvent, Platform, ScrollView, StyleSheet, Text, Te
 import { PanResponder } from "react-native";
 import { useTranslation } from "react-i18next";
 import { Room } from "colyseus.js";
-import { ANDROID_GAME_UI_SCALE, Screen, Title, BigButton, theme } from "../components/ui";
+import { ANDROID_GAME_UI_SCALE, Screen, ScreenScaleContext, Title, BigButton, theme } from "../components/ui";
 import { PhaseTimer } from "../components/PhaseTimer";
 import { DamageHud } from "../components/DamageHud";
 
@@ -26,9 +26,17 @@ export function QuestionScreen({ room, state }: { room: Room; state: any }) {
   const slotRefs = React.useRef<Array<View | null>>([]);
   const cardRefs = React.useRef<Array<View | null>>([]);
   const draggingCardIndexRef = React.useRef<number | null>(null);
-  const boardWindowOriginRef = React.useRef<{ x: number; y: number } | null>(null);
+  const dragOriginRef = React.useRef<{ x: number; y: number; scale: number } | null>(null);
+  const dragGenerationRef = React.useRef(0);
+  const lockedRef = React.useRef(false);
+  lockedRef.current = locked;
   const cardSizesRef = React.useRef<Record<number, { width: number; height: number }>>({});
   const dragPosition = React.useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+
+  useEffect(() => () => {
+    dragGenerationRef.current += 1;
+    draggingCardIndexRef.current = null;
+  }, []);
 
   // Reset local UI state at the start of every new round.
   useEffect(() => {
@@ -37,7 +45,8 @@ export function QuestionScreen({ room, state }: { room: Room; state: any }) {
     setLocked(false);
     setDraggingCardIndex(null);
     draggingCardIndexRef.current = null;
-    boardWindowOriginRef.current = null;
+    dragOriginRef.current = null;
+    dragGenerationRef.current += 1;
     dragPosition.setValue({ x: 0, y: 0 });
   }, [state?.currentQuestion?.id]);
 
@@ -61,6 +70,11 @@ export function QuestionScreen({ room, state }: { room: Room; state: any }) {
     if (!isOrderingQuestion) return;
     setSlotOrder(options.map((_, index) => index).sort(() => Math.random() - 0.5));
   }, [isOrderingQuestion, options.length, q.id]);
+
+  useEffect(() => {
+    if (!isOrderingQuestion || locked || slotOrder.length !== options.length || slotOrder.some((index) => index === null)) return;
+    room.send("saveAnswerDraft", { value: slotOrder });
+  }, [room, isOrderingQuestion, locked, slotOrder, options.length]);
 
   const canSubmitOrdering = isOrderingQuestion
     && slotOrder.length === options.length
@@ -98,51 +112,67 @@ export function QuestionScreen({ room, state }: { room: Room; state: any }) {
   }
 
   async function measureRect(view: View | null): Promise<MeasuredRect | null> {
-    if (!view) return null;
+    const board = boardRef.current;
+    if (!view || !board) return null;
 
     return new Promise((resolve) => {
-      view.measureInWindow((x, y, width, height) => {
+      // Layout coordinates exclude the Screen canvas transform and Android's
+      // status-bar offsets. Every drop target uses this same coordinate space.
+      view.measureLayout(board, (x, y, width, height) => {
         resolve({ x, y, width, height });
-      });
+      }, () => resolve(null));
     });
   }
 
-  function beginDrag(cardIndex: number, pageX: number, pageY: number) {
-    if (locked) return;
+  async function beginDrag(cardIndex: number, scale: number) {
+    if (lockedRef.current) return;
     draggingCardIndexRef.current = cardIndex;
-    setDraggingCardIndex(cardIndex);
-
+    const generation = ++dragGenerationRef.current;
     const size = cardSizesRef.current[cardIndex] ?? { width: 80, height: 64 };
+    const rect = await measureRect(cardRefs.current[cardIndex]);
+    if (!rect || generation !== dragGenerationRef.current) return;
+    dragOriginRef.current = { x: rect.x, y: rect.y, scale };
     setDraggingCardSize(size);
-    boardRef.current?.measureInWindow((boardX, boardY) => {
-      if (draggingCardIndexRef.current !== cardIndex) return;
-      boardWindowOriginRef.current = { x: boardX, y: boardY };
-      dragPosition.setValue({
-        x: pageX - boardX - size.width / 2,
-        y: pageY - boardY - size.height / 2,
-      });
-    });
+    dragPosition.setValue({ x: rect.x, y: rect.y });
+    setDraggingCardIndex(cardIndex);
   }
 
-  async function findDropSlotIndex(pageX: number, pageY: number) {
+  function moveDrag(dx: number, dy: number) {
+    const origin = dragOriginRef.current;
+    if (origin && origin.scale > 0) {
+      dragPosition.setValue({
+        x: origin.x + dx / origin.scale,
+        y: origin.y + dy / origin.scale,
+      });
+    }
+  }
+
+  async function findDropSlotIndex(x: number, y: number) {
     const slotRects = await Promise.all(slotRefs.current.map((slotRef) => measureRect(slotRef ?? null)));
     return slotRects.findIndex((slotRect) => {
       if (!slotRect) return false;
-      return pageX >= slotRect.x
-        && pageX <= slotRect.x + slotRect.width
-        && pageY >= slotRect.y
-        && pageY <= slotRect.y + slotRect.height;
+      return x >= slotRect.x
+        && x <= slotRect.x + slotRect.width
+        && y >= slotRect.y
+        && y <= slotRect.y + slotRect.height;
     });
   }
 
-  async function finishDrag(cardIndex: number, pageX: number, pageY: number) {
-    const targetSlotIndex = await findDropSlotIndex(pageX, pageY);
-    if (targetSlotIndex >= 0) {
+  async function finishDrag(cardIndex: number, dx: number, dy: number) {
+    const origin = dragOriginRef.current;
+    const generation = dragGenerationRef.current;
+    const size = cardSizesRef.current[cardIndex];
+    const targetSlotIndex = origin && size && origin.scale > 0
+      ? await findDropSlotIndex(origin.x + dx / origin.scale + size.width / 2, origin.y + dy / origin.scale + size.height / 2)
+      : -1;
+    if (generation !== dragGenerationRef.current) return;
+    if (!lockedRef.current && targetSlotIndex >= 0) {
       placeCardIntoSlot(cardIndex, targetSlotIndex);
     }
 
     draggingCardIndexRef.current = null;
-    boardWindowOriginRef.current = null;
+    dragOriginRef.current = null;
+    dragGenerationRef.current += 1;
     setDraggingCardIndex(null);
     dragPosition.setValue({ x: 0, y: 0 });
   }
@@ -153,41 +183,36 @@ export function QuestionScreen({ room, state }: { room: Room; state: any }) {
     room.send("submitAnswer", { value: slotOrder as number[] });
   }
 
-  function getCardPanResponder(cardIndex: number) {
+  function getCardPanResponder(cardIndex: number, scale: number) {
     return PanResponder.create({
-      onStartShouldSetPanResponder: () => !locked,
-      onMoveShouldSetPanResponder: () => !locked,
-      onPanResponderGrant: (event) => {
-        beginDrag(cardIndex, event.nativeEvent.pageX, event.nativeEvent.pageY);
+      onStartShouldSetPanResponder: () => !lockedRef.current,
+      onMoveShouldSetPanResponder: () => !lockedRef.current,
+      onPanResponderGrant: () => {
+        void beginDrag(cardIndex, scale);
       },
       onPanResponderMove: (_event, gestureState) => {
         if (draggingCardIndexRef.current !== cardIndex) return;
-        const boardOrigin = boardWindowOriginRef.current;
-        if (!boardOrigin) return;
-        const size = cardSizesRef.current[cardIndex] ?? { width: 80, height: 64 };
-        dragPosition.setValue({
-          x: gestureState.moveX - boardOrigin.x - size.width / 2,
-          y: gestureState.moveY - boardOrigin.y - size.height / 2,
-        });
+        moveDrag(gestureState.dx, gestureState.dy);
       },
       onPanResponderRelease: (_event, gestureState) => {
         if (draggingCardIndexRef.current !== cardIndex) return;
-        void finishDrag(cardIndex, gestureState.moveX, gestureState.moveY);
+        void finishDrag(cardIndex, gestureState.dx, gestureState.dy);
       },
       onPanResponderTerminate: () => {
         if (draggingCardIndexRef.current !== cardIndex) return;
         draggingCardIndexRef.current = null;
-        boardWindowOriginRef.current = null;
+        dragOriginRef.current = null;
+        dragGenerationRef.current += 1;
         setDraggingCardIndex(null);
         dragPosition.setValue({ x: 0, y: 0 });
       },
     });
   }
 
-  function renderOrderingCard(cardIndex: number, location: "slot" | "bank", slotIndex?: number) {
+  function renderOrderingCard(cardIndex: number, scale: number, location: "slot" | "bank", slotIndex?: number) {
     const cardLabel = options[cardIndex];
     const isDragging = draggingCardIndex === cardIndex;
-    const panHandlers = getCardPanResponder(cardIndex).panHandlers;
+    const panHandlers = getCardPanResponder(cardIndex, scale).panHandlers;
 
     return (
       <View
@@ -279,6 +304,7 @@ export function QuestionScreen({ room, state }: { room: Room; state: any }) {
               )}
             </View>
           ) : isOrderingQuestion ? (
+            <ScreenScaleContext.Consumer>{(scale) => (
             <View ref={boardRef} collapsable={false} style={[styles.orderingWrap, state.gameMode === "damage" && styles.damageAnswerWrap]}>
               <View style={styles.orderSlotsWrap}>
                 {slotOrder.map((cardIndex, slotIndex) => (
@@ -290,7 +316,7 @@ export function QuestionScreen({ room, state }: { room: Room; state: any }) {
                     collapsable={false}
                     style={[styles.orderSlot, state.gameMode === "damage" && styles.damageOrderSlot]}
                   >
-                    {cardIndex !== null ? renderOrderingCard(cardIndex, "slot", slotIndex) : null}
+                    {cardIndex !== null ? renderOrderingCard(cardIndex, scale, "slot", slotIndex) : null}
                   </View>
                 ))}
               </View>
@@ -334,6 +360,7 @@ export function QuestionScreen({ room, state }: { room: Room; state: any }) {
                 </Animated.View>
               ) : null}
             </View>
+            )}</ScreenScaleContext.Consumer>
           ) : (
             <ScrollView
               horizontal

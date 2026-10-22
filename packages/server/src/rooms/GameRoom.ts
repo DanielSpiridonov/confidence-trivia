@@ -34,6 +34,7 @@ import {
 import { getLocalizedCorrectAnswer, getQuestionSet, localize, localizeAnswer, localizeAnswerItems } from "../content/questions";
 import { canPlayerEnterGame, getAcceptedChallengeParticipantRole, getPlayerCustomization, isAuthenticatedPlayer, reserveDamageWager, saveCompletedMatch, settleDamageWager, upsertPlayer } from "../database";
 import { verifySupabaseIdentity } from "../auth";
+import { logServerError } from "../logging";
 
 interface JoinOptions {
   deviceId?: string;
@@ -85,7 +86,7 @@ export class GameRoom extends Room<RoomStateSchema> {
   // sees the public projections (schema.currentQuestion, confidenceBoard,
   // revealResults) that we derive from this at the right phase.
   private roundAnswers = new Map<string, PlayerAnswer>();
-  private roundAnswerDrafts = new Map<string, string>();
+  private roundAnswerDrafts = new Map<string, string | number[]>();
   private roundConfidenceDecisions = new Set<string>();
   private roundSideBets = new Map<string, SideBet>();
   private roundSideBetDecisions = new Set<string>();
@@ -94,12 +95,13 @@ export class GameRoom extends Room<RoomStateSchema> {
   // session IDs remain the room keys and public gameplay identifiers.
   private deviceIds = new Map<string, string>();
   private challengeRoles = new Map<string, "challenger" | "challenged">();
-  private readonly matchId = randomUUID();
+  private matchId = randomUUID();
   private gameStartedAt = new Date();
   private resultsPersisted = false;
   private damageKnockout = false;
   private damageWagerReserved = false;
   private gameStartPending = false;
+  private lobbyWasPublic = false;
   private hasCustomQuestions = false;
 
   async onCreate(options: CreateOptions = {}) {
@@ -216,11 +218,19 @@ export class GameRoom extends Room<RoomStateSchema> {
     }
     this.state.players.set(client.sessionId, player);
     this.challengeRoles.delete(client.sessionId);
+    // Return the join handshake immediately; database work must not hold the
+    // second player's queue screen behind profile loading or wager reservation.
+    void this.finishJoining(player, deviceId).catch((error) => logServerError("Could not finish joining room", error));
+    void this.updateLobbyMetadata();
+  }
+
+  private async finishJoining(player: PlayerSchema, deviceId: string) {
     const [stars, customization] = await Promise.all([
       upsertPlayer(deviceId, player.name),
       getPlayerCustomization(deviceId),
     ]);
-    if (stars !== null) player.stars = stars;
+    if (this.state.players.get(player.id) !== player) return;
+    if (stars !== null && !this.damageWagerReserved) player.stars = stars;
     if (customization) {
       player.nameColor = customization.nameColor;
       player.avatarId = customization.avatarId;
@@ -241,6 +251,11 @@ export class GameRoom extends Room<RoomStateSchema> {
     const player = this.state.players.get(client.sessionId);
     if (!player) return;
     player.connected = false;
+    // Final standings remain authoritative even as clients exit the room.
+    if (this.state.gameEnded) return;
+    if (this.state.phase === "starting" && !this.hasEnoughPlayers()) {
+      await this.cancelStarting();
+    }
     this.shortenConfidencePhaseIfEveryoneDecided();
     this.shortenSideBetPhaseIfEveryoneDecided();
 
@@ -282,7 +297,15 @@ export class GameRoom extends Room<RoomStateSchema> {
       await this.allowReconnection(client, RECONNECT_GRACE_MS / 1000);
       player.connected = true;
       void this.updateLobbyMetadata();
+      if (this.state.phase === "lobby" && this.hasEnoughPlayers()) {
+        if (this.state.gameMode === "ranked") this.beginGame();
+        else if (this.state.gameMode === "damage" && !this.state.isChallenge) {
+          const host = this.clients.find((candidate) => candidate.sessionId === this.state.hostId);
+          if (host) void this.handleStartGame(host);
+        }
+      }
     } catch {
+      if (this.state.gameEnded) return;
       if (this.state.gameMode === "damage" && this.state.gameStarted && !this.state.gameEnded) {
         player.health = 0;
         this.damageKnockout = true;
@@ -345,24 +368,19 @@ export class GameRoom extends Room<RoomStateSchema> {
   private async handleStartGame(client: Client) {
     if (client.sessionId !== this.state.hostId) return; // only host may start
     if (this.state.gameStarted || this.gameStartPending) return;
-    const requiredPlayerCount = this.state.gameMode === "damage"
-      ? 2
-      : this.state.gameMode === "ranked"
-        ? RANKED_PLAYER_COUNT
-        : MIN_PLAYERS_TO_START;
-    if (this.state.gameMode === "friends" && this.state.friendsTeamMode === "duos" && (this.state.players.size < 4 || this.state.players.size % 2 !== 0)) return;
-    if (this.state.gameMode === "damage" || this.state.gameMode === "ranked"
-      ? this.state.players.size !== requiredPlayerCount
-      : this.state.players.size < requiredPlayerCount) return;
+    if (!this.hasEnoughPlayers()) return;
     if (this.state.gameMode === "damage") {
       this.gameStartPending = true;
       const playerEntries = [...this.state.players.values()].flatMap((player) => {
         const deviceId = this.deviceIds.get(player.id);
         return deviceId ? [{ player, deviceId }] : [];
       });
+      // A cancelled countdown may already have a refunded wager, so each new
+      // attempt needs a fresh match id while keeping the wager linked to it.
+      this.matchId = randomUUID();
       const reservation = await reserveDamageWager(this.matchId, playerEntries.map(({ deviceId }) => deviceId), this.state.damageWager);
-      this.gameStartPending = false;
       if (!reservation.ok) {
+        this.gameStartPending = false;
         const insufficientNames = playerEntries.filter(({ deviceId }) => reservation.insufficientPlayerIds.includes(deviceId)).map(({ player }) => player.name);
         this.broadcast("gameStartError", { code: "insufficient_stars", names: insufficientNames, stake: this.state.damageWager });
         return;
@@ -372,12 +390,19 @@ export class GameRoom extends Room<RoomStateSchema> {
         if (balance !== undefined) player.stars = balance;
       });
       this.damageWagerReserved = true;
+      if (!this.hasEnoughPlayers() || playerEntries.some(({ player }) => this.state.players.get(player.id) !== player)) {
+        await this.refundStartingWager();
+        this.gameStartPending = false;
+        return;
+      }
+      this.gameStartPending = false;
     }
     this.beginGame();
   }
 
   private beginGame() {
-    if (this.state.gameStarted) return;
+    if (this.state.gameStarted || !this.hasEnoughPlayers()) return;
+    this.lobbyWasPublic = this.isPublic;
     this.state.gameStarted = true;
     this.gameStartedAt = new Date();
     this.isPublic = false;
@@ -385,6 +410,38 @@ export class GameRoom extends Room<RoomStateSchema> {
     void this.setPrivate(true);
     this.state.currentRoundIndex = -1;
     this.setPhase("starting", GAME_START_COUNTDOWN_MS);
+  }
+
+  private hasEnoughPlayers() {
+    const count = [...this.state.players.values()].filter((player) => player.connected).length;
+    if (this.state.gameMode === "damage") return count === 2;
+    if (this.state.gameMode === "ranked") return count === RANKED_PLAYER_COUNT;
+    if (this.state.gameMode === "friends" && this.state.friendsTeamMode === "duos") return count >= 4 && count % 2 === 0;
+    return count >= MIN_PLAYERS_TO_START;
+  }
+
+  private async refundStartingWager() {
+    if (!this.damageWagerReserved) return;
+    const balances = await settleDamageWager(this.matchId, null);
+    this.damageWagerReserved = false;
+    for (const player of this.state.players.values()) {
+      const balance = balances.get(this.deviceIds.get(player.id) ?? "");
+      if (balance !== undefined) player.stars = balance;
+    }
+  }
+
+  private async cancelStarting() {
+    if (this.phaseTimeout) clearTimeout(this.phaseTimeout);
+    this.gameStartPending = true;
+    this.state.phase = "lobby";
+    this.state.phaseEndsAt = 0;
+    this.state.gameStarted = false;
+    await this.refundStartingWager();
+    this.isPublic = this.lobbyWasPublic;
+    this.state.isPublic = this.isPublic;
+    await this.setPrivate(!this.isPublic);
+    await this.unlock();
+    this.gameStartPending = false;
   }
 
   // ---------------------------------------------------------------------
@@ -436,6 +493,10 @@ export class GameRoom extends Room<RoomStateSchema> {
   private advancePhase() {
     switch (this.state.phase) {
       case "starting":
+        if (!this.hasEnoughPlayers()) {
+          void this.cancelStarting();
+          break;
+        }
         this.advanceToNextRound();
         break;
       case "question":
@@ -494,6 +555,14 @@ export class GameRoom extends Room<RoomStateSchema> {
   private handleSaveAnswerDraft(client: Client, msg: { value?: unknown }) {
     if (this.state.phase !== "question" || this.roundAnswers.has(client.sessionId)) return;
     const questionType = this.state.currentQuestion.qType;
+    if (questionType === "ordering") {
+      const value = msg?.value;
+      const count = this.state.currentQuestion.options.length;
+      if (!Array.isArray(value) || value.length !== count || new Set(value).size !== count
+        || !value.every((index) => Number.isInteger(index) && index >= 0 && index < count)) return;
+      this.roundAnswerDrafts.set(client.sessionId, [...value]);
+      return;
+    }
     if (!["word", "estimate", "closest_answer"].includes(questionType)) return;
     if (typeof msg?.value !== "string") return;
     this.roundAnswerDrafts.set(client.sessionId, msg.value.slice(0, questionType === "word" ? 32 : 12));
@@ -503,11 +572,11 @@ export class GameRoom extends Room<RoomStateSchema> {
     const questionType = this.state.currentQuestion.qType;
     for (const [playerId, draft] of this.roundAnswerDrafts) {
       if (this.roundAnswers.has(playerId)) continue;
-      const trimmed = draft.trim();
+      const trimmed = typeof draft === "string" ? draft.trim() : draft;
       if (!trimmed) continue;
 
-      const value = questionType === "word" ? trimmed : Number(trimmed.replace(",", "."));
-      if (questionType !== "word" && !Number.isFinite(value)) continue;
+      const value = Array.isArray(trimmed) ? trimmed : questionType === "word" ? trimmed : Number(trimmed.replace(",", "."));
+      if (questionType !== "word" && questionType !== "ordering" && !Number.isFinite(value)) continue;
       this.roundAnswers.set(playerId, {
         playerId,
         value: value as PlayerAnswer["value"],
@@ -776,6 +845,7 @@ export class GameRoom extends Room<RoomStateSchema> {
   }
 
   private endGame() {
+    if (this.state.gameEnded) return;
     this.state.phase = "final_results";
     this.state.gameEnded = true;
     if (this.phaseTimeout) clearTimeout(this.phaseTimeout);

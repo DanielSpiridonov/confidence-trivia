@@ -1,1 +1,1 @@
-export const MIN_PLAYERS_TO_START = 1;
+export const MIN_PLAYERS_TO_START = 2;

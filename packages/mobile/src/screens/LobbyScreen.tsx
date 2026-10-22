@@ -81,11 +81,12 @@ export function LobbyScreen({ room, state, mySessionId }: { room: Room; state: a
   const me = players.find((p) => p.id === mySessionId);
   const isHost = me?.isHost ?? false;
   const requiredPlayers = state.gameMode === "damage" ? 2 : state.gameMode === "ranked" ? RANKED_PLAYER_COUNT : MIN_PLAYERS_TO_START;
+  const connectedPlayerCount = players.filter((player) => player.connected).length;
   const isRanked = state.gameMode === "ranked";
   const isChallenge = Boolean(state.isChallenge);
   const isMatchmade = isRanked || (state.gameMode === "damage" && !isChallenge);
-  const validFriendsTeamSize = state.gameMode !== "friends" || state.friendsTeamMode !== "duos" || (players.length >= 4 && players.length % 2 === 0);
-  const canStart = isHost && validFriendsTeamSize && (state.gameMode === "damage" || state.gameMode === "ranked" ? players.length === requiredPlayers : players.length >= requiredPlayers);
+  const validFriendsTeamSize = state.gameMode !== "friends" || state.friendsTeamMode !== "duos" || (connectedPlayerCount >= 4 && connectedPlayerCount % 2 === 0);
+  const canStart = isHost && validFriendsTeamSize && (state.gameMode === "damage" || state.gameMode === "ranked" ? connectedPlayerCount === requiredPlayers : connectedPlayerCount >= requiredPlayers);
 
   async function handleCopyCode() {
     await Clipboard.setStringAsync(String(state.code));
