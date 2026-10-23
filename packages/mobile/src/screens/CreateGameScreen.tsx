@@ -15,7 +15,8 @@ const DEFAULT_ROUNDS = ROUND_OPTIONS.reduce((closest, value) => Math.abs(value -
 type GameMode = "classic" | "friends" | "ranked" | "damage";
 const FRIEND_CATEGORIES = ["general", "science", "geography", "history", "movies", "music", "sports", "animals", "technology", "food"];
 
-export function CreateGameScreen({ onCreate, deviceId, stars, registered, onSignInRequired, initialName, onBack }: {
+export function CreateGameScreen({ onCreate, onEndless, deviceId, stars, registered, onSignInRequired, initialName, onBack }: {
+  onEndless: () => void;
   onCreate: (name: string, rounds: number, gameMode: GameMode, visibility: "private" | "public", damageWager: number, friendsOptions?: { teamMode: "ffa" | "duos"; categories: string[]; customQuestions: Array<{ question: string; answer: string }> }) => Promise<void>;
   locale: "en" | "bg";
   deviceId: string;
@@ -96,8 +97,11 @@ export function CreateGameScreen({ onCreate, deviceId, stars, registered, onSign
       <BackIconButton label={t("common.back")} onPress={onBack} disabled={submitting} />
       <Title>{t("home.createGame")}</Title>
       <View style={styles.body}>
-        <View style={styles.modeRail}>
+        <ScrollView style={styles.modeRail} showsVerticalScrollIndicator contentContainerStyle={{ paddingBottom: 4 }}>
           <Text style={styles.sectionLabel}>{t("create.mode")}</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel="Endless solo mode" onPress={onEndless} style={styles.modeItem}>
+            <View style={styles.modeIcon}><MaterialCommunityIcons name="infinity" size={25} color="#D8B1FF" /></View><View style={styles.modeCopy}><Text style={styles.modeTitle}>Endless</Text><Text style={styles.modeDetail}>Solo · 3 lives · Beat your best</Text></View><MaterialCommunityIcons name="chevron-right" size={18} color="#D8B1FF" />
+          </Pressable>
           {modes.map((mode) => {
             const selected = gameMode === mode.id;
             return <Pressable key={mode.id} accessibilityRole="radio" accessibilityState={{ selected }} onPress={() => selectMode(mode.id)} style={({ pressed }) => [styles.modeItem, selected && styles.modeItemSelected, pressed && styles.modeItemPressed]}>
@@ -106,7 +110,7 @@ export function CreateGameScreen({ onCreate, deviceId, stars, registered, onSign
               <MaterialCommunityIcons name="chevron-right" size={18} color={selected ? theme.primary : "rgba(185,176,214,0.42)"} />
             </Pressable>;
           })}
-        </View>
+        </ScrollView>
 
         <View style={styles.configurationPanel}>
           <View style={styles.playerRow}>

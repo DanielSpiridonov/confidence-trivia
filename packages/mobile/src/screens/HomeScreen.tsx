@@ -102,6 +102,7 @@ export function HomeScreen({
   unreadInboxCount,
   deviceId,
   onRanked,
+  onEndless,
   onShop,
   dailyReward,
   dailyRewardClaiming,
@@ -119,6 +120,7 @@ export function HomeScreen({
   unreadInboxCount: number;
   deviceId: string | null;
   onRanked: () => void;
+  onEndless: () => void;
   onShop: () => void;
   dailyReward: { available: boolean; amount: number; streakDay: number; nextClaimAt: string } | null;
   dailyRewardClaiming: boolean;
@@ -255,6 +257,7 @@ export function HomeScreen({
         <View style={styles.actions}>
           <HomeActionButton label={t("home.createGame")} icon="add-circle-outline" onPress={onCreate} />
           <HomeActionButton label={t("home.joinGame")} icon="enter-outline" secondary onPress={onJoin} />
+          <HomeActionButton label="Endless" icon="infinite-outline" onPress={onEndless} />
         </View>
       </View>
       <View style={styles.homeMenuDock}>

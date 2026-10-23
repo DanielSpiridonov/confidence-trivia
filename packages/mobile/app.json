@@ -41,6 +41,7 @@
       "package": "com.daniespi.confidencetrivia"
     },
     "plugins": [
+      "./plugins/withAndroidIconInset",
       "expo-dev-client",
       ["expo-audio", { "recordAudioAndroid": false, "microphonePermission": false }],
       "expo-secure-store",

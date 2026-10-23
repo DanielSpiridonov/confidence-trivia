@@ -3,6 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.databaseSql = void 0;
 exports.submitPlayerReport = submitPlayerReport;
 exports.getNewsPosts = getNewsPosts;
 exports.redeemPromoCode = redeemPromoCode;
@@ -53,6 +54,7 @@ const databaseUrl = process.env.DATABASE_URL;
 const sql = databaseUrl
     ? (0, postgres_1.default)(databaseUrl, { max: 3, idle_timeout: 20 })
     : null;
+exports.databaseSql = sql;
 async function submitPlayerReport(reporterId, rawReportedName, rawDescription) {
     if (!sql)
         return { ok: false, error: "Player reports are temporarily unavailable" };

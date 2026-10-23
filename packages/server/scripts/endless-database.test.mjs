@@ -1,0 +1,137 @@
+import test, { before, beforeEach, after } from "node:test";
+import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { PGlite } from "@electric-sql/pglite";
+import { endlessAction, endlessLeaderboard } from "../dist/endless.js";
+
+// Real PostgreSQL SQL/constraints/transactions in WASM. Only the postgres.js
+// transport is adapted. All production service queries and migration 023 run
+// unchanged. PGlite queues transactions on one connection: these tests validate
+// concurrent request semantics, not multi-instance lock contention/performance.
+const pg = new PGlite();
+function adapter(connection) {
+  const sql = async (strings, ...values) => {
+    const query = strings.reduce((text, part, i) => text + (i ? `$${i}` : "") + part, "");
+    return (await connection.query(query, values)).rows;
+  };
+  sql.json = (value) => JSON.stringify(value);
+  sql.begin = (callback) => pg.transaction((tx) => callback(adapter(tx)));
+  return sql;
+}
+const sql = adapter(pg);
+const playerId = randomUUID(), userId = randomUUID();
+const sync = () => endlessAction(playerId, userId, { type: "sync" }, sql);
+const start = (requestId = randomUUID()) => endlessAction(playerId, userId, { type: "start", requestId }, sql);
+async function storedRun() { return (await pg.query("select state from endless_runs where player_id = $1 order by finished, created_at desc limit 1", [playerId])).rows[0].state; }
+async function setRun(state) { await pg.query("update endless_runs set state = $1::jsonb, finished = $2 where id = $3", [JSON.stringify(state), state.phase === "finished", state.id]); }
+async function answerCorrect() {
+  const r = await storedRun();
+  return endlessAction(playerId, userId, { type: "answer", runId: r.id, token: r.question.token, answer: r.question.correctIndex }, sql);
+}
+
+before(async () => {
+  // Dependencies belong to earlier migrations; minimal fixture keeps tests
+  // independent of external Supabase Auth and pg_cron infrastructure.
+  await pg.exec(`
+    create role anon; create role authenticated;
+    create table players(id uuid primary key, auth_user_id uuid, display_name text default 'Player', account_type text default 'registered', moderation_status text default 'active', suspended_until timestamptz, stars integer not null default 0 check(stars >= 0));
+    create table star_transactions(id uuid primary key, player_id uuid references players(id) on delete set null, amount integer not null check(amount <> 0), reason text not null);
+    create table player_cosmetics(player_id uuid references players(id) on delete cascade, cosmetic_id text, cosmetic_type text, equipped boolean);
+  `);
+  await pg.exec(await readFile(new URL("../../../supabase/migrations/023_create_endless.sql", import.meta.url), "utf8"));
+});
+beforeEach(async () => {
+  await pg.exec("truncate players cascade");
+  await pg.query("insert into players(id, auth_user_id, stars) values ($1, $2, 100)", [playerId, userId]);
+});
+after(async () => { await pg.close(); });
+
+test("migration creates private tables with RLS and no API privileges", async () => {
+  const rows = (await pg.query("select relname, relrowsecurity from pg_class where relname in ('endless_runs','endless_records','endless_reward_claims')")).rows;
+  assert.equal(rows.length, 3); assert.ok(rows.every((r) => r.relrowsecurity));
+  for (const role of ["anon", "authenticated"]) {
+    for (const table of ["endless_runs", "endless_records", "endless_reward_claims"]) {
+      const [r] = (await pg.query("select has_table_privilege($1, $2, 'select') as readable, has_table_privilege($1, $2, 'insert,update,delete') as writable", [role, table])).rows;
+      assert.equal(r.readable, false); assert.equal(r.writable, false);
+    }
+  }
+});
+test("unauthorized identity, guests, and banned players cannot mutate Endless", async () => {
+  await assert.rejects(endlessAction(playerId, randomUUID(), { type: "start", requestId: randomUUID() }, sql), { status: 403 });
+  for (const [accountType, moderation] of [["guest", "active"], ["registered", "banned"], ["registered", "suspended"]]) {
+    await pg.query("update players set account_type = $1, moderation_status = $2, suspended_until = now() + interval '1 day'", [accountType, moderation]);
+    await assert.rejects(start(), { status: 403 });
+  }
+  assert.equal((await pg.query("select count(*)::int as n from endless_runs")).rows[0].n, 0);
+});
+test("Start is idempotent; simultaneous devices share one persistent active run", async () => {
+  const id = randomUUID();
+  const states = await Promise.all(Array.from({ length: 12 }, (_, i) => start(i % 2 ? randomUUID() : id)));
+  assert.equal(new Set(states.map((s) => s.run.id)).size, 1);
+  assert.equal((await pg.query("select count(*)::int as n from endless_runs")).rows[0].n, 1);
+  const resumed = await sync(); assert.deepEqual(resumed.run, states[0].run);
+});
+test("database deadlines survive reconnect and cannot be reset by another Start", async () => {
+  await start(); const r = await storedRun(); r.question.deadline = Date.now() - 10000; await setRun(r);
+  const lost = await start(); assert.equal(lost.run.lives, 2); assert.equal(lost.run.phase, "feedback"); assert.equal(lost.run.feedback.timedOut, true);
+  assert.equal((await sync()).run.lives, 2); assert.equal((await storedRun()).question.deadline, r.question.deadline);
+});
+test("concurrent answers, retries, records, and reward grants settle exactly once", async () => {
+  await start(); const r = await storedRun(); r.score = 9; await setRun(r);
+  const command = { type: "answer", runId: r.id, token: r.question.token, answer: r.question.correctIndex };
+  const results = await Promise.all(Array.from({ length: 20 }, () => endlessAction(playerId, userId, command, sql)));
+  for (const state of results) { assert.equal(state.run.score, 10); assert.equal(state.personalBest, 10); assert.equal(state.stars, 110); assert.deepEqual(state.claimed, [10]); }
+  assert.equal((await pg.query("select count(*)::int as n from star_transactions")).rows[0].n, 1);
+  assert.equal((await pg.query("select count(*)::int as n from endless_reward_claims")).rows[0].n, 1);
+});
+test("failed currency transaction rolls back answer, record, and claim; retry succeeds", async () => {
+  await start(); const r = await storedRun(); r.score = 9; await setRun(r);
+  await pg.exec("create function fail_reward() returns trigger language plpgsql as $$ begin raise exception 'simulated failure'; end $$; create trigger fail_reward before insert on star_transactions for each row execute function fail_reward();");
+  try { await assert.rejects(answerCorrect(), /simulated failure/); } finally { await pg.exec("drop trigger fail_reward on star_transactions; drop function fail_reward();"); }
+  assert.equal((await storedRun()).score, 9); assert.equal((await storedRun()).phase, "question");
+  assert.equal((await pg.query("select best_score from endless_records")).rows[0].best_score, 0);
+  const result = await answerCorrect(); assert.equal(result.run.score, 10); assert.equal(result.stars, 110);
+});
+test("several milestone rewards commit together and their unique claims prevent duplicates", async () => {
+  await start(); const r = await storedRun(); r.score = 75; await setRun(r);
+  const state = await sync(); assert.equal(state.personalBest, 75); assert.deepEqual(state.claimed.sort((a,b) => a-b), [10,25,50,75]); assert.equal(state.stars, 170);
+  assert.equal((await sync()).stars, 170);
+  await assert.rejects(pg.query("insert into endless_reward_claims select * from endless_reward_claims limit 1"), /duplicate key/);
+});
+test("replay resets the run; finishing below a previous best never reduces permanent progress", async () => {
+  const id = randomUUID(); await start(id); let r = await storedRun(); r.score = 50; r.phase = "finished"; r.lives = 0; r.endReason = "lives"; await setRun(r); await sync();
+  const replay = await start(); assert.equal(replay.run.score, 0); assert.equal(replay.run.lives, 3); assert.equal(replay.run.previousBest, 50); assert.equal(replay.personalBest, 50); assert.equal(replay.stars, 145);
+  // Retrying an old Start cannot replace a newer run.
+  assert.equal((await start(id)).run.id, replay.run.id);
+  r = await storedRun(); r.score = 35; r.phase = "finished"; r.lives = 0; await setRun(r);
+  const below = await sync(); assert.equal(below.personalBest, 50); assert.equal(below.stars, 145); assert.deepEqual(below.run.rewards, []);
+});
+test("one-active-run database constraint protects against non-cooperating writers", async () => {
+  await start(); await assert.rejects(pg.query("insert into endless_runs(id,player_id,state) values ($1,$2,'{}')", [randomUUID(), playerId]), /duplicate key/);
+});
+test("leaderboard uses verified single-run best, earliest achievement, then player ID", async () => {
+  assert.deepEqual(await endlessLeaderboard(playerId, sql), { top: [], currentPlayer: null });
+  const earlier = randomUUID();
+  await pg.query("insert into players(id, auth_user_id, display_name) values($1,$2,'Earlier')", [earlier, randomUUID()]);
+  await pg.query("insert into endless_records(player_id,best_score,achieved_at) values ($1,50,'2026-01-02'),($2,50,'2026-01-01')", [playerId, earlier]);
+  await pg.query("insert into player_cosmetics values($1,'clever_fox','avatar',true)", [earlier]);
+  const board = await endlessLeaderboard(playerId, sql); assert.equal(board.top[0].playerId, earlier); assert.equal(board.top[0].avatarId, "clever_fox"); assert.equal(board.currentPlayer.position, 2);
+  await pg.query("update endless_records set achieved_at = '2026-01-01'");
+  const tied = await endlessLeaderboard(playerId, sql); assert.equal(tied.top[0].playerId, [earlier, playerId].sort()[0]);
+  await pg.query("update players set moderation_status = 'banned' where id = $1", [earlier]);
+  assert.equal((await endlessLeaderboard(playerId, sql)).top.length, 1);
+});
+test("leaderboard includes the current player outside the top 100", async () => {
+  await pg.query("insert into endless_records(player_id,best_score) values ($1,1)", [playerId]);
+  for (let i=0; i<101; i++) {
+    const id = randomUUID(); await pg.query("insert into players(id,auth_user_id) values($1,$2)", [id,randomUUID()]); await pg.query("insert into endless_records(player_id,best_score) values($1,2)", [id]);
+  }
+  const board = await endlessLeaderboard(playerId, sql); assert.equal(board.top.length, 100); assert.equal(board.currentPlayer.position, 102);
+});
+test("account deletion erases private Endless history and removes the leaderboard record", async () => {
+  await start(); const r = await storedRun(); r.score = 10; await setRun(r); await sync();
+  await pg.query("update players set account_type = 'deleted' where id = $1", [playerId]);
+  for (const table of ["endless_runs", "endless_records", "endless_reward_claims"]) assert.equal((await pg.query(`select count(*)::int as n from ${table}`)).rows[0].n, 0);
+  assert.equal((await pg.query("select count(*)::int as n from star_transactions")).rows[0].n, 1);
+});

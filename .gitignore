@@ -9,6 +9,8 @@ packages/mobile/.env.local
 packages/mobile/.env.*.local
 packages/server/.env
 packages/server/.env.local
+/.codex-staging/npm-cache/
+/.codex-staging/endless-smoke/
 
 # Standalone website is maintained separately from the game.
 /website/

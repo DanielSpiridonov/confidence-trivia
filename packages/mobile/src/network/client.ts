@@ -1,6 +1,7 @@
 import { Client, Room } from "colyseus.js";
 import { useEffect, useRef, useState } from "react";
 import { getAccessToken } from "../auth/supabase";
+import type { EndlessState, EndlessLeaderboard } from "@confidence-trivia/shared";
 
 // Set this through EXPO_PUBLIC_SERVER_URL. Use the Docker host's LAN IP when
 // testing on a physical device; localhost only reaches the device itself.
@@ -10,6 +11,26 @@ export const SERVER_CONFIGURATION_ERROR = !__DEV__ && !/^wss:\/\//i.test(SERVER_
   : null;
 const HTTP_SERVER_URL = SERVER_URL.replace(/^ws/, "http").replace(/\/$/, "");
 const ROOM_REQUEST_TIMEOUT_MS = 10_000;
+
+async function endlessRequest<T>(playerId: string, path: string, command?: object): Promise<T> {
+  const accessToken = await getAccessToken();
+  if (!accessToken) throw new Error("Your session expired. Please sign in again.");
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12_000);
+  try {
+    const response = await fetch(`${HTTP_SERVER_URL}/endless/${path}?playerId=${encodeURIComponent(playerId)}`, {
+      method: command ? "POST" : "GET", signal: controller.signal,
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+      ...(command ? { body: JSON.stringify(command) } : {}),
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload?.error ?? "Endless is temporarily unavailable.");
+    return payload as T;
+  } finally { clearTimeout(timeout); }
+}
+export const getEndlessState = (playerId: string) => endlessRequest<EndlessState>(playerId, "state");
+export const sendEndlessAction = (playerId: string, command: object) => endlessRequest<EndlessState>(playerId, "action", command);
+export const getEndlessLeaderboard = (playerId: string) => endlessRequest<EndlessLeaderboard>(playerId, "leaderboard");
 
 export interface PlayerAccount {
   playerId: string;

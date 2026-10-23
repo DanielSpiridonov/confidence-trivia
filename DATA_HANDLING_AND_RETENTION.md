@@ -13,6 +13,7 @@ This inventory describes the version-one application. It must be reviewed whenev
 | Stars and immutable star ledger | Currency balance, rewards, fraud prevention and wager settlement | Game database | Authenticated player and Render game server |
 | Cosmetics and equipped items | Persistent customization | Game database | Render server and other players when shown in a game |
 | Scores, match placement, rank, LP and wins | Gameplay results and persistent progression | Game database | Players in the match and ranked leaderboard where applicable |
+| Endless active/completed runs, question deadlines, lives, best score and milestone claims | Resume solo runs, validate answers and prevent duplicate Star rewards | Game database; private server-only tables | Own run through authenticated Render endpoints; best score, name, avatar and position on the authenticated Endless leaderboard |
 | Custom-room questions and expected answers | Run a private host-created match | Active Render room memory only; not intentionally persisted | Players invited to that room |
 | Friendships, Blessings and challenges | Social features and reward integrity | Game database | The involved players |
 | Presence timestamps | Show whether a friend can be challenged | Game database | Friends through the game server |
@@ -44,6 +45,12 @@ need configuration or a manual operating procedure.
   completion, plus `ranked_match_results` for Ranked. These records currently
   have no automatic expiry. Player names in match results are replaced on
   account deletion; account aggregates and integrity records are retained.
+- Endless run snapshots and records: retain while the account exists; no
+  automatic expiry is configured. Completed run IDs also serve as persistent
+  Start idempotency keys. Migration `023_create_endless.sql` immediately deletes
+  the player's Endless runs, records and milestone claims when the existing
+  account deletion flow marks the player as deleted. Star ledger retention and
+  anonymization follow the existing currency policy.
 - Application logs: the server writes startup and error messages to standard
   output/error. Production errors contain a context, error name, and optional
   database error code. Render captures these messages and applies its workspace

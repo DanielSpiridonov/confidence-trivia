@@ -1,19 +1,23 @@
 import React from "react";
-import { FlatList, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { getRankedDivision, RANKED_PLACEMENT_MATCHES } from "@confidence-trivia/shared";
-import { ANDROID_MENU_UI_SCALE, BackIconButton, Screen, Title, theme } from "../components/ui";
+import { ANDROID_MENU_UI_SCALE, BackIconButton, Screen, theme } from "../components/ui";
 import { getRankedLeaderboard, RankedLeaderboardEntry, RankedLeaderboardResponse } from "../network/client";
 import { RankIcon } from "../components/RankIcon";
+import { EndlessLeaderboardPanel } from "../components/EndlessLeaderboardPanel";
 
 export function RankedScreen({
   deviceId,
   onBack,
+  initialTab = "ranked",
 }: {
   deviceId: string;
   onBack: () => void;
+  initialTab?: "ranked" | "endless";
 }) {
   const { t } = useTranslation();
+  const [tab, setTab] = React.useState(initialTab);
   const [leaderboard, setLeaderboard] = React.useState<RankedLeaderboardResponse | null>(null);
   const [loading, setLoading] = React.useState(true);
 
@@ -33,9 +37,11 @@ export function RankedScreen({
   return (
     <Screen style={styles.screen} androidScale={ANDROID_MENU_UI_SCALE * 0.9}>
       <BackIconButton label={t("common.back")} onPress={onBack} />
-      <Title>{t("ranked.title")}</Title>
+      <View style={{ flexDirection: "row", justifyContent: "center", gap: 10, marginBottom: 8 }}>
+        {(["ranked", "endless"] as const).map((value) => <Pressable key={value} accessibilityRole="tab" accessibilityState={{ selected: tab === value }} onPress={() => setTab(value)} style={{ borderRadius: 9, paddingHorizontal: 20, paddingVertical: 8, backgroundColor: tab === value ? theme.primary : theme.surface }}><Text style={{ color: theme.text, fontSize: 14, fontWeight: "800" }}>{value === "ranked" ? t("ranked.title") : "Endless"}</Text></Pressable>)}
+      </View>
 
-      <View style={styles.content}>
+      {tab === "endless" ? <EndlessLeaderboardPanel playerId={deviceId} /> : <View style={styles.content}>
         {current ? <PlayerRankCard entry={current} t={t} /> : null}
         <View style={styles.leaderboardPanel}>
           <View pointerEvents="none" style={[styles.framePin, styles.framePinTopLeft]} />
@@ -64,7 +70,7 @@ export function RankedScreen({
           ) : null}
         </View>
 
-      </View>
+      </View>}
     </Screen>
   );
 }

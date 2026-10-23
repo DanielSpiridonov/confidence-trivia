@@ -38,6 +38,13 @@ The question bank is in `packages/server/src/content/questions.ts` and
 need review. Record how each imported or generated batch was created and
 retain permission or provenance evidence for any externally sourced wording.
 
+`packages/server/src/content/endlessQuestions.ts` reuses that bank and adds
+72 original, code-generated mathematical questions (combinations, sums of
+squares and modular powers), written during the Endless implementation on
+23 October 2026. Their wording, distractors and answer calculations are present
+in the source; no external question dataset or new image/audio asset was added.
+This does not resolve the existing bank's outstanding provenance review.
+
 ## Completion rule
 
 Do not mark the content-ownership checklist complete until every shipped file

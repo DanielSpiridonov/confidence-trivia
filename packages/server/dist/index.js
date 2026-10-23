@@ -15,6 +15,7 @@ const auth_1 = require("./auth");
 const shared_1 = require("@confidence-trivia/shared");
 const rateLimit_1 = require("./rateLimit");
 const logging_1 = require("./logging");
+const endlessRoutes_1 = require("./endlessRoutes");
 const port = Number(process.env.PORT ?? 2567);
 const app = (0, express_1.default)();
 app.set("trust proxy", 1);
@@ -32,6 +33,7 @@ app.get("/health", async (_req, res) => {
     res.json({ ok: true, database });
 });
 app.use(generalLimit);
+app.use("/endless", endlessRoutes_1.endlessRouter);
 app.get("/news", async (req, res) => {
     const locale = req.query.locale === "bg" ? "bg" : "en";
     const posts = await (0, database_2.getNewsPosts)(locale);

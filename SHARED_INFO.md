@@ -38,6 +38,12 @@ checklist, use `PRE_PUBLISH_CHECKLIST.md`.
 
 ## Current state
 
+- Endless solo mode is implemented locally (23 October 2026), with persistent
+  authoritative runs, a separate leaderboard and once-only Star milestones.
+  See [ENDLESS_MODE.md](ENDLESS_MODE.md) for the source inventory, content limits,
+  validation and required migration 023/server deployment. It is not deployed;
+  device and live test-environment verification remain required.
+
 - The complete game loop has been playtested on Android and iPhone.
 - Startup/account gate, profile, shop, daily rewards, Custom mode, Ranked
   prototype, Damage mode, friends, notifications, and legal pages exist.

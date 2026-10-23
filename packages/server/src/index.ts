@@ -10,6 +10,7 @@ import { deleteSupabaseIdentity, revokeAppleAuthorization, verifySupabaseIdentit
 import { isDamageWager, isOffensivePlayerName } from "@confidence-trivia/shared";
 import { authenticatedActorOrIpKey, createRateLimiter } from "./rateLimit";
 import { logServerError } from "./logging";
+import { endlessRouter } from "./endlessRoutes";
 
 const port = Number(process.env.PORT ?? 2567);
 const app = express();
@@ -31,6 +32,7 @@ app.get("/health", async (_req, res) => {
 });
 
 app.use(generalLimit);
+app.use("/endless", endlessRouter);
 
 app.get("/news", async (req, res) => {
   const locale = req.query.locale === "bg" ? "bg" : "en";

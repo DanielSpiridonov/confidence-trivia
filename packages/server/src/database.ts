@@ -28,6 +28,9 @@ const sql = databaseUrl
   ? postgres(databaseUrl, { max: 3, idle_timeout: 20 })
   : null;
 
+// Share the existing bounded connection pool with authoritative solo gameplay.
+export { sql as databaseSql };
+
 export type DatabaseStatus = "connected" | "not_configured" | "unavailable";
 
 export interface NewsPost { id: string; title: string; body: string; publishedAt: string; }

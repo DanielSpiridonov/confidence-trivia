@@ -1,4 +1,5 @@
 export * from "./types";
+export * from "./config/endless";
 export * from "./config/scoring";
 export * from "./config/room";
 export * from "./config/timing";

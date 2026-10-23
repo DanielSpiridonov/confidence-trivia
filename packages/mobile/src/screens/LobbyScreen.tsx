@@ -8,6 +8,7 @@ import { FRAME_COSMETIC_COLORS, MIN_PLAYERS_TO_START, RANKED_PLAYER_COUNT } from
 import { ANDROID_GAME_UI_SCALE, Screen, Title, Subtitle, BigButton, theme } from "../components/ui";
 import { playSound } from "../audio/sounds";
 import { PlayerFrameEffect } from "../components/PlayerFrameEffect";
+import { MatchmakingQueueScreen } from "./MatchmakingQueueScreen";
 
 interface PublicPlayerView {
   id: string;
@@ -17,6 +18,7 @@ interface PublicPlayerView {
   connected: boolean;
   stars: number;
   nameColor: string;
+  avatarId: string;
   frameId: string;
   team: string;
 }
@@ -31,7 +33,7 @@ export function LobbyScreen({ room, state, mySessionId }: { room: Room; state: a
   const isStarting = state?.phase === "starting";
 
   useEffect(() => {
-    room.onMessage("gameStartError", (message: { code?: string; names?: string[]; stake?: number }) => {
+    return room.onMessage("gameStartError", (message: { code?: string; names?: string[]; stake?: number }) => {
       if (message.code === "insufficient_stars") {
         setStartError(t("lobby.insufficientWagerStars", { names: message.names?.join(", ") || "Player", stake: message.stake ?? 0 }));
       }
@@ -74,6 +76,7 @@ export function LobbyScreen({ room, state, mySessionId }: { room: Room; state: a
     connected: p.connected,
     stars: p.stars,
     nameColor: p.nameColor,
+    avatarId: p.avatarId,
     frameId: p.frameId,
     team: p.team,
   }));
@@ -94,6 +97,10 @@ export function LobbyScreen({ room, state, mySessionId }: { room: Room; state: a
     setTimeout(() => setCopied(false), 1500);
   }
 
+  if (isMatchmade) {
+    return <MatchmakingQueueScreen players={players} mySessionId={mySessionId} ranked={isRanked} isStarting={isStarting} countdownSeconds={countdownSeconds} wager={state.damageWager} pot={state.damagePot} error={startError} />;
+  }
+
   return (
     <Screen androidScale={ANDROID_GAME_UI_SCALE * 0.9}>
       <View style={styles.contentWrap}>
@@ -105,24 +112,24 @@ export function LobbyScreen({ room, state, mySessionId }: { room: Room; state: a
                 <PlayerFrameEffect frameId={item.frameId} />
                 <Text numberOfLines={1} style={[styles.playerName, { color: item.nameColor || theme.text }]}>{item.isHost ? "👑 " : ""}{item.name}{!item.connected ? " (reconnecting…)" : ""}</Text>
                 {item.team ? <Text style={[styles.teamBadge, item.team === "B" && styles.teamBadgeB]}>{t("lobby.team", { team: item.team })}</Text> : null}
-                {!isMatchmade ? <Text style={item.ready ? styles.readyBadge : styles.notReadyBadge}>{item.ready ? t("lobby.ready") : t("lobby.notReady")}</Text> : null}
+                <Text style={item.ready ? styles.readyBadge : styles.notReadyBadge}>{item.ready ? t("lobby.ready") : t("lobby.notReady")}</Text>
               </View>
             )} />
           </View>
 
           <View style={styles.infoColumn}>
             <View style={styles.infoColumnContent}>
-            {isMatchmade ? <View style={styles.rankedQueue}><Subtitle>{t(isRanked ? "lobby.rankedSearching" : "lobby.damageSearching")}</Subtitle><Text style={styles.rankedCount}>{players.length}/{requiredPlayers}</Text><Text style={styles.copyHint}>{t(isRanked ? "lobby.rankedAutoStart" : "lobby.damageAutoStart")}</Text></View> : isChallenge ? <View style={styles.rankedQueue}><Subtitle>{t("lobby.challengeLobby")}</Subtitle><Text style={styles.rankedCount}>{players.length}/{requiredPlayers}</Text><Text style={styles.copyHint}>{t("lobby.challengeManualStart")}</Text></View> : <><Subtitle>{t("lobby.roomCode")}</Subtitle><Pressable onPress={() => void handleCopyCode()} style={styles.codeWrap}><Title>{state.code}</Title><Text style={styles.copyHint}>{copied ? t("lobby.copied") : t("lobby.tapToCopy")}</Text></Pressable></>}
+            {isChallenge ? <View style={styles.rankedQueue}><Subtitle>{t("lobby.challengeLobby")}</Subtitle><Text style={styles.rankedCount}>{players.length}/{requiredPlayers}</Text><Text style={styles.copyHint}>{t("lobby.challengeManualStart")}</Text></View> : <><Subtitle>{t("lobby.roomCode")}</Subtitle><Pressable onPress={() => void handleCopyCode()} style={styles.codeWrap}><Title>{state.code}</Title><Text style={styles.copyHint}>{copied ? t("lobby.copied") : t("lobby.tapToCopy")}</Text></Pressable></>}
             {state.gameMode === "damage" ? <View style={styles.wagerBanner}>
               <Text style={styles.wagerStake}>{t("lobby.wagerStake", { count: state.damageWager })}</Text>
               <Text style={styles.wagerPot}>{t("lobby.wagerPot", { count: state.damagePot })}</Text>
             </View> : null}
-            {!isMatchmade && !isChallenge && isHost && !isStarting && !state.customQuestionsEnabled ? <Pressable accessibilityRole="switch" accessibilityState={{ checked: Boolean(state.isPublic) }} onPress={() => room.send("toggleRoomVisibility")} style={styles.visibilityControl}>
+            {!isChallenge && isHost && !isStarting && !state.customQuestionsEnabled ? <Pressable accessibilityRole="switch" accessibilityState={{ checked: Boolean(state.isPublic) }} onPress={() => room.send("toggleRoomVisibility")} style={styles.visibilityControl}>
               <Text style={styles.visibilityLabel}>{state.isPublic ? t("lobby.partyPublic") : t("lobby.partyPrivate")}</Text>
               <View style={[styles.visibilityTrack, state.isPublic && styles.visibilityTrackEnabled]}><View style={[styles.visibilityThumb, state.isPublic && styles.visibilityThumbEnabled]} /></View>
             </Pressable> : null}
             <View style={styles.actionArea}>
-              {!isMatchmade && !isStarting && (isHost ? <BigButton label={t("lobby.start")} onPress={() => { setStartError(null); room.send("startGame"); }} disabled={!canStart} lobbyHaptic /> : <BigButton label={me?.ready ? t("lobby.notReady") : t("lobby.ready")} onPress={() => room.send("toggleReady")} variant="secondary" lobbyHaptic />)}
+              {!isStarting && (isHost ? <BigButton label={t("lobby.start")} onPress={() => { setStartError(null); room.send("startGame"); }} disabled={!canStart} lobbyHaptic /> : <BigButton label={me?.ready ? t("lobby.notReady") : t("lobby.ready")} onPress={() => room.send("toggleReady")} variant="secondary" lobbyHaptic />)}
               {!isStarting && startError ? <Text style={styles.startError}>{startError}</Text> : null}
             </View>
             </View>
