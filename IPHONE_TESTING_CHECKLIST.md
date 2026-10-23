@@ -39,6 +39,17 @@ Use this checklist after an Apple Developer team is available and an iOS develop
 ## iOS regression checks after installing the development build
 
 - [ ] Confirm landscape orientation, safe-area padding, and keyboard dismissal remain correct.
+- [ ] Check both landscape rotations: the notch margin belongs only on its actual side; content should use the remaining width without the old 720-unit frame.
+- [ ] Confirm Daily Reward, Leaderboard and Shop sit against the left safe edge, and the burger menu sits at the bottom-right safe edge.
+- [ ] Open the burger menu and tap all four entries; confirm none are clipped or outside the interactive dock.
+- [ ] Open Create Game and confirm the mode list uses roughly one third of the width and the configuration column has room for its controls.
+- [ ] Verify Home, Endless and multiplayer question screens on a narrow and a wide iPhone; this change updates their shared iOS canvas sizing.
+- [ ] In Endless, confirm A/B and C/D stay fully visible above the feedback strip. Check short and long questions, a pending answer, incorrect feedback and a timeout; question text may scroll, but answer rows must not move or overlap the feedback.
+- [ ] Leave Endless during a question or feedback, then return: the old run must end and the lobby must offer a fresh attempt. Best score and earned Stars must remain.
+- [ ] Background Endless, including while Start is pending: returning must show an ended run or a fresh lobby, never an indefinitely saved question.
+- [ ] Keep the app foregrounded and disconnect the network briefly: reconnect before the ten-second server window closes and confirm the original question timer keeps running. Reconnect after ten seconds and confirm the entire run ends, including when disconnected during feedback.
+- [ ] Force-close/reopen Endless and confirm there is no Continue button. Start a new run, then verify a delayed old answer/abandonment cannot affect it.
+- [ ] Verify the configured test server's `/health` reports `endlessProtocolVersion: 2`. An older server must show mode unavailability before Start, not an unplayable question or repeated Invalid Endless Action errors. After updating the server, Try Again must recover with a fresh read.
 - [ ] Confirm game background and preloaded avatar/shop images appear without flashes.
 - [ ] Confirm music, sound effects, countdown cancellation, and volume settings work.
 - [ ] Confirm game-start/end vibration works and does not trigger per round.

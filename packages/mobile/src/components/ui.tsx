@@ -3,6 +3,7 @@ import { View, Text, Pressable, StyleSheet, TextStyle, ViewStyle, StyleProp, Key
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { playSound, SoundEffect } from "../audio/sounds";
 import { menuTap } from "./menuHaptics";
+import { getDesignCanvasLayout } from "./designCanvasLayout";
 
 const CONTROL_WIDTH = "100%";
 const CONTENT_WIDTH = "100%";
@@ -21,26 +22,13 @@ function DesignCanvas({ children, style, uiScale, overflowScale }: { children: R
   const insets = useSafeAreaInsets();
   const window = useWindowDimensions();
   const [bounds, setBounds] = React.useState<{ width: number; height: number } | null>(null);
-  const horizontalInset = Math.max(insets.left, insets.right, 8);
-  const verticalInset = Math.max(insets.top, insets.bottom, 4);
-  const viewport = {
-    width: Math.max(1, (bounds?.width ?? window.width) - horizontalInset * 2),
-    height: Math.max(1, (bounds?.height ?? window.height) - verticalInset * 2),
-  };
-  const viewportFitScale = Math.min(
-    viewport.width / ANDROID_DESIGN_WIDTH,
-    viewport.height / ANDROID_DESIGN_HEIGHT,
-  );
-  // Never let a platform adjustment enlarge the fixed canvas past the real
-  // viewport. Android edge-to-edge reports the entire display, so overflowing
-  // a transformed canvas here also makes otherwise centered screens look
-  // shifted or clipped.
-  const scale = viewportFitScale * Math.min(uiScale, overflowScale, 1);
+  const layout = getDesignCanvasLayout(bounds?.width ?? window.width, bounds?.height ?? window.height, insets, Platform.OS === "ios", uiScale, overflowScale);
+  const { scale, paddingLeft, paddingRight, paddingTop, paddingBottom } = layout;
 
   return (
-    <View onLayout={(event) => setBounds(event.nativeEvent.layout)} style={[styles.androidSafeArea, { paddingHorizontal: horizontalInset, paddingVertical: verticalInset }]}>
+    <View onLayout={(event) => setBounds(event.nativeEvent.layout)} style={[styles.androidSafeArea, { paddingLeft, paddingRight, paddingTop, paddingBottom }]}>
       <View style={styles.androidViewport}>
-        <View style={[styles.androidCanvas, { transform: [{ scale }] }]}>
+        <View style={[styles.androidCanvas, { width: layout.canvasWidth, height: layout.canvasHeight, transform: [{ scale }] }]}>
           <ScreenScaleContext.Provider value={scale}>
             <View style={[styles.content, style]}>{children}</View>
           </ScreenScaleContext.Provider>
@@ -182,8 +170,8 @@ const styles = StyleSheet.create({
     flex: 1,
     width: CONTENT_WIDTH,
     alignSelf: "center",
-    maxWidth: Platform.OS === "android" ? 820 : 720,
-    paddingHorizontal: Platform.OS === "android" ? 10 : 18,
+    maxWidth: Platform.OS === "android" ? 820 : undefined,
+    paddingHorizontal: Platform.OS === "android" ? 10 : 12,
     paddingVertical: 20,
     justifyContent: "center",
   },

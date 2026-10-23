@@ -4,11 +4,15 @@ import { randomUUID } from "node:crypto";
 import { createEndlessRun, applyEndlessCommand, publicEndlessRun, desiredDifficulty, selectQuestion, unclaimedEndlessRewards, advanceEndless } from "../dist/endlessEngine.js";
 import { ENDLESS_QUESTIONS } from "../dist/content/endlessQuestions.js";
 import { parseEndlessCommand } from "../dist/endlessRoutes.js";
-import { ENDLESS_TIMERS } from "@confidence-trivia/shared";
+import { ENDLESS_RECONNECT_MS, ENDLESS_TIMERS } from "@confidence-trivia/shared";
 
 function run() { return createEndlessRun(randomUUID(), 25, 1000); }
 function answer(r, value, now = 2000) { applyEndlessCommand(r, { type: "answer", runId: r.id, token: r.question.token, answer: value }, now); }
 function next(r, now) { applyEndlessCommand(r, { type: "next", runId: r.id, token: r.question.token }, now); }
+function heartbeat(r, now) { applyEndlessCommand(r, { type: "heartbeat", runId: r.id }, now); }
+function keepAlive(r, until) {
+  for (let now = r.connectionDeadline - ENDLESS_RECONNECT_MS + 2000; now <= until; now += 2000) heartbeat(r, now);
+}
 
 test("Endless starts with three lives and zero correct answers", () => {
   const r = run(); assert.equal(r.lives, 3); assert.equal(r.score, 0); assert.equal(r.previousBest, 25); assert.equal(r.question.number, 1);
@@ -22,16 +26,60 @@ test("duplicate and rapidly conflicting submissions settle only once", () => {
   assert.equal(r.score, 1); assert.equal(r.lives, 3);
 });
 test("the server deadline wins when an answer arrives at or after zero", () => {
-  for (const late of [0, 1, 10000]) { const r = run(); answer(r, r.question.correctIndex, r.question.deadline + late); assert.equal(r.score, 0); assert.equal(r.lives, 2); assert.equal(r.feedback.timedOut, true); }
+  for (const late of [0, 1, 10000]) { const r = run(); keepAlive(r, r.question.deadline + late - 1); answer(r, r.question.correctIndex, r.question.deadline + late); assert.equal(r.score, 0); assert.equal(r.lives, 2); assert.equal(r.feedback.timedOut, true); }
 });
 test("client timeout before the deadline cannot skip a question", () => {
   const r = run(); answer(r, null); assert.equal(r.phase, "question"); assert.equal(r.lives, 3);
 });
-test("closing, serializing, and reopening a run preserves its timer and life loss", () => {
+test("closing and reopening after the connection window ends the whole run", () => {
   let r = run(); const original = r.question.token; const deadline = r.question.deadline;
   r = JSON.parse(JSON.stringify(r)); applyEndlessCommand(r, { type: "sync" }, deadline + 100000);
-  assert.equal(r.lives, 2); assert.equal(r.question.token, original); assert.equal(r.phase, "feedback");
-  applyEndlessCommand(r, { type: "sync" }, deadline + 200000); assert.equal(r.lives, 2);
+  assert.equal(r.lives, 0); assert.equal(r.question.token, original); assert.equal(r.phase, "finished"); assert.equal(r.endReason, "abandoned");
+  applyEndlessCommand(r, { type: "sync" }, deadline + 200000); assert.equal(r.lives, 0);
+});
+
+test("a brief disconnect can reconnect without pausing or extending the question", () => {
+  const r = run(); const deadline = r.question.deadline, token = r.question.token;
+  heartbeat(r, 1000 + ENDLESS_RECONNECT_MS - 1);
+  assert.equal(r.phase, "question"); assert.equal(r.question.token, token); assert.equal(r.question.deadline, deadline);
+  assert.equal(r.connectionDeadline, 1000 + ENDLESS_RECONNECT_MS * 2 - 1);
+});
+
+test("late heartbeats, answers, next, and Start cannot revive an expired run", () => {
+  for (const type of ["heartbeat", "answer", "next", "start", "sync"]) {
+    const r = run(); r.score = 9;
+    applyEndlessCommand(r, { type, runId: r.id, token: r.question.token, answer: r.question.correctIndex, requestId: randomUUID() }, r.connectionDeadline);
+    assert.equal(r.phase, "finished"); assert.equal(r.endReason, "abandoned"); assert.equal(r.score, 9); assert.equal(r.feedback, null);
+    heartbeat(r, r.connectionDeadline + 1); assert.equal(r.phase, "finished");
+  }
+});
+
+test("menu syncs, repeated Starts, stale tokens, and other run IDs do not renew a lease", () => {
+  for (const command of [{ type: "sync" }, { type: "start", requestId: randomUUID() }, { type: "heartbeat", runId: randomUUID() }, { type: "answer", token: randomUUID(), answer: 0 }, { type: "next", token: randomUUID() }]) {
+    const r = run(); const expires = r.connectionDeadline;
+    applyEndlessCommand(r, { runId: r.id, ...command }, expires - 1);
+    assert.equal(r.connectionDeadline, expires);
+    heartbeat(r, expires); assert.equal(r.endReason, "abandoned");
+  }
+});
+
+test("leaving the game immediately ends it once and preserves earned progress", () => {
+  const r = run(); answer(r, r.question.correctIndex); r.rewards = [{ score: 10, stars: 10 }];
+  applyEndlessCommand(r, { type: "abandon", runId: randomUUID() }, 2100); assert.equal(r.phase, "feedback");
+  const command = { type: "abandon", runId: r.id };
+  applyEndlessCommand(r, command, 2200); const finished = structuredClone(r);
+  assert.equal(r.phase, "finished"); assert.equal(r.endReason, "abandoned"); assert.equal(r.lives, 0); assert.equal(r.score, 1); assert.deepEqual(r.rewards, [{ score: 10, stars: 10 }]);
+  applyEndlessCommand(r, command, 2300); next(r, 4000); assert.deepEqual(r, finished);
+});
+
+test("disconnecting during feedback cannot save a run indefinitely", () => {
+  const r = run(); answer(r, r.question.correctIndex);
+  next(r, r.connectionDeadline); assert.equal(r.endReason, "abandoned"); assert.equal(r.question.number, 1); assert.equal(r.score, 1);
+});
+
+test("legacy runs without a connection deadline expire safely", () => {
+  const r = run(); delete r.connectionDeadline;
+  heartbeat(r, 2000); assert.equal(r.phase, "finished"); assert.equal(r.endReason, "abandoned");
 });
 test("feedback is enforced before advancing and stale tokens cannot answer the next question", () => {
   const r = run(); const old = r.question.token; answer(r, r.question.correctIndex); next(r, 2100); assert.equal(r.question.token, old);

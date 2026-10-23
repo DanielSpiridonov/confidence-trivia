@@ -5,6 +5,7 @@ exports.selectQuestion = selectQuestion;
 exports.advanceEndless = advanceEndless;
 exports.createEndlessRun = createEndlessRun;
 exports.settleEndless = settleEndless;
+exports.expireEndlessConnection = expireEndlessConnection;
 exports.applyEndlessCommand = applyEndlessCommand;
 exports.publicEndlessRun = publicEndlessRun;
 exports.unclaimedEndlessRewards = unclaimedEndlessRewards;
@@ -54,7 +55,7 @@ function advanceEndless(run, now, bank = endlessQuestions_1.ENDLESS_QUESTIONS) {
     run.question = { token: (0, crypto_1.randomUUID)(), contentId: content.id, number: run.usedIds.length, text: content.text, options: indices.map((i) => content.options[i]), correctIndex: indices.indexOf(content.correctIndex), category: content.category, difficulty: content.difficulty, duration, deadline: now + duration * 1000 };
 }
 function createEndlessRun(id, best, now, bank = endlessQuestions_1.ENDLESS_QUESTIONS) {
-    const run = { id, score: 0, lives: 3, previousBest: best, phase: "question", endReason: null, question: null, feedback: null, rewards: [], usedIds: [] };
+    const run = { id, score: 0, lives: 3, previousBest: best, phase: "question", endReason: null, connectionDeadline: now + shared_1.ENDLESS_RECONNECT_MS, question: null, feedback: null, rewards: [], usedIds: [] };
     advanceEndless(run, now, bank);
     return run;
 }
@@ -75,9 +76,40 @@ function settleEndless(run, answer, now) {
     if (run.lives === 0)
         run.endReason = "lives";
 }
+function abandonEndless(run) {
+    run.phase = "finished";
+    run.endReason = "abandoned";
+    run.lives = 0;
+    run.feedback = null;
+}
+function expireEndlessConnection(run, now) {
+    if (run.phase === "finished")
+        return false;
+    // Legacy saved runs have no lease and must not become unlimited resumes.
+    if (!Number.isFinite(run.connectionDeadline) || now >= run.connectionDeadline) {
+        abandonEndless(run);
+        return true;
+    }
+    return false;
+}
 function applyEndlessCommand(run, command, now) {
-    // Expiration is lazy but authoritative: reconnecting charges the expired
-    // question exactly once. No unseen next question starts while disconnected.
+    // Check BEFORE renewing the lease: a late heartbeat/answer cannot revive it.
+    if (expireEndlessConnection(run, now) || run.phase === "finished")
+        return;
+    if ((command.type === "abandon" || command.type === "heartbeat") && command.runId === run.id) {
+        if (command.type === "abandon") {
+            abandonEndless(run);
+            return;
+        }
+        run.connectionDeadline = now + shared_1.ENDLESS_RECONNECT_MS;
+    }
+    // Reads, Starts and stale tokens never keep a run alive. Accepted answers
+    // and next-question actions count as activity, using server time only.
+    if ((command.type === "answer" || command.type === "next") && command.runId === run.id && command.token === run.question?.token &&
+        ((command.type === "answer" && run.phase === "question" && command.answer !== null) ||
+            (command.type === "next" && run.phase === "feedback" && now >= (run.feedback?.readyAt ?? Infinity)))) {
+        run.connectionDeadline = now + shared_1.ENDLESS_RECONNECT_MS;
+    }
     if (run.phase === "question" && run.question && now >= run.question.deadline)
         settleEndless(run, null, now);
     if (command.type === "answer" && command.runId === run.id && command.token === run.question?.token)

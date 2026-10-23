@@ -1,5 +1,5 @@
 import { randomInt, randomUUID } from "crypto";
-import { ENDLESS_FEEDBACK_MS, ENDLESS_MILESTONES, ENDLESS_TIMERS, EndlessDifficulty, EndlessRun } from "@confidence-trivia/shared";
+import { ENDLESS_FEEDBACK_MS, ENDLESS_MILESTONES, ENDLESS_RECONNECT_MS, ENDLESS_TIMERS, EndlessDifficulty, EndlessRun } from "@confidence-trivia/shared";
 import { ENDLESS_QUESTIONS, EndlessContent } from "./content/endlessQuestions";
 
 export interface StoredEndlessRun extends Omit<EndlessRun, "question"> {
@@ -7,6 +7,7 @@ export interface StoredEndlessRun extends Omit<EndlessRun, "question"> {
   question: (NonNullable<EndlessRun["question"]> & { contentId: string; correctIndex: number }) | null;
 }
 export type EndlessCommand = { type: "sync" } | { type: "start"; requestId: string } |
+  { type: "heartbeat" | "abandon"; runId: string } |
   { type: "answer"; runId: string; token: string; answer: number | null } |
   { type: "next"; runId: string; token: string };
 
@@ -44,7 +45,7 @@ export function advanceEndless(run: StoredEndlessRun, now: number, bank = ENDLES
   run.question = { token: randomUUID(), contentId: content.id, number: run.usedIds.length, text: content.text, options: indices.map((i) => content.options[i]), correctIndex: indices.indexOf(content.correctIndex), category: content.category, difficulty: content.difficulty, duration, deadline: now + duration * 1000 };
 }
 export function createEndlessRun(id: string, best: number, now: number, bank = ENDLESS_QUESTIONS): StoredEndlessRun {
-  const run: StoredEndlessRun = { id, score: 0, lives: 3, previousBest: best, phase: "question", endReason: null, question: null, feedback: null, rewards: [], usedIds: [] };
+  const run: StoredEndlessRun = { id, score: 0, lives: 3, previousBest: best, phase: "question", endReason: null, connectionDeadline: now + ENDLESS_RECONNECT_MS, question: null, feedback: null, rewards: [], usedIds: [] };
   advanceEndless(run, now, bank);
   return run;
 }
@@ -60,9 +61,35 @@ export function settleEndless(run: StoredEndlessRun, answer: number | null, now:
   run.phase = run.lives === 0 ? "finished" : "feedback";
   if (run.lives === 0) run.endReason = "lives";
 }
+function abandonEndless(run: StoredEndlessRun): void {
+  run.phase = "finished";
+  run.endReason = "abandoned";
+  run.lives = 0;
+  run.feedback = null;
+}
+export function expireEndlessConnection(run: StoredEndlessRun, now: number): boolean {
+  if (run.phase === "finished") return false;
+  // Legacy saved runs have no lease and must not become unlimited resumes.
+  if (!Number.isFinite(run.connectionDeadline) || now >= run.connectionDeadline) {
+    abandonEndless(run);
+    return true;
+  }
+  return false;
+}
 export function applyEndlessCommand(run: StoredEndlessRun, command: EndlessCommand, now: number): void {
-  // Expiration is lazy but authoritative: reconnecting charges the expired
-  // question exactly once. No unseen next question starts while disconnected.
+  // Check BEFORE renewing the lease: a late heartbeat/answer cannot revive it.
+  if (expireEndlessConnection(run, now) || run.phase === "finished") return;
+  if ((command.type === "abandon" || command.type === "heartbeat") && command.runId === run.id) {
+    if (command.type === "abandon") { abandonEndless(run); return; }
+    run.connectionDeadline = now + ENDLESS_RECONNECT_MS;
+  }
+  // Reads, Starts and stale tokens never keep a run alive. Accepted answers
+  // and next-question actions count as activity, using server time only.
+  if ((command.type === "answer" || command.type === "next") && command.runId === run.id && command.token === run.question?.token &&
+    ((command.type === "answer" && run.phase === "question" && command.answer !== null) ||
+      (command.type === "next" && run.phase === "feedback" && now >= (run.feedback?.readyAt ?? Infinity)))) {
+    run.connectionDeadline = now + ENDLESS_RECONNECT_MS;
+  }
   if (run.phase === "question" && run.question && now >= run.question.deadline) settleEndless(run, null, now);
   if (command.type === "answer" && command.runId === run.id && command.token === run.question?.token) settleEndless(run, command.answer, now);
   if (command.type === "next" && command.runId === run.id && command.token === run.question?.token && run.phase === "feedback" && now >= (run.feedback?.readyAt ?? Infinity)) advanceEndless(run, now);

@@ -205,8 +205,8 @@ export function CreateGameScreen({ onCreate, onEndless, deviceId, stars, registe
 }
 
 const styles = StyleSheet.create({
-  body: { flex: 1, minHeight: 0, width: "91%", maxWidth: 830, alignSelf: "center", flexDirection: "row", gap: 18, paddingTop: Platform.OS === "android" ? 8 : 12, paddingBottom: 4 },
-  modeRail: { width: "31%", minWidth: 205, paddingRight: 16, borderRightWidth: 1, borderRightColor: "rgba(185,176,214,0.22)" },
+  body: { flex: 1, minHeight: 0, width: Platform.OS === "ios" ? "100%" : "91%", maxWidth: Platform.OS === "ios" ? undefined : 830, alignSelf: "center", flexDirection: "row", gap: 18, paddingTop: Platform.OS === "android" ? 8 : 12, paddingBottom: 4 },
+  modeRail: { width: "31%", minWidth: 205, flexGrow: 0, flexShrink: 0, paddingRight: 16, borderRightWidth: 1, borderRightColor: "rgba(185,176,214,0.22)" },
   sectionLabel: { color: theme.textDim, fontSize: 11, fontWeight: "900", textTransform: "uppercase", marginBottom: 7 },
   modeItem: { width: "100%", minHeight: 58, flexDirection: "row", alignItems: "center", gap: 9, marginBottom: 7, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8, borderWidth: 1, borderColor: "rgba(185,176,214,0.14)", backgroundColor: "rgba(24,19,40,0.78)" },
   modeItemSelected: { borderColor: theme.primary, backgroundColor: "rgba(63,45,105,0.92)" },

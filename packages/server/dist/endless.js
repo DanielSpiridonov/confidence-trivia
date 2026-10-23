@@ -4,6 +4,7 @@ exports.EndlessError = void 0;
 exports.endlessAction = endlessAction;
 exports.endlessLeaderboard = endlessLeaderboard;
 const crypto_1 = require("crypto");
+const shared_1 = require("@confidence-trivia/shared");
 const database_1 = require("./database");
 const endlessEngine_1 = require("./endlessEngine");
 class EndlessError extends Error {
@@ -27,52 +28,67 @@ async function endlessAction(playerId, authUserId, command, database = database_
     `;
         if (!player)
             throw new EndlessError(403, "Sign in with an eligible account to play Endless.");
-        const [clock] = await tx `select (extract(epoch from clock_timestamp()) * 1000)::float8 as now`;
-        const now = Number(clock.now);
-        await tx `insert into public.endless_records(player_id) values (${playerId}) on conflict do nothing`;
-        const [record] = await tx `select best_score from public.endless_records where player_id = ${playerId}`;
-        let best = record.best_score;
-        let [stored] = await tx `
-      select state from public.endless_runs where player_id = ${playerId}
-      order by finished asc, created_at desc, id limit 1
+        // Read after acquiring the lock, in a fresh statement snapshot. Combining
+        // this with the lock query would read stale progress when another device
+        // commits while this request is waiting for the player row.
+        const [snapshot] = await tx `
+      select (extract(epoch from clock_timestamp()) * 1000)::float8 as now,
+        coalesce((select best_score from public.endless_records where player_id = ${playerId}), 0) as best_score,
+        coalesce((select jsonb_agg(milestone order by milestone) from public.endless_reward_claims where player_id = ${playerId}), '[]'::jsonb) as claimed,
+        (select state from public.endless_runs where player_id = ${playerId}
+          order by finished asc, created_at desc, id limit 1) as state
     `;
+        const now = Number(snapshot.now);
+        let best = snapshot.best_score;
+        const claimed = [...snapshot.claimed];
+        let run = snapshot.state;
+        let previousState = run ? JSON.stringify(run) : null;
+        // Finish an expired lease before Start checks the one-active-run constraint.
+        // Expiration also runs inside the engine on every other action.
+        if (run && (0, endlessEngine_1.expireEndlessConnection)(run, now)) {
+            await tx `update public.endless_runs set state = ${tx.json(run)}, finished = true, updated_at = clock_timestamp() where id = ${run.id}`;
+            previousState = JSON.stringify(run);
+        }
         if (command.type === "start") {
             const [retry] = await tx `select player_id, state from public.endless_runs where id = ${command.requestId}`;
             if (retry && retry.player_id !== playerId)
                 throw new EndlessError(409, "Please try starting again.");
             // A retried Start never replaces the active run, even after game over.
-            if ((!stored || stored.state.phase === "finished") && !retry) {
+            if ((!run || run.phase === "finished") && !retry) {
                 const state = (0, endlessEngine_1.createEndlessRun)(command.requestId, best, now);
+                await tx `insert into public.endless_records(player_id) values (${playerId}) on conflict do nothing`;
                 await tx `insert into public.endless_runs(id, player_id, state, finished) values (${state.id}, ${playerId}, ${tx.json(state)}, ${state.phase === "finished"})`;
-                stored = { state };
+                run = state;
             }
         }
-        const run = stored?.state ?? null;
         if (run) {
             (0, endlessEngine_1.applyEndlessCommand)(run, command, now);
             if (run.score > best) {
                 best = run.score;
-                await tx `update public.endless_records set best_score = ${best}, achieved_at = clock_timestamp() where player_id = ${playerId}`;
+                await tx `insert into public.endless_records(player_id, best_score, achieved_at)
+          values (${playerId}, ${best}, clock_timestamp())
+          on conflict (player_id) do update set best_score = excluded.best_score, achieved_at = excluded.achieved_at`;
             }
-            // Persist before inserting the claim FK; transaction rollback includes all
-            // scoring, currency, ledger, and progression writes if any step fails.
-            await tx `update public.endless_runs set state = ${tx.json(run)}, finished = ${run.phase === "finished"}, updated_at = clock_timestamp() where id = ${run.id}`;
-        }
-        const claimedRows = await tx `select milestone from public.endless_reward_claims where player_id = ${playerId}`;
-        const claimed = claimedRows.map((c) => c.milestone);
-        if (run) {
+            let rewardStars = 0;
             for (const reward of (0, endlessEngine_1.unclaimedEndlessRewards)(best, claimed)) {
                 const transactionId = (0, crypto_1.randomUUID)();
                 await tx `insert into public.star_transactions(id, player_id, amount, reason) values (${transactionId}, ${playerId}, ${reward.stars}, ${`endless_milestone_${reward.score}`})`;
                 await tx `insert into public.endless_reward_claims(player_id, milestone, stars, run_id, transaction_id) values (${playerId}, ${reward.score}, ${reward.stars}, ${run.id}, ${transactionId})`;
-                await tx `update public.players set stars = stars + ${reward.stars} where id = ${playerId}`;
-                player.stars += reward.stars;
+                rewardStars += reward.stars;
                 run.rewards.push({ ...reward });
                 claimed.push(reward.score);
             }
-            await tx `update public.endless_runs set state = ${tx.json(run)} where id = ${run.id}`;
+            if (rewardStars > 0) {
+                await tx `update public.players set stars = stars + ${rewardStars} where id = ${playerId}`;
+                player.stars += rewardStars;
+            }
+            // One snapshot write per action. Retries and unchanged syncs need none.
+            // Scoring, best, claims, ledger and currency still commit atomically.
+            if (JSON.stringify(run) !== previousState) {
+                await tx `update public.endless_runs set state = ${tx.json(run)}, finished = ${run.phase === "finished"}, updated_at = clock_timestamp() where id = ${run.id}`;
+            }
         }
-        return { serverNow: now, personalBest: best, stars: player.stars, claimed, run: run ? (0, endlessEngine_1.publicEndlessRun)(run) : null };
+        return { protocolVersion: shared_1.ENDLESS_PROTOCOL_VERSION, serverNow: now, personalBest: best, stars: player.stars, claimed, run: run ? (0, endlessEngine_1.publicEndlessRun)(run) : null };
     });
 }
 async function endlessLeaderboard(playerId, database = database_1.databaseSql) {

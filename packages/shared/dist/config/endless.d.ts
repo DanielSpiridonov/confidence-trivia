@@ -1,6 +1,9 @@
 export type EndlessDifficulty = "easy" | "medium" | "hard" | "expert";
 export declare const ENDLESS_TIMERS: Record<EndlessDifficulty, number>;
 export declare const ENDLESS_FEEDBACK_MS = 1600;
+export declare const ENDLESS_RECONNECT_MS = 10000;
+export declare const ENDLESS_HEARTBEAT_MS = 2000;
+export declare const ENDLESS_PROTOCOL_VERSION = 2;
 export declare const ENDLESS_MILESTONES: readonly [{
     readonly score: 10;
     readonly stars: 10;
@@ -45,7 +48,8 @@ export interface EndlessRun {
     lives: number;
     previousBest: number;
     phase: "question" | "feedback" | "finished";
-    endReason: "lives" | "exhausted" | null;
+    endReason: "lives" | "exhausted" | "abandoned" | null;
+    connectionDeadline: number;
     question: EndlessQuestion | null;
     feedback: {
         correctIndex: number;
@@ -60,6 +64,7 @@ export interface EndlessRun {
     }>;
 }
 export interface EndlessState {
+    protocolVersion: number;
     serverNow: number;
     personalBest: number;
     stars: number;

@@ -1,8 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ENDLESS_MILESTONES = exports.ENDLESS_FEEDBACK_MS = exports.ENDLESS_TIMERS = void 0;
+exports.ENDLESS_MILESTONES = exports.ENDLESS_PROTOCOL_VERSION = exports.ENDLESS_HEARTBEAT_MS = exports.ENDLESS_RECONNECT_MS = exports.ENDLESS_FEEDBACK_MS = exports.ENDLESS_TIMERS = void 0;
 exports.ENDLESS_TIMERS = { easy: 30, medium: 25, hard: 20, expert: 15 };
 exports.ENDLESS_FEEDBACK_MS = 1600;
+exports.ENDLESS_RECONNECT_MS = 10000;
+exports.ENDLESS_HEARTBEAT_MS = 2000;
+exports.ENDLESS_PROTOCOL_VERSION = 2;
 // A finite, deliberately modest road: 280 Stars total, below four max-streak daily rewards.
 // Threshold is a permanent identity. Never reuse one for a different reward.
 exports.ENDLESS_MILESTONES = [

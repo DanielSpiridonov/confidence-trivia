@@ -30,7 +30,7 @@ const challengeLimit = (0, rateLimit_1.createRateLimiter)({ windowMs: 10 * 60000
 const rewardLimit = (0, rateLimit_1.createRateLimiter)({ windowMs: 60 * 60000, max: 10, message: "Too many reward attempts. Please try again later.", key: rateLimit_1.authenticatedActorOrIpKey });
 app.get("/health", async (_req, res) => {
     const database = await (0, database_2.getDatabaseStatus)();
-    res.json({ ok: true, database });
+    res.json({ ok: true, database, endlessProtocolVersion: shared_1.ENDLESS_PROTOCOL_VERSION });
 });
 app.use(generalLimit);
 app.use("/endless", endlessRoutes_1.endlessRouter);

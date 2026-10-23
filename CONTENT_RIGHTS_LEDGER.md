@@ -33,6 +33,12 @@ the final bundle is assembled.
 
 ## Question content
 
+Endless menu illustration: `packages/mobile/assets/endless-mountain-chalk.png`
+was generated with the built-in image generation tool on 23 October 2026,
+using the user's menu image as a style reference. The exact prompt and tool
+provenance are recorded in `packages/mobile/assets/endless-mountain-chalk.prompt.md`.
+It is an original transparent mountain/path/flag composition, not a flattened UI.
+
 The question bank is in `packages/server/src/content/questions.ts` and
 `generatedQuestions.ts`. Its source and copyright-sensitive material still
 need review. Record how each imported or generated batch was created and

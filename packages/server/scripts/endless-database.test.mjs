@@ -10,8 +10,10 @@ import { endlessAction, endlessLeaderboard } from "../dist/endless.js";
 // unchanged. PGlite queues transactions on one connection: these tests validate
 // concurrent request semantics, not multi-instance lock contention/performance.
 const pg = new PGlite();
+let statementCount = 0;
 function adapter(connection) {
   const sql = async (strings, ...values) => {
+    statementCount++;
     const query = strings.reduce((text, part, i) => text + (i ? `$${i}` : "") + part, "");
     return (await connection.query(query, values)).rows;
   };
@@ -71,11 +73,67 @@ test("Start is idempotent; simultaneous devices share one persistent active run"
   assert.equal(new Set(states.map((s) => s.run.id)).size, 1);
   assert.equal((await pg.query("select count(*)::int as n from endless_runs")).rows[0].n, 1);
   const resumed = await sync(); assert.deepEqual(resumed.run, states[0].run);
+  assert.equal(resumed.protocolVersion, 2);
 });
 test("database deadlines survive reconnect and cannot be reset by another Start", async () => {
   await start(); const r = await storedRun(); r.question.deadline = Date.now() - 10000; await setRun(r);
   const lost = await start(); assert.equal(lost.run.lives, 2); assert.equal(lost.run.phase, "feedback"); assert.equal(lost.run.feedback.timedOut, true);
   assert.equal((await sync()).run.lives, 2); assert.equal((await storedRun()).question.deadline, r.question.deadline);
+});
+
+test("expired persisted runs reject late answers and heartbeats, keeping records and Stars", async () => {
+  await start(); let r = await storedRun(); r.score = 10; await setRun(r);
+  await sync(); r = await storedRun(); r.connectionDeadline = Date.now() - 1; await setRun(r);
+  const late = await endlessAction(playerId, userId, { type: "answer", runId: r.id, token: r.question.token, answer: r.question.correctIndex }, sql);
+  assert.equal(late.run.phase, "finished"); assert.equal(late.run.endReason, "abandoned"); assert.equal(late.run.score, 10); assert.equal(late.run.lives, 0);
+  const again = await endlessAction(playerId, userId, { type: "heartbeat", runId: r.id }, sql);
+  assert.deepEqual(again.run, late.run); assert.equal(again.personalBest, 10); assert.equal(again.stars, 110); assert.deepEqual(again.claimed, [10]);
+  assert.equal((await pg.query("select finished from endless_runs where id = $1", [r.id])).rows[0].finished, true);
+});
+
+test("Start closes an expired run before inserting a fresh one and retries cannot revive it", async () => {
+  const id = randomUUID(); await start(id); const r = await storedRun(); r.connectionDeadline = Date.now() - 1; await setRun(r);
+  const retry = await start(id); assert.equal(retry.run.id, id); assert.equal(retry.run.endReason, "abandoned");
+  const newId = randomUUID(); const fresh = await start(newId);
+  assert.equal(fresh.run.id, newId); assert.equal(fresh.run.lives, 3); assert.equal(fresh.run.score, 0);
+  assert.equal((await start(id)).run.id, newId);
+  const rows = (await pg.query("select id, finished from endless_runs")).rows;
+  assert.equal(rows.length, 2); assert.equal(rows.filter((r) => !r.finished).length, 1);
+});
+
+test("a new Start atomically expires a lost run without a prior sync", async () => {
+  await start(); const lost = await storedRun(); lost.connectionDeadline = Date.now() - 1; await setRun(lost);
+  const fresh = await start(); assert.notEqual(fresh.run.id, lost.id); assert.equal(fresh.run.phase, "question");
+  assert.equal((await pg.query("select finished from endless_runs where id = $1", [lost.id])).rows[0].finished, true);
+});
+
+test("explicit abandonment is idempotent and stale abandon requests cannot end a newer run", async () => {
+  await start(); const r = await storedRun(); const command = { type: "abandon", runId: r.id };
+  const ended = await endlessAction(playerId, userId, command, sql); assert.equal(ended.run.endReason, "abandoned");
+  assert.deepEqual((await endlessAction(playerId, userId, command, sql)).run, ended.run);
+  const fresh = await start(); const stale = await endlessAction(playerId, userId, command, sql);
+  assert.equal(stale.run.id, fresh.run.id); assert.equal(stale.run.phase, "question"); assert.equal(stale.run.lives, 3);
+});
+
+test("reads cannot keep a run alive and only a matching heartbeat renews it", async () => {
+  await start(); let r = await storedRun(); r.connectionDeadline = Date.now() + 2000; await setRun(r);
+  assert.equal((await sync()).run.connectionDeadline, r.connectionDeadline);
+  const renewed = await endlessAction(playerId, userId, { type: "heartbeat", runId: r.id }, sql);
+  assert.equal(renewed.run.connectionDeadline, renewed.serverNow + 10000);
+  r = await storedRun(); delete r.connectionDeadline; await setRun(r);
+  assert.equal((await sync()).run.endReason, "abandoned");
+});
+test("ordinary answer uses four statements and an idempotent retry performs no writes", async () => {
+  await start(); const r = await storedRun();
+  const command = { type: "answer", runId: r.id, token: r.question.token, answer: r.question.correctIndex };
+  statementCount = 0;
+  const result = await endlessAction(playerId, userId, command, sql);
+  assert.equal(result.run.score, 1); assert.equal(statementCount, 4);
+  const before = (await pg.query("select updated_at from endless_runs where id = $1", [r.id])).rows[0].updated_at;
+  statementCount = 0;
+  await endlessAction(playerId, userId, command, sql);
+  assert.equal(statementCount, 2);
+  assert.deepEqual((await pg.query("select updated_at from endless_runs where id = $1", [r.id])).rows[0].updated_at, before);
 });
 test("concurrent answers, retries, records, and reward grants settle exactly once", async () => {
   await start(); const r = await storedRun(); r.score = 9; await setRun(r);

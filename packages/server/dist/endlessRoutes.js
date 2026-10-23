@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.endlessRouter = void 0;
 exports.parseEndlessCommand = parseEndlessCommand;
 const express_1 = require("express");
+const shared_1 = require("@confidence-trivia/shared");
 const auth_1 = require("./auth");
 const database_1 = require("./database");
 const endless_1 = require("./endless");
@@ -11,6 +12,8 @@ const uuid = (v) => typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]
 function parseEndlessCommand(body) {
     if (body?.type === "start" && uuid(body.requestId))
         return { type: "start", requestId: body.requestId };
+    if ((body?.type === "heartbeat" || body?.type === "abandon") && uuid(body.runId))
+        return { type: body.type, runId: body.runId };
     if ((body?.type === "answer" || body?.type === "next") && uuid(body.runId) && uuid(body.token)) {
         if (body.type === "next")
             return { type: "next", runId: body.runId, token: body.token };
@@ -21,12 +24,15 @@ function parseEndlessCommand(body) {
 }
 exports.endlessRouter = (0, express_1.Router)();
 exports.endlessRouter.use(async (req, res, next) => {
+    res.set("X-Endless-Protocol", String(shared_1.ENDLESS_PROTOCOL_VERSION));
     try {
         const playerId = req.query.playerId;
         const identity = await (0, auth_1.verifySupabaseIdentity)(req.headers.authorization);
         if (!uuid(playerId) || !identity)
             throw new endless_1.EndlessError(401, "Your session expired. Please sign in again.");
-        if (!await (0, database_1.isAuthenticatedPlayer)(playerId, identity.userId))
+        // State/actions validate ownership and moderation under their transaction's
+        // player lock. Only the read-only board needs a separate ownership query.
+        if (req.path === "/leaderboard" && !await (0, database_1.isAuthenticatedPlayer)(playerId, identity.userId))
             throw new endless_1.EndlessError(403, "This account cannot access Endless.");
         res.locals.endlessIdentity = { playerId, userId: identity.userId };
         next();
@@ -68,5 +74,5 @@ exports.endlessRouter.use(((error, _req, res, _next) => {
         return;
     }
     (0, logging_1.logServerError)("Endless request failed", error);
-    res.status(503).json({ error: "Endless could not save your progress. Reconnect to retry safely." });
+    res.status(503).json({ error: "Endless could not confirm the action. The connection window and question timer keep running." });
 }));

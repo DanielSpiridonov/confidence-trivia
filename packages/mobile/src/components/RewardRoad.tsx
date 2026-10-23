@@ -15,9 +15,9 @@ function roadPosition(score: number): number {
   }
   return ENDLESS_MILESTONES.length * STEP;
 }
-export function RewardRoad({ best, claimed }: { best: number; claimed: number[] }) {
+export function RewardRoad({ best, claimed, initialBest = best }: { best: number; claimed: number[]; initialBest?: number }) {
   const scroll = React.useRef<ScrollView>(null);
-  const progress = React.useRef(new Animated.Value(roadPosition(best))).current;
+  const progress = React.useRef(new Animated.Value(roadPosition(initialBest))).current;
   const next = ENDLESS_MILESTONES.find((m) => m.score > best);
   React.useEffect(() => {
     Animated.timing(progress, { toValue: roadPosition(best), duration: 650, useNativeDriver: false }).start();

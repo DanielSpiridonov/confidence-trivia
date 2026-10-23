@@ -260,7 +260,7 @@ export function HomeScreen({
           <HomeActionButton label="Endless" icon="infinite-outline" onPress={onEndless} />
         </View>
       </View>
-      <View style={styles.homeMenuDock}>
+      <View pointerEvents="box-none" style={styles.homeMenuDock}>
         <Animated.View renderToHardwareTextureAndroid={isAndroid} pointerEvents={menuOpen ? "auto" : "none"} style={[styles.homeMenuItems, { opacity: menuProgress, transform: isAndroid
           ? [{ translateX: menuProgress.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }) }]
           : [{ translateX: menuProgress.interpolate({ inputRange: [0, 1], outputRange: [44, 0] }) }, { scale: menuProgress.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] }) }]
@@ -326,9 +326,9 @@ const styles = StyleSheet.create({
   homeActionLabel: { flex: 1, color: "#FFFFFF", fontSize: Platform.OS === "android" ? 17 : 18, fontWeight: "900", textAlign: "center", textTransform: "uppercase" },
   homeActionArrow: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(188,169,238,0.18)", borderWidth: 1, borderColor: "rgba(202,188,242,0.42)" },
   homeActionArrowSecondary: { backgroundColor: "rgba(151,137,190,0.12)", borderColor: "rgba(177,163,216,0.3)" },
-  homeMenuDock: { position: "absolute", right: Platform.OS === "android" ? 44 : 8, bottom: Platform.OS === "android" ? 26 : 4, height: 44, zIndex: 12 },
-  homeMenuItems: { position: "absolute", right: 72, bottom: 0, width: Platform.OS === "android" ? 482 : undefined, height: 44, flexDirection: "row", gap: 6 },
-  menuItemButton: { minWidth: 106, width: Platform.OS === "android" ? 116 : undefined, height: 44, paddingHorizontal: 10, borderRadius: 14, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, borderWidth: 2, borderColor: "#7C5CFF", backgroundColor: "rgba(42,25,72,0.97)" },
+  homeMenuDock: { position: "absolute", right: Platform.OS === "android" ? 44 : 12, bottom: Platform.OS === "android" ? 26 : 12, width: Platform.OS === "android" ? 554 : 566, height: 44, alignItems: "flex-end", zIndex: 12 },
+  homeMenuItems: { position: "absolute", right: Platform.OS === "android" ? 72 : 60, bottom: 0, width: Platform.OS === "android" ? 482 : 506, height: 44, flexDirection: "row", gap: 6 },
+  menuItemButton: { minWidth: 106, width: Platform.OS === "android" ? 116 : 122, height: 44, paddingHorizontal: 10, borderRadius: 14, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, borderWidth: 2, borderColor: "#7C5CFF", backgroundColor: "rgba(42,25,72,0.97)" },
   hamburgerButton: { width: 44, height: 44, borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#7C5CFF", backgroundColor: "rgba(12,9,23,0.96)" },
   hamburgerIcon: { width: 32, color: "#B9AAFF", fontSize: 27, lineHeight: 30, fontWeight: "900", textAlign: "center", includeFontPadding: false },
   menuItemIcon: { width: 32, height: 32 },
@@ -337,7 +337,7 @@ const styles = StyleSheet.create({
   profileButtonPressed: { opacity: 0.72, transform: [{ scale: 0.97 }] },
   profileAvatar: { width: 34, height: 34 },
   profileLabel: { color: "#7C5CFF", fontSize: 14, fontWeight: "800", flexShrink: 0 },
-  popupRail: { position: "absolute", left: Platform.OS === "android" ? 24 : 1, top: Platform.OS === "android" ? 20 : 38, bottom: Platform.OS === "android" ? 20 : 12, width: SIDEBAR_ITEM_WIDTH, justifyContent: Platform.OS === "android" ? "center" : "flex-start", gap: 3, zIndex: 5 },
+  popupRail: { position: "absolute", left: Platform.OS === "android" ? 24 : 12, top: Platform.OS === "android" ? 20 : 24, bottom: Platform.OS === "android" ? 20 : 24, width: SIDEBAR_ITEM_WIDTH, justifyContent: "center", gap: 3, zIndex: 5 },
   popup: { width: SIDEBAR_ITEM_WIDTH, height: SIDEBAR_ITEM_HEIGHT, alignItems: "center", justifyContent: "flex-end", paddingBottom: 2 },
   popupDisabled: { opacity: 0.55 },
   popupPressed: { transform: [{ scale: 0.96 }] },

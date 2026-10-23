@@ -27,6 +27,7 @@ import { FinalResultsScreen } from "./src/screens/FinalResultsScreen";
 import { SettingsScreen, VolumeControl } from "./src/screens/SettingsScreen";
 import { RankedScreen } from "./src/screens/RankedScreen";
 import { EndlessScreen } from "./src/screens/EndlessScreen";
+import { getEndlessState } from "./src/network/client";
 import { ShopScreen } from "./src/screens/ShopScreen";
 import { ProfileScreen } from "./src/screens/ProfileScreen";
 import { RulesScreen } from "./src/screens/RulesScreen";
@@ -152,6 +153,7 @@ export default function App() {
   const { dialog: appDialog, showDialog, dismissDialog, confirmDialog } = useGameDialog();
   const [nav, setNav] = useState<Nav>("startup");
   const [leaderboardTab, setLeaderboardTab] = useState<"ranked" | "endless">("ranked");
+  const [endlessPlaying, setEndlessPlaying] = useState(false);
   const [hasEnteredApp, setHasEnteredApp] = useState(false);
   const [sessionReady, setSessionReady] = useState(false);
   const [startupState, setStartupState] = useState<StartupState>("idle");
@@ -196,6 +198,12 @@ export default function App() {
   const intentionalLeaveRef = useRef(false);
   const reconnectionTokenRef = useRef<string | null>(null);
   const intentionalSignOutRef = useRef(false);
+
+  useEffect(() => {
+    if (nav !== "home" || !deviceId || registeredAccount?.playerId !== deviceId) return;
+    void getEndlessState(deviceId).catch(() => undefined);
+    void Image.prefetch(Image.resolveAssetSource(require("./assets/endless-mountain-chalk.png")).uri).catch(() => undefined);
+  }, [nav, deviceId, registeredAccount?.playerId]);
 
   const refreshNotificationCounts = React.useCallback(async () => {
     if (!hasEnteredApp || !registeredAccount || !deviceId || nav === "in-room") return;
@@ -964,7 +972,7 @@ export default function App() {
       ) : (
         <>
           {nav === "create" && deviceId ? <CreateGameScreen onCreate={handleCreate} onEndless={() => openRegisteredFeature("ranked", () => setNav("endless"))} locale={locale} deviceId={deviceId} stars={stars} registered={Boolean(registeredAccount)} onSignInRequired={() => setNav("profile")} initialName={defaultPlayerName} onBack={() => setNav("home")} /> : null}
-          {nav === "endless" && deviceId ? <EndlessScreen playerId={deviceId} onStarsChange={setStars} onBack={() => setNav("home")} onLeaderboard={() => { setLeaderboardTab("endless"); setNav("ranked"); }} /> : null}
+          {nav === "endless" && deviceId ? <EndlessScreen playerId={deviceId} onStarsChange={setStars} onPlayingChange={setEndlessPlaying} onBack={() => setNav("home")} onLeaderboard={() => { setLeaderboardTab("endless"); setNav("ranked"); }} /> : null}
           {nav === "join" && <JoinGameScreen onJoin={handleJoin} onJoinPublic={handleJoinPublic} initialName={defaultPlayerName} onBack={() => setNav("home")} />}
           {nav === "ranked" && deviceId ? (
             <RankedScreen
@@ -1043,8 +1051,8 @@ export default function App() {
       <FeedbackPopup notice={appNotice} onDismiss={clearFeedback} />
       <GameDialog dialog={appDialog} onCancel={dismissDialog} onConfirm={confirmDialog} />
       <View
-        pointerEvents={hasEnteredApp && nav !== "in-room" && nav !== "endless" ? "box-none" : "none"}
-        style={[styles.starsPersistentLayer, (!hasEnteredApp || nav === "in-room" || nav === "endless") && styles.persistentScreenHidden]}
+        pointerEvents={hasEnteredApp && nav !== "in-room" && !(nav === "endless" && endlessPlaying) ? "box-none" : "none"}
+        style={[styles.starsPersistentLayer, (!hasEnteredApp || nav === "in-room" || (nav === "endless" && endlessPlaying)) && styles.persistentScreenHidden]}
       >
         <StarsBadge stars={stars} gain={starGain} width={starsBadgeWidth} onPress={() => openRegisteredFeature("shop", () => openShop("featured"))} />
       </View>

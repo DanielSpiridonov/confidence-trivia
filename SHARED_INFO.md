@@ -38,8 +38,28 @@ checklist, use `PRE_PUBLISH_CHECKLIST.md`.
 
 ## Current state
 
+- iOS layout correction (23 October 2026): the shared Screen fills its safe
+  viewport instead of capping content at 720 design units, uses separate notch
+  insets per side, and widens the canvas without enlarging controls. Home edge
+  shortcuts/menu and Create Game column sizing were adjusted. Geometry tests,
+  TypeScript and platform exports pass; verify both landscape rotations on a
+  real iPhone using `IPHONE_TESTING_CHECKLIST.md`.
+  Endless gameplay now reserves two answer rows and a separate feedback strip;
+  the question panel flexes and scrolls instead of pushing the bottom choices
+  outside the canvas. Existing horizontal margins are preserved. Local Yoga
+  checks cover four widths and three question lengths; phone verification remains.
+
 - Endless solo mode is implemented locally (23 October 2026), with persistent
   authoritative runs, a separate leaderboard and once-only Star milestones.
+  There is no Continue option: leaving/backgrounding abandons the run. A server
+  lease permits at most ten seconds without foreground gameplay activity for
+  connection failures; question deadlines keep running. Best scores and earned
+  Stars survive abandonment. Deploy matching server/mobile updates together.
+  Protocol version 2 is now checked before Start: old Render APIs must not enter
+  gameplay or loop on invalid heartbeat/abandon actions. Retry reads fresh state.
+  `/health` advertises `endlessProtocolVersion: 2` on the updated server. The
+  configured test service was reachable but lacked that marker on 23 October;
+  local code changes have not deployed it. Regression suite: 111 passing tests.
   See [ENDLESS_MODE.md](ENDLESS_MODE.md) for the source inventory, content limits,
   validation and required migration 023/server deployment. It is not deployed;
   device and live test-environment verification remain required.
