@@ -12,7 +12,7 @@ const { RoomStateSchema, PlayerSchema } = require("../dist/state/schema.js");
 function roomFor(mode = "classic", count = 2) {
   const room = Object.create(GameRoom.prototype);
   Object.assign(room, {
-    state: new RoomStateSchema(), clients: [], deviceIds: new Map(),
+    state: new RoomStateSchema(), clients: [], deviceIds: new Map(), startErrors: [],
     challengeRoles: new Map(), roundAnswers: new Map(), roundAnswerDrafts: new Map(),
     roundConfidenceDecisions: new Set(), roundSideBets: new Map(), roundSideBetDecisions: new Set(),
     gameStartPending: false, damageWagerReserved: false, lobbyWasPublic: true,
@@ -29,7 +29,7 @@ function roomFor(mode = "classic", count = 2) {
     player.isHost = index === 0;
     room.state.players.set(player.id, player);
     room.deviceIds.set(player.id, `device${index}`);
-    room.clients.push({ sessionId: player.id });
+    room.clients.push({ sessionId: player.id, send: (type, message) => room.startErrors.push({ type, message }) });
   }
   room.state.hostId = "p0";
   return room;
@@ -41,11 +41,39 @@ function starting(room) {
   room.state.phaseEndsAt = Date.now() + 3000;
 }
 
-test("a single player cannot start a multiplayer game", async () => {
+test("a single player cannot start Classic", async () => {
   const room = roomFor("classic", 1);
   await room.handleStartGame(room.clients[0]);
   assert.equal(room.state.gameStarted, false);
   assert.equal(room.state.phase, "lobby");
+  assert.deepEqual(room.startErrors, [{ type: "gameStartError", message: { code: "not_enough_players" } }]);
+});
+
+test("temporary solo Custom starts and advances through the countdown with one connected host", async () => {
+  const room = roomFor("friends",1);
+  room.state.friendsTeamMode = "ffa";
+  room.setPhase = (phase) => { room.state.phase = phase; };
+  let advanced = false;
+  room.advanceToNextRound = () => { advanced = true; };
+  await room.handleStartGame(room.clients[0]);
+  assert.equal(room.state.gameStarted,true);
+  assert.equal(room.state.phase,"starting");
+  room.advancePhase();
+  assert.equal(advanced,true);
+});
+
+test("solo testing does not permit duos, Ranked, Damage or disconnected Custom hosts", async () => {
+  for (const mode of ["friends","ranked","damage"]) {
+    const room = roomFor(mode,1);
+    if (mode === "friends") room.state.friendsTeamMode = "duos";
+    await room.handleStartGame(room.clients[0]);
+    assert.equal(room.state.gameStarted,false);
+  }
+  const room = roomFor("friends",1);
+  room.state.friendsTeamMode = "ffa";
+  room.state.players.get("p0").connected = false;
+  await room.handleStartGame(room.clients[0]);
+  assert.equal(room.state.gameStarted,false);
 });
 
 test("Classic countdown continues when two players remain", async () => {

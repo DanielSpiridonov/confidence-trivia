@@ -62,6 +62,8 @@ async function endlessAction(playerId, authUserId, command, database = database_
             }
         }
         if (run) {
+            if (command.type === "answer" && command.runId === run.id && command.token === run.question?.token && !(0, endlessEngine_1.validEndlessAnswer)(run.question, command.answer))
+                throw new EndlessError(400, "Invalid answer for this question.");
             (0, endlessEngine_1.applyEndlessCommand)(run, command, now);
             if (run.score > best) {
                 best = run.score;

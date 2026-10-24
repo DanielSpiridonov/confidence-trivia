@@ -15,6 +15,7 @@ import {
 interface ComputeInput {
   correctAnswer: unknown;
   basePoints?: number; // defaults to DEFAULT_BASE_POINTS (1)
+  answerBasePoints?: Record<string, number>;
   answers: PlayerAnswer[];
   sideBets: SideBet[];
   currentStreaks: Record<string, number>; // playerId -> streak going in
@@ -49,7 +50,7 @@ export function computeRoundResults(input: ComputeInput): RoundResult {
     let delta = answer.confidence === "none"
       ? 0
       : correct
-        ? table.correct + (basePoints - DEFAULT_BASE_POINTS)
+        ? table.correct + ((input.answerBasePoints?.[answer.playerId] ?? basePoints) - DEFAULT_BASE_POINTS)
         : table.wrong;
 
     const priorStreak = currentStreaks[answer.playerId] ?? 0;

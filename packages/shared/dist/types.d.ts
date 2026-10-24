@@ -1,3 +1,4 @@
+import type { VisualPresentation } from "./visualQuestions";
 export type ConfidenceValue = "none" | 1 | 3 | 5 | 6;
 export declare const CONFIDENCE_VALUES: ConfidenceValue[];
 export type QuestionType = "multiple_choice" | "true_false" | "estimate" | "closest_answer" | "ordering" | "word" | "visual";
@@ -5,6 +6,7 @@ export type Locale = "en" | "bg";
 export type GameMode = "classic" | "friends" | "damage" | "ranked";
 /** A single localized rendering of a question, sent to the client. */
 export interface LocalizedQuestion {
+    presentation?: VisualPresentation;
     id: string;
     type: QuestionType;
     category: string;
@@ -18,6 +20,8 @@ export interface LocalizedQuestion {
 /** Full question record as stored server-side (never sent to the client
  * before reveal — contains the answer key). */
 export interface QuestionRecord {
+    presentation?: VisualPresentation;
+    difficultyNote?: string;
     id: string;
     type: QuestionType;
     category: string;
@@ -43,7 +47,7 @@ export interface SideBet {
     targetId: string;
     prediction: "correct" | "wrong";
 }
-export type RoundPhase = "lobby" | "starting" | "question" | "confidence" | "board_sidebet" | "reveal" | "final_results";
+export type RoundPhase = "lobby" | "starting" | "question" | "visual_loading" | "confidence" | "board_sidebet" | "reveal" | "final_results";
 export interface PlayerScoreEvent {
     playerId: string;
     reason: "answer" | "sidebet" | "streak_bonus";

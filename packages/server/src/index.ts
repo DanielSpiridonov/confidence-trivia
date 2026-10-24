@@ -7,7 +7,7 @@ import { MATCHMAKING_FILTERS } from "./rooms/matchmaking";
 import { canAccessPlayerData } from "./database";
 import { anonymizePlayerAccount, canPlayerEnterGame, claimAllFriendGifts, claimDailyReward, claimFriendGift, createPlayerChallenge, equipFreeAvatar, equipFreeFrame, equipFreeNameColor, getAccountProfile, getDailyRewardStatus, getDatabaseStatus, getNewsPosts, getPlayerChallenges, getPlayerCustomization, getPlayerStars, getRankedLeaderboard, isAuthenticatedPlayer, linkPlayerAccount, listFriends, ownsRegisteredPlayer, redeemPromoCode, respondToFriendRequest, respondToPlayerChallenge, searchFriendPlayers, sendFriendGift, sendFriendRequest, submitPlayerReport, suggestFriendPlayers, updateAccountDisplayName, updateFriendRelationship, updatePlayerPresence } from "./database";
 import { deleteSupabaseIdentity, revokeAppleAuthorization, verifySupabaseIdentity } from "./auth";
-import { ENDLESS_PROTOCOL_VERSION, isDamageWager, isOffensivePlayerName } from "@confidence-trivia/shared";
+import { ALLOW_SOLO_CUSTOM_TESTING, ENDLESS_PROTOCOL_VERSION, isDamageWager, isOffensivePlayerName } from "@confidence-trivia/shared";
 import { authenticatedActorOrIpKey, createRateLimiter } from "./rateLimit";
 import { logServerError } from "./logging";
 import { endlessRouter } from "./endlessRoutes";
@@ -28,7 +28,7 @@ const rewardLimit = createRateLimiter({ windowMs: 60 * 60_000, max: 10, message:
 
 app.get("/health", async (_req, res) => {
   const database = await getDatabaseStatus();
-  res.json({ ok: true, database, endlessProtocolVersion: ENDLESS_PROTOCOL_VERSION });
+  res.json({ ok: true, database, endlessProtocolVersion: ENDLESS_PROTOCOL_VERSION, customSoloTesting: ALLOW_SOLO_CUSTOM_TESTING });
 });
 
 app.use(generalLimit);

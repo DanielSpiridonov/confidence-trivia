@@ -3,6 +3,15 @@ node_modules
 **/dist
 .expo
 .git
+.private
+.codex-staging
+**/*.private.*
+ngrok.yml
+**/*.pem
+**/*.key
+**/*.p8
+**/*.p12
+**/credentials.json
 .env
 .env.*
 npm-debug.log*

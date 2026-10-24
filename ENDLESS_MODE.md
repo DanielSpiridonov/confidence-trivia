@@ -7,19 +7,22 @@ EAS build, or production data mutation was performed.
 
 - Home has an Endless action; Create Game also links to the solo lobby.
 - The solo lobby follows the supplied chalkboard reference: three larger illustrated
-  rule cards, a hand-drawn infinity/title treatment, a generated chalk mountain
+  rule cards, a hand-drawn infinity/title treatment, an inline chalk mountain
   with summit flag, a dark purple play button with independently centered text,
-  and best-score, next-milestone and Beat Your Record panels. The small leaderboard
-  preview and Unlock Rewards rule were removed. Beat Your Record opens rankings.
+  and best-score and next-milestone panels. Beat Your Record, the small leaderboard
+  preview and Unlock Rewards rule were removed. The best-score panel links to rankings.
   The header reuses the app's existing Stars badge and has no extra trophy button.
   The full Reward Road remains exclusive to run end. Scores are never mock data.
-- The menu renders immediately. Home preloads the mountain artwork and fetches
+- The menu renders immediately. The mountain/path/flag is native SVG artwork,
+  with no separate bitmap request or decode; the earlier generated PNG remains
+  in the repository as historical artwork but is no longer imported by the app.
+  Home fetches
   the account's Endless snapshot; entering the mode displays any cached snapshot
   and refreshes in the background. No menu leaderboard request is made. Initial
   unknown best scores show a dash rather than a fabricated zero. Tapping Play
   during a refresh queues the Start action. Actual run creation and all answers
   still require the authoritative server response; cached state cannot score.
-- A fresh state read validates Endless protocol version 2 before Start or old-run
+- A fresh state read validates Endless protocol version 3 before Start or old-run
   cleanup is sent. Older server responses and active snapshots without a lease
   show a temporary-unavailability message in the lobby instead of starting an
   unplayable question. API contract/auth failures stop heartbeat retries; network
@@ -28,13 +31,13 @@ EAS build, or production data mutation was performed.
   recover as soon as the matching server is deployed.
 - A run starts with three lives and zero score. Only correct answers add a
   point. Incorrect/late answers cost one life and reveal the correct choice.
-- Questions and answer order are selected on the server. Four answer choices,
-  a question token, actual difficulty, duration and deadline reach the client;
+- Questions and answer order are selected on the server. The configured input,
+  choices when applicable, question token, difficulty, duration and deadline reach the client;
   the answer key is withheld until the question has settled.
 - Stage progression uses questions encountered: Easy 1–10, Medium 11–25,
   Hard 26–50, Expert 51+. Transitions blend near boundaries. Empty pools fall
   back to the closest available real difficulty. Actual difficulty always sets
-  the timer (30/25/20/15 seconds).
+  the timer (20 seconds for Easy/Medium, 15 seconds for Hard/Expert).
 - There is no saved-run Continue option. Leaving the mode or backgrounding the
   app sends an immediate abandonment; the whole run ends with zero lives.
   Best scores and earned Stars remain saved. Starting from the lobby closes any
@@ -77,9 +80,13 @@ EAS build, or production data mutation was performed.
   seconds, then fades out into the results screen. There are no road screens
   between questions, and no road in the lobby or active gameplay. Backgrounding
   pauses the presentation; reduced-motion settings disable its fades.
-- The all-time Endless leaderboard has its own tab, names, equipped avatars,
+- The all-time Endless leaderboard has its own tab, player names without avatars,
   top 100, and the current player's position even outside the top 100. Ties use
   earliest achievement, then player UUID. Ranked LP/calculations stay separate.
+  Its lavender chalkboard panels, handwritten type, crown rank markers and own-row
+  highlight follow the menu reference. A shared animated Ranked / Endless selector
+  adopts each board's palette, respects reduced motion, and retains loaded boards
+  and scroll positions while switching. Each board loads only on its first visit.
 - Results show correct score, question count, previous/current best, run rewards,
   replay, main menu and the leaderboard. Exhaustion also has a distinct
   completion message instead of repeating content or charging an extra life.
@@ -93,14 +100,17 @@ finite milestone list. It currently awards **280 Stars total** across thresholds
 is the permanent claim identity. Changing an amount does not re-award a claim.
 New milestones below an existing best are awarded on the next state request.
 
-The current pool has **156 unique questions**: 30 Easy, 28 Medium, 26 Hard and
-72 Expert. It reuses four-option questions and converts existing numeric facts
-to four options without changing their answer or difficulty. Expert is an
+The current pool has **167 unique questions**: 34 Easy, 32 Medium, 29 Hard and
+72 Expert. It reuses four-option questions and converts existing nonvisual numeric facts
+to four options without changing their answer or difficulty. Visual questions
+retain their configured multiple-choice, written or exact numeric inputs. See
+[VISUAL_QUESTIONS.md](VISUAL_QUESTIONS.md) for readiness, stage timing and authoring.
+Expert is an
 original math pool with explicit reasoning rubrics and computed answer keys.
 The multiplayer question bank and its three-tier types are unchanged.
 
 Content limitations: Expert is math-focused; inherited labels have no empirical
-player calibration. A run can currently score at most 156 before exhausting the
+player calibration. A run can currently score at most 167 before exhausting the
 bank, so the 200–300 rewards are configured for future content expansion. Add
 reviewed, diverse content with stable unique IDs before promoting very long
 runs. The selector never silently repeats questions or invents difficulty for
@@ -114,15 +124,15 @@ registered player, supplied as the `playerId` query parameter:
 | Route | Operation |
 | --- | --- |
 | `GET /endless/state` | Sync; expire lost runs and settle overdue questions without renewing the connection window |
-| `POST /endless/action` | `start` with UUID `requestId`; `answer` with `runId`, `token`, `answer` (0–3 or timeout null); `next` with `runId`, `token`; `heartbeat` or `abandon` with `runId` |
+| `POST /endless/action` | `start` with UUID `requestId`; `answer` with `runId`, `token`, an input-appropriate number/text or timeout null; `next`, `ready`, `visualFailed` with `runId`, `token`; `heartbeat` or `abandon` with `runId` |
 | `GET /endless/leaderboard` | All-time top 100 plus current player |
 
 The existing general HTTP rate limiter covers these endpoints. Responses use
 `Cache-Control: no-store`. Client-provided score, lives, timestamps and currency
 are discarded. Responses do not contain internal database error messages.
-State/action payloads include `protocolVersion: 2`. All Endless responses include
-`X-Endless-Protocol: 2`, including errors. Public `/health` includes
-`endlessProtocolVersion: 2` so the deployed contract can be checked without an
+State/action payloads include `protocolVersion: 3`. All Endless responses include
+`X-Endless-Protocol: 3`, including errors. Public `/health` includes
+`endlessProtocolVersion: 3` so the deployed contract can be checked without an
 account token. Reloading Expo cannot update the Render server.
 
 `endlessAction` reuses the bounded PostgreSQL pool and locks the player row
@@ -152,7 +162,7 @@ existing account deletion flow through a new database trigger.
    Ship the matching mobile update with this server change: older clients do
    not send heartbeats. The connection deadline lives in the existing JSON run
    snapshot; no additional SQL migration is needed beyond migration 023.
-   Verify the deployed `/health` returns `endlessProtocolVersion: 2` before device
+   Verify the deployed `/health` returns `endlessProtocolVersion: 3` before device
    testing. On 23 October the configured test URL's public health check returned
    a connected database but no protocol marker: the local server update had not
    reached that service. No remote write or deployment was performed to fix it.
@@ -166,7 +176,7 @@ existing account deletion flow through a new database trigger.
 ## Checks executed
 
 - `npm run test:unit --workspace=packages/server`: builds server/shared and runs
-  the complete Node suite: **111 passed, 0 failed**. Includes engine, embedded PostgreSQL, mobile layout/presentation/cache/transport and HTTP route
+  the complete Node suite: **133 passed, 0 failed**. Includes engine, embedded PostgreSQL, mobile layout/presentation/cache/transport and HTTP route
   tests alongside existing auth, scoring, matchmaking, question-bank, rate-limit
   and multiplayer room regression tests.
 - `node node_modules/typescript/bin/tsc --noEmit -p packages/mobile/tsconfig.json`.
@@ -218,6 +228,8 @@ Created:
 - `packages/mobile/src/components/RewardRoad.tsx`
 - `packages/mobile/src/components/EndlessRunProgress.tsx`
 - `packages/mobile/src/components/EndlessLobby.tsx`
+- `packages/mobile/src/components/EndlessMountain.tsx`
+- `packages/mobile/src/components/LeaderboardSwitch.tsx`
 - `packages/mobile/src/components/EndlessAnswerOption.tsx`
 - `packages/mobile/src/components/endlessPresentation.ts`
 - `packages/mobile/src/network/endlessCache.ts`

@@ -6,9 +6,9 @@ import { ENDLESS_QUESTIONS } from "../dist/content/endlessQuestions.js";
 import { parseEndlessCommand } from "../dist/endlessRoutes.js";
 import { ENDLESS_RECONNECT_MS, ENDLESS_TIMERS } from "@confidence-trivia/shared";
 
-function run() { return createEndlessRun(randomUUID(), 25, 1000); }
-function answer(r, value, now = 2000) { applyEndlessCommand(r, { type: "answer", runId: r.id, token: r.question.token, answer: value }, now); }
-function next(r, now) { applyEndlessCommand(r, { type: "next", runId: r.id, token: r.question.token }, now); }
+function run() { return createEndlessRun(randomUUID(), 25, 1000, ENDLESS_QUESTIONS.filter((q) => !q.presentation)); }
+function answer(r, value, now = 2000) { if (r.phase === "loading") applyEndlessCommand(r, { type: "ready", runId: r.id, token: r.question.token }, now-1); applyEndlessCommand(r, { type: "answer", runId: r.id, token: r.question.token, answer: value }, now); }
+function next(r, now) { applyEndlessCommand(r, { type: "next", runId: r.id, token: r.question.token }, now); if (r.phase === "loading") applyEndlessCommand(r, { type: "ready", runId: r.id, token: r.question.token }, now); }
 function heartbeat(r, now) { applyEndlessCommand(r, { type: "heartbeat", runId: r.id }, now); }
 function keepAlive(r, until) {
   for (let now = r.connectionDeadline - ENDLESS_RECONNECT_MS + 2000; now <= until; now += 2000) heartbeat(r, now);
@@ -107,7 +107,8 @@ test("Endless never repeats a question and reports exhaustion", () => {
   const r = run(); const seen = new Set(); let now = 1000;
   while (r.phase !== "finished") {
     assert.ok(!seen.has(r.question.contentId)); seen.add(r.question.contentId);
-    answer(r, r.question.correctIndex, now + 10); next(r, now + 2000); now += 2100;
+    const key = r.question.correctAnswer ?? r.question.correctIndex;
+    answer(r, Array.isArray(key) ? key[0] : key, now + 10); next(r, now + 2000); now += 2100;
   }
   assert.equal(r.endReason, "exhausted"); assert.equal(seen.size, ENDLESS_QUESTIONS.length); assert.equal(r.score, seen.size);
 });
@@ -127,7 +128,7 @@ test("Reward Road uses maximum single-run best and awards all new thresholds onc
   assert.deepEqual(unclaimedEndlessRewards(75, claimed), []);
 });
 test("API rejects malformed actions and strips fabricated score, timestamp, reward fields", () => {
-  for (const answer of [-1, 4, 0.5, "0", {}, undefined]) assert.throws(() => parseEndlessCommand({ type: "answer", runId: randomUUID(), token: randomUUID(), answer }));
+  for (const answer of [{}, [], true, "", "x".repeat(65), undefined]) assert.throws(() => parseEndlessCommand({ type: "answer", runId: randomUUID(), token: randomUUID(), answer }));
   assert.throws(() => parseEndlessCommand({ type: "start", requestId: "fake" }));
   const c = parseEndlessCommand({ type: "start", requestId: randomUUID(), score: 100000, stars: 99999 }); assert.deepEqual(Object.keys(c).sort(), ["requestId", "type"]);
 });

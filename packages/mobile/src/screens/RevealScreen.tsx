@@ -6,6 +6,7 @@ import { ANDROID_GAME_UI_SCALE, Screen, Title, Subtitle, theme } from "../compon
 import { PhaseTimer } from "../components/PhaseTimer";
 import { LeaderboardStrip } from "./LeaderboardScreen";
 import { DamageHud } from "../components/DamageHud";
+import { VisualCanvas } from "../components/VisualQuestion";
 
 // These combat-sized assets avoid decoding and compositing the much larger
 // profile artwork during the reveal animation. This is especially important
@@ -81,6 +82,7 @@ export function RevealScreen({ room, state, active = true }: { room: Room; state
   const myLeaderboardId = isFriendsDuos ? `team-${state.players.get(room.sessionId)?.team}` : room.sessionId;
   const isOrderingReveal = state.currentQuestion?.qType === "ordering";
   const isClosestAnswerReveal = state.currentQuestion?.qType === "closest_answer";
+  const visual = state.currentQuestion?.visualFormat ? <VisualCanvas presentation={{ format: state.currentQuestion.visualFormat, assetId: state.currentQuestion.visualAssetId }} startedAt={state.currentQuestion.startedAt} durationMs={state.currentQuestion.durationMs} full /> : null;
 
   if (state.gameMode === "damage") {
     const mutualCorrectDraw = results.length === 2 && results.every((result: any) => result.correct && (result.damageDealt ?? 0) === 0);
@@ -91,6 +93,7 @@ export function RevealScreen({ room, state, active = true }: { room: Room; state
           <Text style={styles.damageCorrectAnswerLabel}>{t("reveal.correctAnswer")}</Text>
           <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={styles.damageCorrectAnswerText}>{state.correctAnswerText}</Text>
         </View>
+        {visual ? <View style={{ height: 95, width: 170, alignSelf: "center" }}>{visual}</View> : null}
         <View style={styles.damageBattleStage}>
           <DamageAvatarPane state={state} results={results} myPlayerId={room.sessionId} active={active} />
           {mutualCorrectDraw ? (
@@ -201,6 +204,7 @@ export function RevealScreen({ room, state, active = true }: { room: Room; state
       <Title>{state.correctAnswerText}</Title>
 
       <View style={styles.revealBody}>
+        {visual ? <View style={{ width: 200, alignSelf: "stretch", marginRight: 12 }}>{visual}</View> : null}
         <FlatList
           style={styles.list}
           data={results}

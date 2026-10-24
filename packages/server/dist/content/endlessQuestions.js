@@ -8,6 +8,9 @@ const existing = questions_1.QUESTIONS.flatMap((q) => {
     if (!["easy", "medium", "hard"].includes(q.difficulty))
         return [];
     const t = q.translations.en;
+    if (q.presentation && (q.type === "multiple_choice" || q.type === "word" || q.type === "estimate")) {
+        return [{ id: q.id, text: t.text, options: [...(t.options ?? [])], correctIndex: q.type === "multiple_choice" ? Number(q.correctAnswer) : -1, correctAnswer: q.correctAnswer, answerType: q.type, presentation: q.presentation, difficulty: q.difficulty, category: q.category }];
+    }
     if (q.type === "multiple_choice" && t.options?.length === 4 && Number.isInteger(q.correctAnswer)) {
         return [{ id: q.id, text: t.text, options: [...t.options], correctIndex: Number(q.correctAnswer), difficulty: q.difficulty, category: q.category }];
     }
@@ -51,8 +54,10 @@ exports.ENDLESS_QUESTIONS = [...existing, ...experts];
 const ids = new Set();
 const texts = new Set();
 for (const q of exports.ENDLESS_QUESTIONS) {
-    if (ids.has(q.id) || texts.has(q.text.toLowerCase()) || q.options.length !== 4 || !["easy", "medium", "hard", "expert"].includes(q.difficulty) || q.correctIndex < 0 || q.correctIndex > 3)
+    const fingerprint = `${q.text.toLowerCase()}:${q.presentation?.assetId ?? ""}`;
+    const choice = !q.answerType || q.answerType === "multiple_choice";
+    if (ids.has(q.id) || texts.has(fingerprint) || (choice && (q.options.length !== 4 || q.correctIndex < 0 || q.correctIndex > 3)) || !["easy", "medium", "hard", "expert"].includes(q.difficulty))
         throw new Error(`Invalid Endless content: ${q.id}`);
     ids.add(q.id);
-    texts.add(q.text.toLowerCase());
+    texts.add(fingerprint);
 }

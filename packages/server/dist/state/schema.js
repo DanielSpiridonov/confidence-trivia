@@ -120,6 +120,10 @@ __decorate([
 class PublicQuestionSchema extends schema_1.Schema {
     constructor() {
         super(...arguments);
+        this.visualFormat = "";
+        this.visualAssetId = "";
+        this.startedAt = 0;
+        this.durationMs = 30000;
         this.id = "";
         this.qType = "";
         this.category = "";
@@ -130,6 +134,22 @@ class PublicQuestionSchema extends schema_1.Schema {
     }
 }
 exports.PublicQuestionSchema = PublicQuestionSchema;
+__decorate([
+    (0, schema_1.type)("string"),
+    __metadata("design:type", String)
+], PublicQuestionSchema.prototype, "visualFormat", void 0);
+__decorate([
+    (0, schema_1.type)("string"),
+    __metadata("design:type", String)
+], PublicQuestionSchema.prototype, "visualAssetId", void 0);
+__decorate([
+    (0, schema_1.type)("number"),
+    __metadata("design:type", Number)
+], PublicQuestionSchema.prototype, "startedAt", void 0);
+__decorate([
+    (0, schema_1.type)("number"),
+    __metadata("design:type", Number)
+], PublicQuestionSchema.prototype, "durationMs", void 0);
 __decorate([
     (0, schema_1.type)("string"),
     __metadata("design:type", String)
@@ -251,6 +271,7 @@ __decorate([
 class RoomStateSchema extends schema_1.Schema {
     constructor() {
         super(...arguments);
+        this.serverNow = 0;
         this.code = "";
         this.gameMode = "classic";
         this.friendsTeamMode = "ffa";
@@ -275,6 +296,10 @@ class RoomStateSchema extends schema_1.Schema {
     }
 }
 exports.RoomStateSchema = RoomStateSchema;
+__decorate([
+    (0, schema_1.type)("number"),
+    __metadata("design:type", Number)
+], RoomStateSchema.prototype, "serverNow", void 0);
 __decorate([
     (0, schema_1.type)("string"),
     __metadata("design:type", String)

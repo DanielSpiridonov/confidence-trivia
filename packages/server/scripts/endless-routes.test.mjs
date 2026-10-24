@@ -49,8 +49,8 @@ test("API compatibility headers are also present on rejected requests", async ()
   assert.equal(response.status, 401);
   assert.equal(response.headers.get("X-Endless-Protocol"), String(ENDLESS_PROTOCOL_VERSION));
 });
-test("HTTP actions reject invalid answer indices and malformed tokens", async () => {
-  for (const body of [{ type: "answer", runId: randomUUID(), token: randomUUID(), answer: 99 }, { type: "next", runId: "invalid", token: randomUUID() }]) assert.equal((await request("action", { method: "POST", body: JSON.stringify(body) })).status, 400);
+test("HTTP actions reject malformed answer values and tokens", async () => {
+  for (const body of [{ type: "answer", runId: randomUUID(), token: randomUUID(), answer: {} }, { type: "next", runId: "invalid", token: randomUUID() }]) assert.equal((await request("action", { method: "POST", body: JSON.stringify(body) })).status, 400);
 });
 test("HTTP actions discard client supplied score, reward, lives, and timestamps", async () => {
   const command = { type: "answer", runId: randomUUID(), token: randomUUID(), answer: 2 };

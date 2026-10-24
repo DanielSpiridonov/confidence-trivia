@@ -29,6 +29,10 @@ export class PlayerSchema extends Schema {
 /** What the client is allowed to see about the current question BEFORE
  * reveal — no correct answer field exists here. */
 export class PublicQuestionSchema extends Schema {
+  @type("string") visualFormat: string = "";
+  @type("string") visualAssetId: string = "";
+  @type("number") startedAt: number = 0;
+  @type("number") durationMs: number = 30_000;
   @type("string") id: string = "";
   @type("string") qType: string = "";
   @type("string") category: string = "";
@@ -63,6 +67,7 @@ export class RevealEntrySchema extends Schema {
 }
 
 export class RoomStateSchema extends Schema {
+  @type("number") serverNow: number = 0;
   @type("string") code: string = "";
   @type("string") gameMode: string = "classic";
   @type("string") friendsTeamMode: string = "ffa";

@@ -202,7 +202,6 @@ export default function App() {
   useEffect(() => {
     if (nav !== "home" || !deviceId || registeredAccount?.playerId !== deviceId) return;
     void getEndlessState(deviceId).catch(() => undefined);
-    void Image.prefetch(Image.resolveAssetSource(require("./assets/endless-mountain-chalk.png")).uri).catch(() => undefined);
   }, [nav, deviceId, registeredAccount?.playerId]);
 
   const refreshNotificationCounts = React.useCallback(async () => {
@@ -1147,6 +1146,7 @@ function InRoomRouter({
       case "starting":
         return <LobbyScreen room={room} state={state} mySessionId={room.sessionId} />;
       case "question":
+      case "visual_loading":
         return <QuestionScreen room={room} state={state} />;
       case "confidence":
         return <ConfidenceScreen room={room} state={state} />;

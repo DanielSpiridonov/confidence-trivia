@@ -5,6 +5,7 @@ exports.selectQuestion = selectQuestion;
 exports.advanceEndless = advanceEndless;
 exports.createEndlessRun = createEndlessRun;
 exports.settleEndless = settleEndless;
+exports.validEndlessAnswer = validEndlessAnswer;
 exports.expireEndlessConnection = expireEndlessConnection;
 exports.applyEndlessCommand = applyEndlessCommand;
 exports.publicEndlessRun = publicEndlessRun;
@@ -37,7 +38,7 @@ function selectQuestion(number, used, bank = endlessQuestions_1.ENDLESS_QUESTION
     return pool[Math.min(pool.length - 1, Math.floor(random() * pool.length))];
 }
 function advanceEndless(run, now, bank = endlessQuestions_1.ENDLESS_QUESTIONS) {
-    const content = selectQuestion(run.usedIds.length + 1, run.usedIds, bank);
+    const content = selectQuestion(run.usedIds.length + 1, [...run.usedIds, ...(run.skippedIds ?? [])], bank);
     if (!content) {
         run.phase = "finished";
         run.endReason = "exhausted";
@@ -50,9 +51,11 @@ function advanceEndless(run, now, bank = endlessQuestions_1.ENDLESS_QUESTIONS) {
     }
     const duration = shared_1.ENDLESS_TIMERS[content.difficulty];
     run.usedIds.push(content.id);
-    run.phase = "question";
+    run.phase = content.presentation ? "loading" : "question";
     run.feedback = null;
-    run.question = { token: (0, crypto_1.randomUUID)(), contentId: content.id, number: run.usedIds.length, text: content.text, options: indices.map((i) => content.options[i]), correctIndex: indices.indexOf(content.correctIndex), category: content.category, difficulty: content.difficulty, duration, deadline: now + duration * 1000 };
+    const choice = !content.answerType || content.answerType === "multiple_choice";
+    const correctIndex = choice ? indices.indexOf(content.correctIndex) : -1;
+    run.question = { token: (0, crypto_1.randomUUID)(), contentId: content.id, number: run.usedIds.length, text: content.text, options: choice ? indices.map((i) => content.options[i]) : [], correctIndex, correctAnswer: choice ? correctIndex : content.correctAnswer, answerType: content.answerType ?? "multiple_choice", ...(content.presentation ? { presentation: content.presentation } : {}), category: content.category, difficulty: content.difficulty, duration, startedAt: content.presentation ? 0 : now, loadingExpiresAt: content.presentation ? now + shared_1.VISUAL_READY_TIMEOUT_MS : undefined, deadline: content.presentation ? 0 : now + duration * 1000 };
 }
 function createEndlessRun(id, best, now, bank = endlessQuestions_1.ENDLESS_QUESTIONS) {
     const run = { id, score: 0, lives: 3, previousBest: best, phase: "question", endReason: null, connectionDeadline: now + shared_1.ENDLESS_RECONNECT_MS, question: null, feedback: null, rewards: [], usedIds: [] };
@@ -62,19 +65,32 @@ function createEndlessRun(id, best, now, bank = endlessQuestions_1.ENDLESS_QUEST
 function settleEndless(run, answer, now) {
     if (run.phase !== "question" || !run.question)
         return;
+    if (!validEndlessAnswer(run.question, answer))
+        return;
     const timedOut = now >= run.question.deadline;
     if (answer === null && !timedOut)
         return;
-    const selectedIndex = timedOut ? null : answer;
-    const correct = selectedIndex === run.question.correctIndex;
+    const selectedIndex = timedOut || typeof answer !== "number" || run.question.answerType === "estimate" ? null : answer;
+    const key = run.question.correctAnswer ?? run.question.correctIndex;
+    const correct = !timedOut && answer !== null && (0, shared_1.isAnswerCorrect)(run.question.answerType ?? "multiple_choice", answer, key, run.question.presentation?.format === "map_shapes" ? shared_1.normalizeGeographyAnswer : undefined);
     if (correct)
         run.score += 1;
     else
         run.lives -= 1;
-    run.feedback = { correctIndex: run.question.correctIndex, selectedIndex, correct, timedOut, readyAt: now + shared_1.ENDLESS_FEEDBACK_MS };
+    const answerText = run.question.correctIndex >= 0 ? run.question.options[run.question.correctIndex] : String(Array.isArray(key) ? key[0] : key);
+    run.feedback = { correctIndex: run.question.correctIndex, correctAnswerText: answerText, selectedIndex, correct, timedOut, readyAt: now + shared_1.ENDLESS_FEEDBACK_MS };
     run.phase = run.lives === 0 ? "finished" : "feedback";
     if (run.lives === 0)
         run.endReason = "lives";
+}
+function validEndlessAnswer(question, answer) {
+    if (answer === null)
+        return true;
+    return (0, shared_1.isValidAnswerValue)(question.answerType ?? "multiple_choice", answer, question.options.length);
+}
+function skipEndlessVisual(run, now) {
+    (run.skippedIds ?? (run.skippedIds = [])).push(run.usedIds.pop());
+    advanceEndless(run, now, endlessQuestions_1.ENDLESS_QUESTIONS.filter((q) => !q.presentation));
 }
 function abandonEndless(run) {
     run.phase = "finished";
@@ -96,6 +112,20 @@ function applyEndlessCommand(run, command, now) {
     // Check BEFORE renewing the lease: a late heartbeat/answer cannot revive it.
     if (expireEndlessConnection(run, now) || run.phase === "finished")
         return;
+    if (run.phase === "loading" && now >= (run.question?.loadingExpiresAt ?? 0))
+        skipEndlessVisual(run, now);
+    if ((command.type === "ready" || command.type === "visualFailed") && command.runId === run.id && command.token === run.question?.token && run.phase === "loading") {
+        run.connectionDeadline = now + shared_1.ENDLESS_RECONNECT_MS;
+        if (command.type === "ready") {
+            run.phase = "question";
+            run.question.startedAt = now;
+            run.question.deadline = now + run.question.duration * 1000;
+        }
+        else {
+            skipEndlessVisual(run, now);
+        }
+        return;
+    }
     if ((command.type === "abandon" || command.type === "heartbeat") && command.runId === run.id) {
         if (command.type === "abandon") {
             abandonEndless(run);
@@ -106,7 +136,7 @@ function applyEndlessCommand(run, command, now) {
     // Reads, Starts and stale tokens never keep a run alive. Accepted answers
     // and next-question actions count as activity, using server time only.
     if ((command.type === "answer" || command.type === "next") && command.runId === run.id && command.token === run.question?.token &&
-        ((command.type === "answer" && run.phase === "question" && command.answer !== null) ||
+        ((command.type === "answer" && run.phase === "question" && command.answer !== null && !!run.question && validEndlessAnswer(run.question, command.answer)) ||
             (command.type === "next" && run.phase === "feedback" && now >= (run.feedback?.readyAt ?? Infinity)))) {
         run.connectionDeadline = now + shared_1.ENDLESS_RECONNECT_MS;
     }
@@ -118,10 +148,10 @@ function applyEndlessCommand(run, command, now) {
         advanceEndless(run, now);
 }
 function publicEndlessRun(run) {
-    const { usedIds, question, ...safe } = run;
+    const { usedIds, skippedIds, question, ...safe } = run;
     if (!question)
         return { ...safe, question: null };
-    const { correctIndex, contentId, ...publicQuestion } = question;
+    const { correctIndex, correctAnswer, loadingExpiresAt, contentId, ...publicQuestion } = question;
     return { ...safe, question: publicQuestion };
 }
 function unclaimedEndlessRewards(best, claimed) {

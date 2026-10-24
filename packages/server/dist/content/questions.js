@@ -8,6 +8,8 @@ exports.localizeAnswer = localizeAnswer;
 exports.localizeAnswerItems = localizeAnswerItems;
 exports.getLocalizedCorrectAnswer = getLocalizedCorrectAnswer;
 const shared_1 = require("@confidence-trivia/shared");
+const visualQuestions_1 = require("./visualQuestions");
+const shared_2 = require("@confidence-trivia/shared");
 const generatedQuestions_1 = require("./generatedQuestions");
 const ENABLED_TEST_TYPES = new Set([
     "multiple_choice",
@@ -434,7 +436,7 @@ const SEED_QUESTIONS = [
         },
     },
 ];
-exports.QUESTIONS = [...SEED_QUESTIONS, ...generatedQuestions_1.GENERATED_QUESTIONS].map((question) => ({
+exports.QUESTIONS = [...SEED_QUESTIONS, ...generatedQuestions_1.GENERATED_QUESTIONS, ...visualQuestions_1.VISUAL_QUESTIONS].map((question) => ({
     ...question,
     basePoints: shared_1.DIFFICULTY_REWARDS[question.difficulty],
 }));
@@ -445,6 +447,8 @@ function validateQuestionBank(questions = exports.QUESTIONS) {
         if (ids.has(question.id))
             throw new Error(`Duplicate question id: ${question.id}`);
         ids.add(question.id);
+        if (question.presentation && (!(0, shared_1.hasVisualAsset)(question.presentation.assetId) || !["map_shapes", "image_reveal"].includes(question.presentation.format) || !["multiple_choice", "word", "estimate"].includes(question.type)))
+            throw new Error(`Invalid visual question ${question.id}`);
         if (question.basePoints !== shared_1.DIFFICULTY_REWARDS[question.difficulty]) {
             throw new Error(`Wrong base points for ${question.id}`);
         }
@@ -452,13 +456,17 @@ function validateQuestionBank(questions = exports.QUESTIONS) {
             const translation = question.translations[locale];
             if (!translation?.text.trim())
                 throw new Error(`Missing ${locale} text for ${question.id}`);
-            const fingerprint = `${locale}:${translation.text.trim().toLocaleLowerCase(locale)}:${(translation.options ?? []).join("|").toLocaleLowerCase(locale)}`;
+            const fingerprint = `${locale}:${question.presentation?.assetId ?? ""}:${translation.text.trim().toLocaleLowerCase(locale)}:${(translation.options ?? []).join("|").toLocaleLowerCase(locale)}`;
             if (localizedQuestions.has(fingerprint))
                 throw new Error(`Duplicate ${locale} question: ${question.id}`);
             localizedQuestions.add(fingerprint);
         }
         const enOptions = question.translations.en.options;
         const bgOptions = question.translations.bg.options;
+        if (question.presentation && question.type === "multiple_choice" && enOptions?.length !== 4)
+            throw new Error(`Visual choices require four options: ${question.id}`);
+        if (question.presentation && question.type === "estimate" && (typeof question.correctAnswer !== "number" || !Number.isFinite(question.correctAnswer)))
+            throw new Error(`Invalid visual numeric answer: ${question.id}`);
         if ((enOptions?.length ?? 0) !== (bgOptions?.length ?? 0)) {
             throw new Error(`Option count differs between languages for ${question.id}`);
         }
@@ -481,10 +489,11 @@ validateQuestionBank();
  * long-running server (multiple concurrent rooms) avoid immediate repeats
  * within one room's own game — it does not need to be global.
  */
-function getQuestionSet(count, excludeIds = [], categories = []) {
+function getQuestionSet(count, excludeIds = [], categories = [], allowVisual = true) {
     const categorySet = new Set(categories.map((category) => category.trim().toLowerCase()).filter(Boolean));
-    const categoryQuestions = exports.QUESTIONS.filter((q) => ENABLED_TEST_TYPES.has(q.type) && (categorySet.size === 0 || categorySet.has(q.category.toLowerCase())));
-    const enabledQuestions = categoryQuestions.length > 0 ? categoryQuestions : exports.QUESTIONS.filter((q) => ENABLED_TEST_TYPES.has(q.type));
+    const available = exports.QUESTIONS.filter((q) => ENABLED_TEST_TYPES.has(q.type) && (allowVisual || !q.presentation));
+    const categoryQuestions = available.filter((q) => categorySet.size === 0 || categorySet.has(q.category.toLowerCase()) || shared_2.VISUAL_TEST_CATEGORIES.some(filter => categorySet.has(filter.id) && q.presentation?.format === filter.format && (!("category" in filter) || q.category === filter.category)));
+    const enabledQuestions = categoryQuestions.length > 0 ? categoryQuestions : available;
     const questionSet = [];
     const excluded = new Set(excludeIds);
     const usedIds = new Set();
@@ -499,13 +508,14 @@ function getQuestionSet(count, excludeIds = [], categories = []) {
         const desiredDifficulty = difficultyPattern[questionSet.length % difficultyPattern.length];
         const difficultyMatches = candidatePool.filter((question) => question.difficulty === desiredDifficulty);
         const candidates = difficultyMatches.length > 0 ? difficultyMatches : candidatePool;
-        const lowestTypeCount = Math.min(...candidates.map((question) => typeCounts.get(question.type) ?? 0));
-        const leastUsedTypes = candidates.filter((question) => (typeCounts.get(question.type) ?? 0) === lowestTypeCount);
+        const kind = (q) => q.presentation?.format ?? q.type;
+        const lowestTypeCount = Math.min(...candidates.map((question) => typeCounts.get(kind(question)) ?? 0));
+        const leastUsedTypes = candidates.filter((question) => (typeCounts.get(kind(question)) ?? 0) === lowestTypeCount);
         const selected = leastUsedTypes[Math.floor(Math.random() * leastUsedTypes.length)];
         questionSet.push(selected);
         usedIds.add(selected.id);
         excluded.delete(selected.id);
-        typeCounts.set(selected.type, (typeCounts.get(selected.type) ?? 0) + 1);
+        typeCounts.set(kind(selected), (typeCounts.get(kind(selected)) ?? 0) + 1);
     }
     return questionSet;
 }
@@ -520,11 +530,14 @@ function localize(record, locale) {
         text: t.text,
         options: t.options,
         basePoints: shared_1.DIFFICULTY_REWARDS[record.difficulty],
+        presentation: record.presentation,
     };
 }
 function localizeAnswer(record, locale, answer) {
     const t = record.translations[locale] ?? record.translations.en;
     if (Array.isArray(answer)) {
+        if (record.type === "word")
+            return String(answer[0] ?? "");
         return localizeAnswerItems(record, locale, answer).join(" -> ");
     }
     if (typeof answer === "number" && t.options?.[answer] !== undefined) {

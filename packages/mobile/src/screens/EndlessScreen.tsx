@@ -7,6 +7,7 @@ import { Screen, theme } from "../components/ui";
 import { EndlessRunProgress } from "../components/EndlessRunProgress";
 import { EndlessLobby } from "../components/EndlessLobby";
 import { EndlessAnswerOption } from "../components/EndlessAnswerOption";
+import { VisualQuestionRound } from "../components/VisualQuestion";
 import { getEndlessOptionState, getEndlessOutcome } from "../components/endlessPresentation";
 import { getCachedEndlessState, getEndlessState, sendEndlessAction } from "../network/client";
 import { asEndlessRequestError, type EndlessRequestError } from "../network/endlessTransport";
@@ -192,7 +193,7 @@ export function EndlessScreen({ playerId, onBack, onLeaderboard, onStarsChange, 
     if (!alive.current || !await request()) return;
     const active = currentState.current?.run;
     if (playing && !mustAbandon.current && AppState.currentState === "active" && active && active.phase !== "finished") {
-      await request({ type: "heartbeat", runId: active.id });
+      await request(active.phase === "loading" && active.question ? { type: "ready", runId: active.id, token: active.question.token } : { type: "heartbeat", runId: active.id });
     }
   }
   const finishedReady = playing && run?.phase === "finished" && (!run.feedback || now >= Math.max(run.feedback.readyAt, feedbackReadyAt));
@@ -227,7 +228,11 @@ export function EndlessScreen({ playerId, onBack, onLeaderboard, onStarsChange, 
     </View>
     {!playing ? <EndlessLobby best={state?.personalBest ?? null} busy={starting} unavailable={!!error} onStart={() => void start()} onLeaderboard={onLeaderboard} /> : null}
 
-    {showQuestion && question ? <View style={s.playBody}>
+    {showQuestion && question?.presentation && run ? <VisualQuestionRound key={question.token} id={question.token} text={question.text} presentation={question.presentation} answerType={question.answerType ?? "multiple_choice"} options={question.options} startedAt={question.startedAt ?? question.deadline - question.duration*1000} durationMs={question.duration*1000} serverNow={now} preparing={run.phase === "loading"} locked={busy || selected !== null || !!error || run.phase !== "question" || connectionExpired} solo
+      feedback={run.feedback ? { correct: run.feedback.correct, timedOut: run.feedback.timedOut, answer: run.feedback.correctAnswerText ?? question.options[run.feedback.correctIndex] ?? "" } : null}
+      onReady={() => { if (run.phase === "loading") void request({ type: "ready", runId: run.id, token: question.token }); }} onFailure={() => void request({ type: "visualFailed", runId: run.id, token: question.token })}
+      onSubmit={(answer) => { if (inFlight.current) return; void request({ type: "answer", runId: run.id, token: question.token, answer }); }} /> : null}
+    {showQuestion && question && !question.presentation ? <View style={s.playBody}>
       <View style={s.questionPanel}>
         <View style={s.questionMeta}><View style={s.questionLabels}><Text style={s.questionNumber}>QUESTION {question.number.toString().padStart(2, "0")}</Text><Text style={[s.difficulty, { color: accent }]}>{question.difficulty.toUpperCase()}</Text><Text style={s.category}>{question.category}</Text></View>
           {outcome ? <Ionicons accessibilityLabel={outcome.title} name={outcome.icon} size={25} color={outcome.color} /> : <Text accessibilityLabel={`${seconds} seconds remaining`} style={[s.seconds, seconds <= 5 && { color: "#FF9FAD" }]}>{seconds}<Text style={s.timeUnit}> s</Text></Text>}

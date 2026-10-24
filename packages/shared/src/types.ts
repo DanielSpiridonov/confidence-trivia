@@ -1,6 +1,7 @@
 // Pure types shared by server and every client (mobile now, web later).
 // Nothing in this file depends on React Native, Colyseus, or any transport.
 
+import type { VisualPresentation } from "./visualQuestions";
 export type ConfidenceValue = "none" | 1 | 3 | 5 | 6;
 
 export const CONFIDENCE_VALUES: ConfidenceValue[] = ["none", 1, 3, 5, 6];
@@ -19,6 +20,7 @@ export type GameMode = "classic" | "friends" | "damage" | "ranked";
 
 /** A single localized rendering of a question, sent to the client. */
 export interface LocalizedQuestion {
+  presentation?: VisualPresentation;
   id: string;
   type: QuestionType;
   category: string;
@@ -33,6 +35,8 @@ export interface LocalizedQuestion {
 /** Full question record as stored server-side (never sent to the client
  * before reveal — contains the answer key). */
 export interface QuestionRecord {
+  presentation?: VisualPresentation;
+  difficultyNote?: string;
   id: string;
   type: QuestionType;
   category: string;
@@ -66,6 +70,7 @@ export type RoundPhase =
   | "lobby"
   | "starting"
   | "question"
+  | "visual_loading"
   | "confidence"
   | "board_sidebet"
   | "reveal"

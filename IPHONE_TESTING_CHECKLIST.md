@@ -38,6 +38,11 @@ Use this checklist after an Apple Developer team is available and an iOS develop
 
 ## iOS regression checks after installing the development build
 
+- [ ] Deploy matching visual-question code and verify `/health` advertises protocol 3. In a two-device match, check country/continent silhouettes, readiness, all three reveal stages, and recovery after one device cannot prepare a visual. Timers must start together and missing visuals must not award points or cost lives.
+- [ ] Test visual choice, written aliases and exact numeric counts in multiplayer and Endless. Confirm stage boundaries affect multiplayer base rewards only; Endless always scores +1. Test keyboard use, long prompts, timeout feedback, clear-image reveal, reconnect mid-stage and Reduce Motion on both phone platforms.
+- [ ] Cold-start the app and open Endless immediately: the inline mountain must appear with the menu; Beat Your Record must be absent and the best-score card must still open rankings.
+- [ ] Check Endless rankings with an empty board, long player names, a top-three score and a player outside the top 100: no character heads, accurate scores and a visible own-row highlight.
+- [ ] Switch Ranked / Endless repeatedly: the selected pill slides, each theme fits its board, and existing list positions survive switching. Check Reduce Motion and VoiceOver tab selection.
 - [ ] Confirm landscape orientation, safe-area padding, and keyboard dismissal remain correct.
 - [ ] Check both landscape rotations: the notch margin belongs only on its actual side; content should use the remaining width without the old 720-unit frame.
 - [ ] Confirm Daily Reward, Leaderboard and Shop sit against the left safe edge, and the burger menu sits at the bottom-right safe edge.
@@ -49,7 +54,7 @@ Use this checklist after an Apple Developer team is available and an iOS develop
 - [ ] Background Endless, including while Start is pending: returning must show an ended run or a fresh lobby, never an indefinitely saved question.
 - [ ] Keep the app foregrounded and disconnect the network briefly: reconnect before the ten-second server window closes and confirm the original question timer keeps running. Reconnect after ten seconds and confirm the entire run ends, including when disconnected during feedback.
 - [ ] Force-close/reopen Endless and confirm there is no Continue button. Start a new run, then verify a delayed old answer/abandonment cannot affect it.
-- [ ] Verify the configured test server's `/health` reports `endlessProtocolVersion: 2`. An older server must show mode unavailability before Start, not an unplayable question or repeated Invalid Endless Action errors. After updating the server, Try Again must recover with a fresh read.
+- [ ] Verify the configured test server's `/health` reports `endlessProtocolVersion: 3`. An older server must show mode unavailability before Start, not an unplayable question or repeated Invalid Endless Action errors. After updating the server, Try Again must recover with a fresh read.
 - [ ] Confirm game background and preloaded avatar/shop images appear without flashes.
 - [ ] Confirm music, sound effects, countdown cancellation, and volume settings work.
 - [ ] Confirm game-start/end vibration works and does not trigger per round.

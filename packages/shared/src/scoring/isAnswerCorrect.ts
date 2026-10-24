@@ -8,9 +8,10 @@ import { QuestionType } from "../types";
 export function isAnswerCorrect(
   type: QuestionType,
   value: unknown,
-  correctAnswer: unknown
+  correctAnswer: unknown,
+  textNormalizer?: (value: unknown) => string
 ): boolean {
-  const normalizeText = (input: unknown) => String(input ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+  const normalizeText = textNormalizer ?? ((input: unknown) => String(input ?? "").trim().toLowerCase().replace(/\s+/g, " "));
 
   switch (type) {
     case "multiple_choice":
@@ -30,7 +31,6 @@ export function isAnswerCorrect(
     case "closest_answer":
       return Number(value) === Number(correctAnswer);
     default:
-      // Phase 2 will add ordering/visual comparisons.
       return String(value) === String(correctAnswer);
   }
 }

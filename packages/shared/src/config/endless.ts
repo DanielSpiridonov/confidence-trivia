@@ -1,9 +1,9 @@
 export type EndlessDifficulty = "easy" | "medium" | "hard" | "expert";
-export const ENDLESS_TIMERS: Record<EndlessDifficulty, number> = { easy: 30, medium: 25, hard: 20, expert: 15 };
+export const ENDLESS_TIMERS: Record<EndlessDifficulty, number> = { easy: 20, medium: 20, hard: 15, expert: 15 };
 export const ENDLESS_FEEDBACK_MS = 1600;
 export const ENDLESS_RECONNECT_MS = 10_000;
 export const ENDLESS_HEARTBEAT_MS = 2_000;
-export const ENDLESS_PROTOCOL_VERSION = 2;
+export const ENDLESS_PROTOCOL_VERSION = 3;
 // A finite, deliberately modest road: 280 Stars total, below four max-streak daily rewards.
 // Threshold is a permanent identity. Never reuse one for a different reward.
 export const ENDLESS_MILESTONES = [
@@ -13,6 +13,9 @@ export const ENDLESS_MILESTONES = [
 ] as const;
 
 export interface EndlessQuestion {
+  answerType?: "multiple_choice" | "word" | "estimate";
+  presentation?: import("../visualQuestions").VisualPresentation;
+  startedAt?: number;
   token: string;
   number: number;
   text: string;
@@ -27,11 +30,11 @@ export interface EndlessRun {
   score: number;
   lives: number;
   previousBest: number;
-  phase: "question" | "feedback" | "finished";
+  phase: "loading" | "question" | "feedback" | "finished";
   endReason: "lives" | "exhausted" | "abandoned" | null;
   connectionDeadline: number;
   question: EndlessQuestion | null;
-  feedback: { correctIndex: number; selectedIndex: number | null; correct: boolean; timedOut: boolean; readyAt: number } | null;
+  feedback: { correctIndex: number; correctAnswerText?: string; selectedIndex: number | null; correct: boolean; timedOut: boolean; readyAt: number } | null;
   rewards: Array<{ score: number; stars: number }>;
 }
 export interface EndlessState {

@@ -38,6 +38,21 @@ checklist, use `PRE_PUBLISH_CHECKLIST.md`.
 
 ## Current state
 
+- Map Shapes and Image Reveal are implemented locally. Presentation metadata
+  reuses choice/written/exact-number answer types. Eleven verified sample
+  questions use bundled Natural Earth silhouettes and original SVG illustrations.
+  Multiplayer synchronizes artwork readiness and scores reveal stages 3/2/1 as
+  base rewards; Endless stays +1 and keeps 20/20/15/15-second timers. Protocol 3
+  requires matching server/app updates. No SQL migration or native module added.
+  See `VISUAL_QUESTIONS.md` for assets, scoring policy, authoring and validation.
+
+- Endless UI follow-up: the lobby uses inline SVG mountain/path/flag art to avoid
+  late bitmap loading; Beat Your Record was removed. The best-score card links
+  to rankings. Endless rankings now use lavender chalkboard panels, chalk type,
+  crown rank markers and no character heads. A themed animated Ranked / Endless
+  selector preserves each visited board and scroll position. Mobile-only changes;
+  no additional server deployment or native dependency is required for this UI.
+
 - iOS layout correction (23 October 2026): the shared Screen fills its safe
   viewport instead of capping content at 720 design units, uses separate notch
   insets per side, and widens the canvas without enlarging controls. Home edge
@@ -55,11 +70,11 @@ checklist, use `PRE_PUBLISH_CHECKLIST.md`.
   lease permits at most ten seconds without foreground gameplay activity for
   connection failures; question deadlines keep running. Best scores and earned
   Stars survive abandonment. Deploy matching server/mobile updates together.
-  Protocol version 2 is now checked before Start: old Render APIs must not enter
+  Protocol version 3 is now checked before Start: old Render APIs must not enter
   gameplay or loop on invalid heartbeat/abandon actions. Retry reads fresh state.
-  `/health` advertises `endlessProtocolVersion: 2` on the updated server. The
+  `/health` advertises `endlessProtocolVersion: 3` on the updated server. The
   configured test service was reachable but lacked that marker on 23 October;
-  local code changes have not deployed it. Regression suite: 111 passing tests.
+  local code changes have not deployed it. Regression suite: 133 passing tests.
   See [ENDLESS_MODE.md](ENDLESS_MODE.md) for the source inventory, content limits,
   validation and required migration 023/server deployment. It is not deployed;
   device and live test-environment verification remain required.

@@ -1,0 +1,9 @@
+version: "3"
+# Set NGROK_AUTHTOKEN in your local environment; never commit a real token.
+tunnels:
+  api:
+    proto: http
+    addr: 8081
+  signaling:
+    proto: http
+    addr: 2567

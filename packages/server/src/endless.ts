@@ -2,7 +2,7 @@ import { randomUUID } from "crypto";
 import type postgres from "postgres";
 import { ENDLESS_PROTOCOL_VERSION, EndlessLeaderboard, EndlessLeaderboardEntry, EndlessState } from "@confidence-trivia/shared";
 import { databaseSql } from "./database";
-import { applyEndlessCommand, createEndlessRun, EndlessCommand, expireEndlessConnection, publicEndlessRun, StoredEndlessRun, unclaimedEndlessRewards } from "./endlessEngine";
+import { applyEndlessCommand, createEndlessRun, EndlessCommand, expireEndlessConnection, publicEndlessRun, StoredEndlessRun, unclaimedEndlessRewards, validEndlessAnswer } from "./endlessEngine";
 
 export class EndlessError extends Error {
   constructor(public status: number, message: string) { super(message); }
@@ -55,6 +55,7 @@ export async function endlessAction(playerId: string, authUserId: string, comman
       }
     }
     if (run) {
+      if (command.type === "answer" && command.runId === run.id && command.token === run.question?.token && !validEndlessAnswer(run.question, command.answer)) throw new EndlessError(400, "Invalid answer for this question.");
       applyEndlessCommand(run, command, now);
       if (run.score > best) {
         best = run.score;

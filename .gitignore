@@ -1,4 +1,17 @@
 node_modules
+.private/
+.codex-staging/
+*.private.*
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p8
+*.p12
+*.mobileprovision
+credentials.json
+/ngrok.yml
 ./node_modules
 .expo/
 packages/mobile/.expo/
@@ -11,6 +24,7 @@ packages/server/.env
 packages/server/.env.local
 /.codex-staging/npm-cache/
 /.codex-staging/endless-smoke/
+/.codex-staging/visual-*
 
 # Standalone website is maintained separately from the game.
 /website/

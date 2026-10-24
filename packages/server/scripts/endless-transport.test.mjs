@@ -15,6 +15,23 @@ async function mobileModule(path) {
 }
 const { createEndlessTransport, EndlessRequestError } = await mobileModule("../../mobile/src/network/endlessTransport.ts");
 const { createEndlessCache } = await mobileModule("../../mobile/src/network/endlessCache.ts");
+const { requireSoloCustomServer } = await mobileModule("../../mobile/src/network/customTesting.ts");
+
+test("solo Custom rejects old deployed servers even when the mobile app allows solo", async () => {
+  for (const health of [{ok:true,endlessProtocolVersion:2},{ok:true,endlessProtocolVersion:3},{ok:true,customSoloTesting:false}]) {
+    await assert.rejects(requireSoloCustomServer("wss://test.example",async () => new Response(JSON.stringify(health))),/server needs an update/);
+  }
+});
+
+test("solo Custom checks the actual backend capability before sending Start", async () => {
+  let called;
+  await requireSoloCustomServer("wss://test.example/",async (url, options) => {
+    called = url; assert.equal(options.cache,"no-store"); assert.ok(options.signal);
+    return new Response(JSON.stringify({ok:true,customSoloTesting:true}));
+  });
+  assert.equal(called,"https://test.example/health");
+  await assert.rejects(requireSoloCustomServer("wss://test.example",async () => new Response(null,{status:503})),/Could not check/);
+});
 const snapshot = (overrides = {}) => ({ protocolVersion: ENDLESS_PROTOCOL_VERSION, serverNow: 100, personalBest: 25, claimed: [10,25], stars: 125, run: null, ...overrides });
 const response = (payload, status = 200, headers = {}) => new Response(JSON.stringify(payload), { status, headers: { "Content-Type": "application/json", ...headers } });
 const transport = (fetch, options = {}) => createEndlessTransport({ baseUrl: "http://endless.test", getAccessToken: async () => "valid", fetch, ...options });

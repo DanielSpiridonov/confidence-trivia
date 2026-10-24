@@ -1,16 +1,17 @@
 import React from "react";
-import { Image, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { Ionicons } from "@expo/vector-icons";
-import { ENDLESS_MILESTONES } from "@confidence-trivia/shared";
+import { ENDLESS_MILESTONES, ENDLESS_TIMERS } from "@confidence-trivia/shared";
 import { PointsIcon } from "./PointsIcon";
 import { menuTap } from "./menuHaptics";
 import { playSound } from "../audio/sounds";
+import { EndlessMountain } from "./EndlessMountain";
 
 const CHALK = Platform.OS === "ios" ? "ChalkboardSE-Regular" : "casual";
 const RULES = [
   { title: "Three lives", detail: "Three mistakes and the run ends.", icon: "heart", color: "#F586AC" },
-  { title: "Timed questions", detail: "30 seconds to start. Faster as you climb.", icon: "stopwatch-outline", color: "#8CB9F1" },
+  { title: "Timed questions", detail: `${ENDLESS_TIMERS.easy}s on Easy & Medium. ${ENDLESS_TIMERS.hard}s on Hard & Expert.`, icon: "stopwatch-outline", color: "#8CB9F1" },
   { title: "Increasing difficulty", detail: "Easy → Medium → Hard → Expert", icon: "stats-chart", color: "#F0CC81" },
 ] as const;
 
@@ -35,7 +36,7 @@ export function EndlessLobby({ best, busy, unavailable, onStart, onLeaderboard }
     </View>)}</View>
     <View style={s.hero}>
       <ChalkMark /><Text style={s.title}>ENDLESS</Text><View style={s.underline} /><Text style={s.subtitle}>How far can you go?</Text>
-      <Image accessible={false} source={require("../../assets/endless-mountain-chalk.png")} resizeMode="contain" style={s.mountain} />
+      <View pointerEvents="none" style={s.mountain}><EndlessMountain /></View>
       <Pressable accessibilityRole="button" accessibilityLabel="Start Endless" accessibilityState={{ disabled: busy || unavailable }} disabled={busy || unavailable}
         onPress={() => { menuTap(); playSound("button"); onStart(); }} style={({ pressed }) => [s.play, (pressed || busy || unavailable) && { opacity: 0.6 }]}>
         <Ionicons name="play" size={21} color="#F5EFFF" style={s.playIcon} /><Text style={s.playText}>{busy ? "Connecting…" : "Let’s play"}</Text>
@@ -46,13 +47,13 @@ export function EndlessLobby({ best, busy, unavailable, onStart, onLeaderboard }
       <Pressable accessibilityRole="button" accessibilityLabel="Your best score; open Endless rankings" onPress={onLeaderboard} style={s.panel}>
         <View style={s.heading}><Ionicons name="ribbon-outline" size={18} color="#F1CE7D" /><Text style={s.panelTitle}>Your best score</Text></View>
         <View style={s.bestRow}><Text style={s.best}>{best ?? "—"}<Text style={s.points}> points</Text></Text><Text style={s.muted}>Your highest{ "\n" }single run</Text></View>
+        <View style={s.rankLinkRow}><Text style={s.rankLink}>Endless leaderboard</Text><Ionicons name="chevron-forward" size={16} color="#D7B8F1" /></View>
       </Pressable>
       <View style={s.panel}>
         <View style={s.heading}><Ionicons name="gift-outline" size={18} color="#C49AEF" /><Text style={s.panelTitle}>Next milestone</Text></View>
         {next ? <View style={s.nextRow}><Text style={s.nextScore}>{next.score}<Text style={s.points}> correct</Text></Text><View style={s.stars}><PointsIcon size={25} /><Text style={s.starAmount}>+{next.stars}</Text></View></View> : <Text style={s.message}>{best === null ? "Earn Stars by beating your best." : "Every reward unlocked!"}</Text>}
         <Text style={s.rewardHint}>{next && best !== null ? `${next.score - best} beyond your best` : "Your milestone Stars are yours to keep."}</Text>
       </View>
-      <Pressable accessibilityRole="button" accessibilityLabel="Beat your record; open Endless rankings" onPress={onLeaderboard} style={[s.panel, s.recordPanel]}><Ionicons name="trophy-outline" size={37} color="#C79AF1" /><View style={s.ruleCopy}><Text style={s.panelTitle}>Beat your record</Text><Text style={s.rewardHint}>Set a new personal best and climb the rankings.</Text><Text style={s.rankLink}>View rankings ›</Text></View></Pressable>
     </View>
   </View>;
 }
@@ -72,7 +73,7 @@ const s = StyleSheet.create({
   playIcon: { position: "absolute", left: 15 }, playText: { width: "100%", paddingHorizontal: 40, color: "#FCF7FF", fontFamily: CHALK, fontSize: 21, lineHeight: 29, textAlign: "center", textAlignVertical: "center", includeFontPadding: false }, runHint: { color: "#B7A0CD", fontSize: 10, textAlign: "center", marginTop: 6, marginBottom: 2 },
   panels: { width: "31%", gap: 8, justifyContent: "center" },
   panel: { borderRadius: 15, borderWidth: 1.5, borderColor: "#5D4877", backgroundColor: "rgba(24,17,39,0.78)", padding: 12 },
-  heading: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 3 }, panelTitle: { color: "#F3E7FF", fontFamily: CHALK, fontSize: 17 }, recordPanel: { flexDirection: "row", alignItems: "center", gap: 10 }, rankLink: { color: "#D7B8F1", fontSize: 11, marginTop: 6 },
+  heading: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 3 }, panelTitle: { color: "#F3E7FF", fontFamily: CHALK, fontSize: 17 }, rankLinkRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 8 }, rankLink: { color: "#D7B8F1", fontFamily: CHALK, fontSize: 13 },
   bestRow: { flexDirection: "row", alignItems: "center", gap: 6 }, best: { flex: 1, color: "#F5E8FF", fontSize: 38, fontWeight: "900" }, points: { color: "#BAA7CD", fontSize: 11, fontWeight: "400" }, muted: { color: "#B6A1CE", fontSize: 11, lineHeight: 15 },
   nextRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, nextScore: { color: "#E8D7FA", fontSize: 27, fontWeight: "800" }, stars: { flexDirection: "row", alignItems: "center", gap: 4 }, starAmount: { color: "#F5D798", fontSize: 21, fontWeight: "800" }, rewardHint: { color: "#B7A3CA", fontSize: 11, lineHeight: 15, marginTop: 3 },
   message: { color: "#BCA4D3", fontSize: 11, lineHeight: 15, paddingVertical: 8 },

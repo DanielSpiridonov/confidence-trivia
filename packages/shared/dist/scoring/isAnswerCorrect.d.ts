@@ -4,4 +4,4 @@ import { QuestionType } from "../types";
  * decided from one answer in isolation. `closest_answer` is resolved from
  * the full round's submissions in the server room flow instead.
  */
-export declare function isAnswerCorrect(type: QuestionType, value: unknown, correctAnswer: unknown): boolean;
+export declare function isAnswerCorrect(type: QuestionType, value: unknown, correctAnswer: unknown, textNormalizer?: (value: unknown) => string): boolean;

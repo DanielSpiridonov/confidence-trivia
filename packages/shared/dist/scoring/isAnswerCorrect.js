@@ -6,8 +6,8 @@ exports.isAnswerCorrect = isAnswerCorrect;
  * decided from one answer in isolation. `closest_answer` is resolved from
  * the full round's submissions in the server room flow instead.
  */
-function isAnswerCorrect(type, value, correctAnswer) {
-    const normalizeText = (input) => String(input ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+function isAnswerCorrect(type, value, correctAnswer, textNormalizer) {
+    const normalizeText = textNormalizer ?? ((input) => String(input ?? "").trim().toLowerCase().replace(/\s+/g, " "));
     switch (type) {
         case "multiple_choice":
         case "true_false":
@@ -26,7 +26,6 @@ function isAnswerCorrect(type, value, correctAnswer) {
         case "closest_answer":
             return Number(value) === Number(correctAnswer);
         default:
-            // Phase 2 will add ordering/visual comparisons.
             return String(value) === String(correctAnswer);
     }
 }

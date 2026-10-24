@@ -4,11 +4,13 @@ import { View, Text, FlatList, Platform, StyleSheet } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { useTranslation } from "react-i18next";
 import { Room } from "colyseus.js";
-import { FRAME_COSMETIC_COLORS, MIN_PLAYERS_TO_START, RANKED_PLAYER_COUNT } from "@confidence-trivia/shared";
+import { ALLOW_SOLO_CUSTOM_TESTING, FRAME_COSMETIC_COLORS, MIN_PLAYERS_TO_START, RANKED_PLAYER_COUNT } from "@confidence-trivia/shared";
 import { ANDROID_GAME_UI_SCALE, Screen, Title, Subtitle, BigButton, theme } from "../components/ui";
 import { playSound } from "../audio/sounds";
 import { PlayerFrameEffect } from "../components/PlayerFrameEffect";
 import { MatchmakingQueueScreen } from "./MatchmakingQueueScreen";
+import { SERVER_URL } from "../network/client";
+import { requireSoloCustomServer } from "../network/customTesting";
 
 interface PublicPlayerView {
   id: string;
@@ -29,13 +31,32 @@ export function LobbyScreen({ room, state, mySessionId }: { room: Room; state: a
   const [now, setNow] = useState(Date.now());
   const [countdownEndsAt, setCountdownEndsAt] = useState<number | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
+  const [startPending, setStartPending] = useState(false);
+  const startTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startInFlight = useRef(false);
+  const mounted = useRef(true);
   const countdownSoundPlayed = useRef(false);
   const isStarting = state?.phase === "starting";
 
+  function finishStartRequest() {
+    if (startTimer.current) clearTimeout(startTimer.current);
+    startTimer.current = null;
+    startInFlight.current = false;
+    if (mounted.current) setStartPending(false);
+  }
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; if (startTimer.current) clearTimeout(startTimer.current); };
+  }, []);
+  useEffect(() => { if (isStarting) finishStartRequest(); }, [isStarting]);
+
   useEffect(() => {
     return room.onMessage("gameStartError", (message: { code?: string; names?: string[]; stake?: number }) => {
+      finishStartRequest();
       if (message.code === "insufficient_stars") {
         setStartError(t("lobby.insufficientWagerStars", { names: message.names?.join(", ") || "Player", stake: message.stake ?? 0 }));
+      } else {
+        setStartError(message.code === "not_enough_players" ? "This room does not have enough connected players to start." : "The game could not start. Please leave and create a new room.");
       }
     });
   }, [room, t]);
@@ -83,13 +104,30 @@ export function LobbyScreen({ room, state, mySessionId }: { room: Room; state: a
 
   const me = players.find((p) => p.id === mySessionId);
   const isHost = me?.isHost ?? false;
-  const requiredPlayers = state.gameMode === "damage" ? 2 : state.gameMode === "ranked" ? RANKED_PLAYER_COUNT : MIN_PLAYERS_TO_START;
+  const requiredPlayers = state.gameMode === "damage" ? 2 : state.gameMode === "ranked" ? RANKED_PLAYER_COUNT : ALLOW_SOLO_CUSTOM_TESTING && state.gameMode === "friends" && state.friendsTeamMode !== "duos" ? 1 : MIN_PLAYERS_TO_START;
   const connectedPlayerCount = players.filter((player) => player.connected).length;
   const isRanked = state.gameMode === "ranked";
   const isChallenge = Boolean(state.isChallenge);
   const isMatchmade = isRanked || (state.gameMode === "damage" && !isChallenge);
   const validFriendsTeamSize = state.gameMode !== "friends" || state.friendsTeamMode !== "duos" || (connectedPlayerCount >= 4 && connectedPlayerCount % 2 === 0);
   const canStart = isHost && validFriendsTeamSize && (state.gameMode === "damage" || state.gameMode === "ranked" ? connectedPlayerCount === requiredPlayers : connectedPlayerCount >= requiredPlayers);
+
+  async function handleStart() {
+    if (!canStart || startInFlight.current) return;
+    startInFlight.current = true; setStartPending(true); setStartError(null);
+    try {
+      if (state.gameMode === "friends" && connectedPlayerCount === 1) await requireSoloCustomServer(SERVER_URL);
+      if (!mounted.current || room.connection?.isOpen === false) throw new Error("The room connection was lost. Please leave and create a new room.");
+      room.send("startGame");
+      startTimer.current = setTimeout(() => {
+        finishStartRequest();
+        if (mounted.current) setStartError("The server did not start this room. Please leave and create a new room after the server update.");
+      }, 6000);
+    } catch (error) {
+      finishStartRequest();
+      if (mounted.current) setStartError(error instanceof Error ? error.message : "The game could not start. Please try again.");
+    }
+  }
 
   async function handleCopyCode() {
     await Clipboard.setStringAsync(String(state.code));
@@ -129,7 +167,7 @@ export function LobbyScreen({ room, state, mySessionId }: { room: Room; state: a
               <View style={[styles.visibilityTrack, state.isPublic && styles.visibilityTrackEnabled]}><View style={[styles.visibilityThumb, state.isPublic && styles.visibilityThumbEnabled]} /></View>
             </Pressable> : null}
             <View style={styles.actionArea}>
-              {!isStarting && (isHost ? <BigButton label={t("lobby.start")} onPress={() => { setStartError(null); room.send("startGame"); }} disabled={!canStart} lobbyHaptic /> : <BigButton label={me?.ready ? t("lobby.notReady") : t("lobby.ready")} onPress={() => room.send("toggleReady")} variant="secondary" lobbyHaptic />)}
+              {!isStarting && (isHost ? <BigButton label={startPending ? "Starting…" : t("lobby.start")} onPress={() => void handleStart()} disabled={!canStart || startPending} lobbyHaptic /> : <BigButton label={me?.ready ? t("lobby.notReady") : t("lobby.ready")} onPress={() => room.send("toggleReady")} variant="secondary" lobbyHaptic />)}
               {!isStarting && startError ? <Text style={styles.startError}>{startError}</Text> : null}
             </View>
             </View>

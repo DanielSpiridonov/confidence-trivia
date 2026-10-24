@@ -13,7 +13,8 @@ import { GameDialog, useGameDialog } from "../components/GameDialog";
 const ROUND_OPTIONS = [3, 5, 7, 9, 11, 13, 15];
 const DEFAULT_ROUNDS = ROUND_OPTIONS.reduce((closest, value) => Math.abs(value - DEFAULT_ROUND_COUNT) < Math.abs(closest - DEFAULT_ROUND_COUNT) ? value : closest, ROUND_OPTIONS[0]);
 type GameMode = "classic" | "friends" | "ranked" | "damage";
-const FRIEND_CATEGORIES = ["general", "science", "geography", "history", "movies", "music", "sports", "animals", "technology", "food"];
+import { VISUAL_TEST_CATEGORIES } from "@confidence-trivia/shared";
+const FRIEND_CATEGORIES = [...VISUAL_TEST_CATEGORIES.map(filter => filter.id), "general", "science", "geography", "history", "movies", "music", "sports", "animals", "technology", "food"];
 
 export function CreateGameScreen({ onCreate, onEndless, deviceId, stars, registered, onSignInRequired, initialName, onBack }: {
   onEndless: () => void;
@@ -174,7 +175,7 @@ export function CreateGameScreen({ onCreate, onEndless, deviceId, stars, registe
               <Text style={styles.fieldLabel}>{t("create.categories")}</Text>
               <View style={styles.categoryGrid}>{FRIEND_CATEGORIES.map((category) => {
                 const selected = friendCategories.includes(category);
-                return <Pressable key={category} accessibilityRole="checkbox" accessibilityState={{ checked: selected }} onPress={() => setFriendCategories((current) => selected ? current.filter((item) => item !== category) : [...current, category])} style={[styles.categoryChip, selected && styles.categoryChipSelected]}><Text style={[styles.categoryText, selected && styles.categoryTextSelected]}>{t(`categories.${category}`, { defaultValue: category })}</Text></Pressable>;
+                return <Pressable key={category} accessibilityRole="checkbox" accessibilityState={{ checked: selected }} onPress={() => setFriendCategories((current) => selected ? current.filter((item) => item !== category) : [...current, category])} style={[styles.categoryChip, selected && styles.categoryChipSelected]}><Text style={[styles.categoryText, selected && styles.categoryTextSelected]}>{VISUAL_TEST_CATEGORIES.find(filter => filter.id === category)?.label ?? t(`categories.${category}`, { defaultValue: category })}</Text></Pressable>;
               })}</View>
               <View style={styles.customHeader}><Text style={styles.fieldLabel}>{t("create.customQuestions")}</Text>{customQuestions.length < 5 ? <Pressable accessibilityRole="button" onPress={() => setCustomQuestions((current) => [...current, { question: "", answer: "" }])} style={styles.addQuestion}><MaterialCommunityIcons name="plus" size={16} color="#FFFFFF" /><Text style={styles.addQuestionText}>{t("create.addQuestion")}</Text></Pressable> : null}</View>
               {customQuestions.map((item, index) => <View key={index} style={styles.customQuestionRow}>

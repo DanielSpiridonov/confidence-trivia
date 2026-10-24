@@ -1,12 +1,13 @@
 import React from "react";
 import { Pressable } from "../components/menuHaptics";
-import { ActivityIndicator, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Linking, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { IMAGE_CREDITS } from "@confidence-trivia/shared";
 import { useTranslation } from "react-i18next";
 import { ANDROID_COMPACT_MENU_UI_SCALE, BackIconButton, Screen, Title, BigButton, theme } from "../components/ui";
 import { redeemPromoCode, submitPlayerReport } from "../network/client";
 import { FeedbackKind } from "../components/FeedbackPopup";
 
-type SettingsSection = "sounds" | "haptics" | "language" | "accessibility" | "redeem" | "report";
+type SettingsSection = "sounds" | "haptics" | "language" | "accessibility" | "redeem" | "report" | "credits";
 
 function SettingsToggle({ label, value, onChange }: { label: string; value: boolean; onChange: (value: boolean) => void }) {
   return (
@@ -159,6 +160,13 @@ export function SettingsScreen({
 
   function renderPanel() {
     switch (section) {
+      case "credits":
+        return <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingVertical: 8, gap: 16 }}>
+          <View><Text style={styles.toggleLabel}>Map Shapes</Text><Text style={styles.redeemHint}>Geography: Natural Earth, public domain.</Text><Pressable accessibilityRole="link" onPress={() => void Linking.openURL("https://www.naturalearthdata.com/about/terms-of-use/").catch(() => undefined)}><Text style={styles.creditLink}>Source and terms</Text></Pressable></View>
+          <View><Text style={styles.toggleLabel}>Image Reveal illustrations</Text><Text style={styles.redeemHint}>Original code-drawn pyramid, owl and apple illustrations.</Text></View>
+          {IMAGE_CREDITS.some(credit => credit.license === "owner-reviewed") ? <View><Text style={styles.toggleLabel}>Unsplash photos</Text><Text style={styles.redeemHint}>{IMAGE_CREDITS.filter(credit => credit.license === "owner-reviewed").length} photographs supplied by the game owner.</Text></View> : null}
+          {IMAGE_CREDITS.filter(credit => credit.license !== "owner-reviewed").map(credit => <View key={credit.assetId}><Text style={styles.toggleLabel}>{credit.photographer ?? "Image source"}</Text><Text style={styles.redeemHint}>{credit.license === "unsplash" ? "Unsplash" : "Commercial-use license documented"}</Text>{credit.sourceUrl ? <Pressable accessibilityRole="link" onPress={() => void Linking.openURL(credit.sourceUrl!).catch(() => undefined)}><Text style={styles.creditLink}>View photograph</Text></Pressable> : null}{credit.licenseUrl ? <Pressable accessibilityRole="link" onPress={() => void Linking.openURL(credit.licenseUrl!).catch(() => undefined)}><Text style={styles.creditLink}>License</Text></Pressable> : null}</View>)}
+        </ScrollView>;
       case "sounds":
         return (
           <View style={styles.panelContent}>
@@ -202,7 +210,7 @@ export function SettingsScreen({
       <Title>{t("settings.title")}</Title>
       <View style={styles.settingsLayout}>
         <View style={styles.sidebar}>
-          {(["sounds", "haptics", "language", "accessibility", "redeem", "report"] as const).map((value) => (
+          {(["sounds", "haptics", "language", "accessibility", "redeem", "report", "credits"] as const).map((value) => (
             <Pressable
               key={value}
               accessibilityRole="tab"
@@ -211,13 +219,13 @@ export function SettingsScreen({
               style={[styles.sectionButton, section === value && styles.sectionButtonSelected]}
             >
               <Text style={[styles.sectionButtonText, section === value && styles.sectionButtonTextSelected]}>
-                {t(`settings.${value}`)}
+                {value === "credits" ? "Credits" : t(`settings.${value}`)}
               </Text>
             </Pressable>
           ))}
         </View>
         <View style={styles.settingsPanel}>
-          <Text style={styles.panelTitle}>{t(`settings.${section}`)}</Text>
+          <Text style={styles.panelTitle}>{section === "credits" ? "Credits" : t(`settings.${section}`)}</Text>
           {renderPanel()}
         </View>
       </View>
@@ -226,6 +234,7 @@ export function SettingsScreen({
 }
 
 const styles = StyleSheet.create({
+  creditLink: { color: theme.primary, fontSize: 13, paddingVertical: 4 },
   screen: { justifyContent: "flex-start", paddingTop: 14 },
   settingsLayout: { flex: 1, minHeight: 0, width: "100%", flexDirection: "row", gap: 24 },
   sidebar: { width: "30%", minWidth: 180, justifyContent: "center" },

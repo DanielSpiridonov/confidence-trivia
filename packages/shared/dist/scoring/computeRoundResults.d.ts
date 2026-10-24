@@ -2,6 +2,7 @@ import { PlayerAnswer, SideBet, RoundResult } from "../types";
 interface ComputeInput {
     correctAnswer: unknown;
     basePoints?: number;
+    answerBasePoints?: Record<string, number>;
     answers: PlayerAnswer[];
     sideBets: SideBet[];
     currentStreaks: Record<string, number>;

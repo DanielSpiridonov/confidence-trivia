@@ -54,6 +54,7 @@ class GameRoom extends colyseus_1.Room {
         this.gameStartPending = false;
         this.lobbyWasPublic = false;
         this.hasCustomQuestions = false;
+        this.visualReady = new Set();
     }
     async onCreate(options = {}) {
         // Use the public six-digit code as the actual Colyseus room id so
@@ -70,6 +71,8 @@ class GameRoom extends colyseus_1.Room {
             throw new Error("Could not allocate a unique six-digit room code.");
         }
         this.setState(new schema_1.RoomStateSchema());
+        this.state.serverNow = Date.now();
+        this.clock.setInterval(() => { this.state.serverNow = Date.now(); }, 500);
         this.challengeId = typeof options.challengeId === "string" && DEVICE_ID_PATTERN.test(options.challengeId) ? options.challengeId : "";
         this.state.isChallenge = Boolean(this.challengeId);
         this.state.code = this.roomId;
@@ -107,7 +110,7 @@ class GameRoom extends colyseus_1.Room {
         this.isPublic = options.visibility === "public" && customQuestions.length === 0;
         this.state.isPublic = this.isPublic;
         const requestedCategories = this.state.gameMode === "friends" && Array.isArray(options.friendCategories)
-            ? options.friendCategories.filter((category) => typeof category === "string").slice(0, 12)
+            ? options.friendCategories.filter((category) => typeof category === "string").slice(0, 20)
             : [];
         const standardQuestions = (0, questions_1.getQuestionSet)(this.state.gameMode === "damage" ? 100 : Math.max(0, this.state.totalRounds - customQuestions.length), options.excludeQuestionIds ?? [], requestedCategories);
         this.questionSet = [...customQuestions, ...standardQuestions].slice(0, this.state.gameMode === "damage" ? 100 : this.state.totalRounds);
@@ -120,6 +123,7 @@ class GameRoom extends colyseus_1.Room {
         this.onMessage("toggleRoomVisibility", (client) => void this.handleToggleRoomVisibility(client));
         this.onMessage("startGame", (client) => void this.handleStartGame(client));
         this.onMessage("submitAnswer", (client, msg) => this.handleSubmitAnswer(client, msg));
+        this.onMessage("visualReady", (client, msg) => this.handleVisualReady(client, msg));
         this.onMessage("saveAnswerDraft", (client, msg) => this.handleSaveAnswerDraft(client, msg));
         this.onMessage("submitConfidence", (client, msg) => this.handleSubmitConfidence(client, msg));
         this.onMessage("submitSideBet", (client, msg) => this.handleSubmitSideBet(client, msg));
@@ -209,6 +213,8 @@ class GameRoom extends colyseus_1.Room {
         if (!player)
             return;
         player.connected = false;
+        if (this.state.phase === "visual_loading")
+            this.beginVisualIfReady();
         // Final standings remain authoritative even as clients exit the room.
         if (this.state.gameEnded)
             return;
@@ -329,8 +335,10 @@ class GameRoom extends colyseus_1.Room {
             return; // only host may start
         if (this.state.gameStarted || this.gameStartPending)
             return;
-        if (!this.hasEnoughPlayers())
+        if (!this.hasEnoughPlayers()) {
+            client.send("gameStartError", { code: "not_enough_players" });
             return;
+        }
         if (this.state.gameMode === "damage") {
             this.gameStartPending = true;
             const playerEntries = [...this.state.players.values()].flatMap((player) => {
@@ -382,6 +390,8 @@ class GameRoom extends colyseus_1.Room {
             return count === shared_1.RANKED_PLAYER_COUNT;
         if (this.state.gameMode === "friends" && this.state.friendsTeamMode === "duos")
             return count >= 4 && count % 2 === 0;
+        if (shared_1.ALLOW_SOLO_CUSTOM_TESTING && this.state.gameMode === "friends")
+            return count >= 1;
         return count >= shared_1.MIN_PLAYERS_TO_START;
     }
     async refundStartingWager() {
@@ -428,6 +438,9 @@ class GameRoom extends colyseus_1.Room {
         this.state.correctAnswerText = "";
         for (const p of this.state.players.values())
             p.hasActedThisPhase = false;
+        this.presentCurrentQuestion();
+    }
+    presentCurrentQuestion() {
         const record = this.questionSet[this.state.currentRoundIndex % this.questionSet.length];
         if (!record) {
             this.endGame();
@@ -440,9 +453,47 @@ class GameRoom extends colyseus_1.Room {
         this.state.currentQuestion.difficulty = localized.difficulty;
         this.state.currentQuestion.text = localized.text;
         this.state.currentQuestion.basePoints = localized.basePoints;
+        this.state.currentQuestion.visualFormat = localized.presentation?.format ?? "";
+        this.state.currentQuestion.visualAssetId = localized.presentation?.assetId ?? "";
+        this.state.currentQuestion.startedAt = 0;
+        this.state.currentQuestion.durationMs = shared_1.PHASE_DURATIONS_MS.question;
         this.state.currentQuestion.options.clear();
         (localized.options ?? []).forEach((o) => this.state.currentQuestion.options.push(o));
-        this.setPhase("question", shared_1.PHASE_DURATIONS_MS.question);
+        this.visualReady = new Set();
+        if (record.presentation)
+            this.setPhase("visual_loading", shared_1.VISUAL_READY_TIMEOUT_MS);
+        else
+            this.beginQuestion();
+    }
+    beginQuestion() {
+        this.state.currentQuestion.startedAt = Date.now();
+        this.state.serverNow = Date.now();
+        this.setPhase("question", this.state.currentQuestion.durationMs);
+    }
+    handleVisualReady(client, msg) {
+        if (this.state.phase !== "visual_loading" || msg?.questionId !== this.state.currentQuestion.id || !this.state.players.get(client.sessionId)?.connected)
+            return;
+        if (msg.failed) {
+            this.replaceUnavailableVisual();
+            return;
+        }
+        this.visualReady.add(client.sessionId);
+        this.beginVisualIfReady();
+    }
+    beginVisualIfReady() {
+        const connected = [...this.state.players.values()].filter((p) => p.connected);
+        if (this.state.phase === "visual_loading" && connected.length && connected.every((p) => this.visualReady.has(p.id)))
+            this.beginQuestion();
+    }
+    replaceUnavailableVisual() {
+        const record = this.questionSet[this.state.currentRoundIndex % this.questionSet.length];
+        const fallback = (0, questions_1.getQuestionSet)(1, this.questionSet.map((q) => q.id), record ? [record.category] : [], false)[0];
+        if (!fallback) {
+            this.endGame();
+            return;
+        }
+        this.questionSet[this.state.currentRoundIndex % this.questionSet.length] = fallback;
+        this.presentCurrentQuestion();
     }
     setPhase(phase, durationMs) {
         this.state.phase = phase;
@@ -454,6 +505,9 @@ class GameRoom extends colyseus_1.Room {
     /** Server-driven phase transition — never triggered by a client message. */
     advancePhase() {
         switch (this.state.phase) {
+            case "visual_loading":
+                this.replaceUnavailableVisual();
+                break;
             case "starting":
                 if (!this.hasEnoughPlayers()) {
                     void this.cancelStarting();
@@ -495,6 +549,12 @@ class GameRoom extends colyseus_1.Room {
     handleSubmitAnswer(client, msg) {
         if (this.state.phase !== "question")
             return;
+        if (Date.now() >= this.state.phaseEndsAt || !this.state.players.has(client.sessionId))
+            return;
+        if (msg?.questionId !== undefined && msg.questionId !== this.state.currentQuestion.id)
+            return;
+        if (!(0, shared_1.isValidAnswerValue)(this.state.currentQuestion.qType, msg?.value, this.state.currentQuestion.options.length))
+            return;
         if (this.roundAnswers.has(client.sessionId))
             return; // one answer per round
         this.roundAnswers.set(client.sessionId, {
@@ -531,7 +591,7 @@ class GameRoom extends colyseus_1.Room {
             return;
         if (typeof msg?.value !== "string")
             return;
-        this.roundAnswerDrafts.set(client.sessionId, msg.value.slice(0, questionType === "word" ? 32 : 12));
+        this.roundAnswerDrafts.set(client.sessionId, msg.value.slice(0, questionType === "word" ? 64 : 12));
     }
     finalizeAnswerDrafts() {
         const questionType = this.state.currentQuestion.qType;
@@ -662,7 +722,7 @@ class GameRoom extends colyseus_1.Room {
         const closestValues = record.type === "closest_answer" ? this.getClosestAnswerWinningValues(correctAnswer) : null;
         const isWinningAnswer = (value) => record.type === "closest_answer"
             ? Number.isFinite(Number(value)) && Boolean(closestValues?.has(Number(value)))
-            : (0, shared_1.isAnswerCorrect)(record.type, value, correctAnswer);
+            : (0, shared_1.isAnswerCorrect)(record.type, value, correctAnswer, record.presentation?.format === "map_shapes" ? shared_1.normalizeGeographyAnswer : undefined);
         const correctness = new Map();
         const attacks = new Map();
         const attackBonuses = new Map();
@@ -692,7 +752,9 @@ class GameRoom extends colyseus_1.Room {
         else if (correctPlayers.length === 1) {
             const attackerId = correctPlayers[0].id;
             attackBonuses.set(attackerId, this.state.pendingDamageBonus);
-            attacks.set(attackerId, damageValue + this.state.pendingDamageBonus);
+            const answer = this.roundAnswers.get(attackerId);
+            const base = record.presentation?.format === "image_reveal" ? (0, shared_1.imageRevealPoints)(this.state.currentQuestion.startedAt, this.state.currentQuestion.durationMs, answer.submittedAt) : damageValue;
+            attacks.set(attackerId, base + this.state.pendingDamageBonus);
             this.state.pendingDamageBonus = 0;
         }
         for (const attacker of this.state.players.values()) {
@@ -748,11 +810,12 @@ class GameRoom extends colyseus_1.Room {
                 const submittedValue = Number(value);
                 return Number.isFinite(submittedValue) && Boolean(closestAnswerWinningValues?.has(submittedValue));
             }
-            return (0, shared_1.isAnswerCorrect)(record.type, value, correctAnswer);
+            return (0, shared_1.isAnswerCorrect)(record.type, value, correctAnswer, record.presentation?.format === "map_shapes" ? shared_1.normalizeGeographyAnswer : undefined);
         };
         const result = (0, shared_1.computeRoundResults)({
             correctAnswer,
             basePoints: record.basePoints,
+            answerBasePoints: record.presentation?.format === "image_reveal" ? Object.fromEntries([...this.roundAnswers].map(([id, answer]) => [id, (0, shared_1.imageRevealPoints)(this.state.currentQuestion.startedAt, this.state.currentQuestion.durationMs, answer.submittedAt)])) : undefined,
             answers: [...this.roundAnswers.values()],
             sideBets: [...this.roundSideBets.values()],
             currentStreaks,

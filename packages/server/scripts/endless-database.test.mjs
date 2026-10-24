@@ -4,6 +4,9 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import { endlessAction, endlessLeaderboard } from "../dist/endless.js";
+import { ENDLESS_PROTOCOL_VERSION } from "@confidence-trivia/shared";
+import { createEndlessRun } from "../dist/endlessEngine.js";
+import { ENDLESS_QUESTIONS } from "../dist/content/endlessQuestions.js";
 
 // Real PostgreSQL SQL/constraints/transactions in WASM. Only the postgres.js
 // transport is adapted. All production service queries and migration 023 run
@@ -24,12 +27,19 @@ function adapter(connection) {
 const sql = adapter(pg);
 const playerId = randomUUID(), userId = randomUUID();
 const sync = () => endlessAction(playerId, userId, { type: "sync" }, sql);
-const start = (requestId = randomUUID()) => endlessAction(playerId, userId, { type: "start", requestId }, sql);
+const start = async (requestId = randomUUID()) => {
+  const result = await endlessAction(playerId, userId, { type: "start", requestId }, sql);
+  return result.run?.phase === "loading" ? endlessAction(playerId, userId, { type: "ready", runId: result.run.id, token: result.run.question.token }, sql) : result;
+};
 async function storedRun() { return (await pg.query("select state from endless_runs where player_id = $1 order by finished, created_at desc limit 1", [playerId])).rows[0].state; }
 async function setRun(state) { await pg.query("update endless_runs set state = $1::jsonb, finished = $2 where id = $3", [JSON.stringify(state), state.phase === "finished", state.id]); }
+function correctInput(run) {
+  const key = run.question.correctAnswer ?? run.question.correctIndex;
+  return Array.isArray(key) ? key[0] : key;
+}
 async function answerCorrect() {
   const r = await storedRun();
-  return endlessAction(playerId, userId, { type: "answer", runId: r.id, token: r.question.token, answer: r.question.correctIndex }, sql);
+  return endlessAction(playerId, userId, { type: "answer", runId: r.id, token: r.question.token, answer: correctInput(r) }, sql);
 }
 
 before(async () => {
@@ -73,7 +83,7 @@ test("Start is idempotent; simultaneous devices share one persistent active run"
   assert.equal(new Set(states.map((s) => s.run.id)).size, 1);
   assert.equal((await pg.query("select count(*)::int as n from endless_runs")).rows[0].n, 1);
   const resumed = await sync(); assert.deepEqual(resumed.run, states[0].run);
-  assert.equal(resumed.protocolVersion, 2);
+  assert.equal(resumed.protocolVersion, ENDLESS_PROTOCOL_VERSION);
 });
 test("database deadlines survive reconnect and cannot be reset by another Start", async () => {
   await start(); const r = await storedRun(); r.question.deadline = Date.now() - 10000; await setRun(r);
@@ -125,7 +135,7 @@ test("reads cannot keep a run alive and only a matching heartbeat renews it", as
 });
 test("ordinary answer uses four statements and an idempotent retry performs no writes", async () => {
   await start(); const r = await storedRun();
-  const command = { type: "answer", runId: r.id, token: r.question.token, answer: r.question.correctIndex };
+  const command = { type: "answer", runId: r.id, token: r.question.token, answer: correctInput(r) };
   statementCount = 0;
   const result = await endlessAction(playerId, userId, command, sql);
   assert.equal(result.run.score, 1); assert.equal(statementCount, 4);
@@ -135,9 +145,28 @@ test("ordinary answer uses four statements and an idempotent retry performs no w
   assert.equal(statementCount, 2);
   assert.deepEqual((await pg.query("select updated_at from endless_runs where id = $1", [r.id])).rows[0].updated_at, before);
 });
+
+test("visual word and numeric answers persist safely and grant one point and one milestone", async () => {
+  for (const answerType of ["word", "estimate"]) {
+    // Reset just this player's prior attempt/claims between answer methods.
+    await pg.exec("truncate endless_runs, endless_records, endless_reward_claims, star_transactions cascade");
+    await pg.query("update players set stars = 100 where id = $1", [playerId]);
+    await start(); const old = await storedRun();
+    const content = ENDLESS_QUESTIONS.find((q) => q.presentation && q.answerType === answerType);
+    const r = createEndlessRun(old.id, 0, Date.now(), [content]); r.score = 9; await setRun(r);
+    const ready = await endlessAction(playerId, userId, { type: "ready", runId: r.id, token: r.question.token }, sql);
+    assert.equal(ready.run.phase, "question"); assert.ok(!("correctAnswer" in ready.run.question));
+    await assert.rejects(endlessAction(playerId, userId, { type: "answer", runId: r.id, token: r.question.token, answer: answerType === "word" ? 123 : "4" }, sql), { status: 400 });
+    const key = r.question.correctAnswer;
+    const command = { type: "answer", runId: r.id, token: r.question.token, answer: Array.isArray(key) ? key[0] : key };
+    const result = await endlessAction(playerId, userId, command, sql);
+    assert.equal(result.run.score, 10); assert.equal(result.run.lives, 3); assert.equal(result.run.feedback.correct, true); assert.equal(result.stars, 110);
+    assert.equal((await endlessAction(playerId, userId, command, sql)).stars, 110);
+  }
+});
 test("concurrent answers, retries, records, and reward grants settle exactly once", async () => {
   await start(); const r = await storedRun(); r.score = 9; await setRun(r);
-  const command = { type: "answer", runId: r.id, token: r.question.token, answer: r.question.correctIndex };
+  const command = { type: "answer", runId: r.id, token: r.question.token, answer: correctInput(r) };
   const results = await Promise.all(Array.from({ length: 20 }, () => endlessAction(playerId, userId, command, sql)));
   for (const state of results) { assert.equal(state.run.score, 10); assert.equal(state.personalBest, 10); assert.equal(state.stars, 110); assert.deepEqual(state.claimed, [10]); }
   assert.equal((await pg.query("select count(*)::int as n from star_transactions")).rows[0].n, 1);

@@ -3,7 +3,7 @@ export declare const ENDLESS_TIMERS: Record<EndlessDifficulty, number>;
 export declare const ENDLESS_FEEDBACK_MS = 1600;
 export declare const ENDLESS_RECONNECT_MS = 10000;
 export declare const ENDLESS_HEARTBEAT_MS = 2000;
-export declare const ENDLESS_PROTOCOL_VERSION = 2;
+export declare const ENDLESS_PROTOCOL_VERSION = 3;
 export declare const ENDLESS_MILESTONES: readonly [{
     readonly score: 10;
     readonly stars: 10;
@@ -33,6 +33,9 @@ export declare const ENDLESS_MILESTONES: readonly [{
     readonly stars: 55;
 }];
 export interface EndlessQuestion {
+    answerType?: "multiple_choice" | "word" | "estimate";
+    presentation?: import("../visualQuestions").VisualPresentation;
+    startedAt?: number;
     token: string;
     number: number;
     text: string;
@@ -47,12 +50,13 @@ export interface EndlessRun {
     score: number;
     lives: number;
     previousBest: number;
-    phase: "question" | "feedback" | "finished";
+    phase: "loading" | "question" | "feedback" | "finished";
     endReason: "lives" | "exhausted" | "abandoned" | null;
     connectionDeadline: number;
     question: EndlessQuestion | null;
     feedback: {
         correctIndex: number;
+        correctAnswerText?: string;
         selectedIndex: number | null;
         correct: boolean;
         timedOut: boolean;

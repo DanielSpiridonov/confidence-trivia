@@ -10,9 +10,10 @@ const uuid = (v: unknown): v is string => typeof v === "string" && /^[0-9a-f]{8}
 export function parseEndlessCommand(body: any): EndlessCommand {
   if (body?.type === "start" && uuid(body.requestId)) return { type: "start", requestId: body.requestId };
   if ((body?.type === "heartbeat" || body?.type === "abandon") && uuid(body.runId)) return { type: body.type, runId: body.runId };
+  if ((body?.type === "ready" || body?.type === "visualFailed") && uuid(body.runId) && uuid(body.token)) return { type: body.type, runId: body.runId, token: body.token };
   if ((body?.type === "answer" || body?.type === "next") && uuid(body.runId) && uuid(body.token)) {
     if (body.type === "next") return { type: "next", runId: body.runId, token: body.token };
-    if (body.answer === null || (Number.isInteger(body.answer) && body.answer >= 0 && body.answer <= 3)) return { type: "answer", runId: body.runId, token: body.token, answer: body.answer };
+    if (body.answer === null || (typeof body.answer === "number" && Number.isFinite(body.answer)) || (typeof body.answer === "string" && body.answer.trim().length > 0 && body.answer.length <= 64)) return { type: "answer", runId: body.runId, token: body.token, answer: body.answer };
   }
   throw new EndlessError(400, "Invalid Endless action.");
 }

@@ -28,7 +28,7 @@ function computeRoundResults(input) {
         let delta = answer.confidence === "none"
             ? 0
             : correct
-                ? table.correct + (basePoints - scoring_1.DEFAULT_BASE_POINTS)
+                ? table.correct + ((input.answerBasePoints?.[answer.playerId] ?? basePoints) - scoring_1.DEFAULT_BASE_POINTS)
                 : table.wrong;
         const priorStreak = currentStreaks[answer.playerId] ?? 0;
         const isHighConfidence = streaks_1.STREAK_QUALIFYING_CONFIDENCE.includes(answer.confidence);

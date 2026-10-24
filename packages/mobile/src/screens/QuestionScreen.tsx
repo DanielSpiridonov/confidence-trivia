@@ -6,6 +6,7 @@ import { Room } from "colyseus.js";
 import { ANDROID_GAME_UI_SCALE, Screen, ScreenScaleContext, Title, BigButton, theme } from "../components/ui";
 import { PhaseTimer } from "../components/PhaseTimer";
 import { DamageHud } from "../components/DamageHud";
+import { VisualQuestionRound } from "../components/VisualQuestion";
 
 interface MeasuredRect {
   x: number;
@@ -243,6 +244,13 @@ export function QuestionScreen({ room, state }: { room: Room; state: any }) {
     );
   }
 
+  if (q.visualFormat) return <Screen style={{ paddingVertical: 12, gap: 6 }} androidScale={ANDROID_GAME_UI_SCALE}>
+    <DamageHud state={state} myPlayerId={room.sessionId} />
+    <VisualQuestionRound key={q.id} id={q.id} text={q.text} presentation={{ format: q.visualFormat, assetId: q.visualAssetId }} answerType={q.qType} options={options} startedAt={q.startedAt} durationMs={q.durationMs} endsAt={state.phaseEndsAt} serverNow={state.serverNow} preparing={state.phase === "visual_loading"} locked={locked || !!state.players.get(room.sessionId)?.hasActedThisPhase} damage={state.gameMode === "damage"}
+      onSubmit={(value) => { if (state.phase !== "question" || lockedRef.current) return; setLocked(true); room.send("submitAnswer", { value, questionId: q.id }); }}
+      onDraft={(value) => room.send("saveAnswerDraft", { value })}
+      onReady={() => room.send("visualReady", { questionId: q.id })} onFailure={() => room.send("visualReady", { questionId: q.id, failed: true })} />
+  </Screen>;
   return (
     <Screen style={styles.screen} androidScale={ANDROID_GAME_UI_SCALE}>
       <PhaseTimer phaseEndsAt={state.phaseEndsAt} />
