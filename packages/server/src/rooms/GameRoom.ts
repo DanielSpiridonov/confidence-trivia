@@ -9,7 +9,6 @@ import {
   DAMAGE_REVEAL_DURATION_MS,
   DEFAULT_ROUND_COUNT,
   MIN_PLAYERS_TO_START,
-  ALLOW_SOLO_CUSTOM_TESTING,
   RECONNECT_GRACE_MS,
   computeRoundResults,
   isAnswerCorrect,
@@ -433,7 +432,6 @@ export class GameRoom extends Room<RoomStateSchema> {
     if (this.state.gameMode === "damage") return count === 2;
     if (this.state.gameMode === "ranked") return count === RANKED_PLAYER_COUNT;
     if (this.state.gameMode === "friends" && this.state.friendsTeamMode === "duos") return count >= 4 && count % 2 === 0;
-    if (ALLOW_SOLO_CUSTOM_TESTING && this.state.gameMode === "friends") return count >= 1;
     return count >= MIN_PLAYERS_TO_START;
   }
 
@@ -922,7 +920,7 @@ export class GameRoom extends Room<RoomStateSchema> {
   private async persistFinalResults() {
     if (this.resultsPersisted) return;
     this.resultsPersisted = true;
-    // Temporary solo testing must not farm completion Stars or recorded wins.
+    // Any solo practice session must not farm completion Stars or recorded wins.
     if (this.practiceMatch) return;
 
     const rankingValueFor = (player: PlayerSchema) => this.state.gameMode === "friends" && this.state.friendsTeamMode === "duos"

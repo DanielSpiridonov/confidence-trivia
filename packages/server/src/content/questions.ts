@@ -1,7 +1,7 @@
 import { DIFFICULTY_REWARDS, QuestionRecord, Locale, hasVisualAsset } from "@confidence-trivia/shared";
 import { VISUAL_QUESTIONS } from "./visualQuestions";
-import { VISUAL_TEST_CATEGORIES } from "@confidence-trivia/shared";
 import { GENERATED_QUESTIONS } from "./generatedQuestions";
+import { ADDITIONAL_QUESTIONS } from "./additionalQuestions";
 
 const ENABLED_TEST_TYPES = new Set<QuestionRecord["type"]>([
   "multiple_choice",
@@ -430,7 +430,7 @@ const SEED_QUESTIONS: QuestionRecord[] = [
   },
 ];
 
-export const QUESTIONS: QuestionRecord[] = [...SEED_QUESTIONS, ...GENERATED_QUESTIONS, ...VISUAL_QUESTIONS].map((question) => ({
+export const QUESTIONS: QuestionRecord[] = [...SEED_QUESTIONS, ...GENERATED_QUESTIONS, ...VISUAL_QUESTIONS, ...ADDITIONAL_QUESTIONS].map((question) => ({
   ...question,
   basePoints: DIFFICULTY_REWARDS[question.difficulty],
 }));
@@ -489,8 +489,7 @@ validateQuestionBank();
 export function getQuestionSet(count: number, excludeIds: string[] = [], categories: string[] = [], allowVisual = true): QuestionRecord[] {
   const categorySet = new Set(categories.map((category) => category.trim().toLowerCase()).filter(Boolean));
   const available = QUESTIONS.filter((q) => ENABLED_TEST_TYPES.has(q.type) && (allowVisual || !q.presentation));
-  const categoryQuestions = available.filter((q) => categorySet.size === 0 || categorySet.has(q.category.toLowerCase()) || VISUAL_TEST_CATEGORIES.some(filter =>
-    categorySet.has(filter.id) && q.presentation?.format === filter.format && (!("category" in filter) || q.category === filter.category)));
+  const categoryQuestions = available.filter((q) => categorySet.size === 0 || categorySet.has(q.category.toLowerCase()));
   const enabledQuestions = categoryQuestions.length > 0 ? categoryQuestions : available;
   const questionSet: QuestionRecord[] = [];
   const excluded = new Set(excludeIds);

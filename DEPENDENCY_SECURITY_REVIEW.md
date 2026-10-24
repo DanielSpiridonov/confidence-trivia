@@ -64,8 +64,9 @@ wagers, and both mobile clients before adopting a different Colyseus stack.
   verified identity within a single HTTP request.
 - Key account action limits by verified user identity. Refreshed tokens retain
   the same budget; arbitrary invalid authorization headers use the IP budget.
-- Keep temporary solo Custom testing available, without persisting completion
-  Stars, games played, or wins for those practice sessions.
+- Custom now requires at least two connected players on client and server;
+  temporary visual test filters and solo starts have been removed. The defensive
+  guard against persisting rewards for solo practice sessions remains.
 
 ## Remaining application and operational concerns
 

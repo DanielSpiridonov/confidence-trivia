@@ -21,7 +21,6 @@ __exportStar(require("./visualAssets"), exports);
 __exportStar(require("./storageVisualAssets"), exports);
 __exportStar(require("./config/scoring"), exports);
 __exportStar(require("./config/room"), exports);
-__exportStar(require("./config/visualTesting"), exports);
 __exportStar(require("./config/timing"), exports);
 __exportStar(require("./config/streaks"), exports);
 __exportStar(require("./config/progression"), exports);

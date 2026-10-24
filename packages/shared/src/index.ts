@@ -5,7 +5,6 @@ export * from "./visualAssets";
 export * from "./storageVisualAssets";
 export * from "./config/scoring";
 export * from "./config/room";
-export * from "./config/visualTesting";
 export * from "./config/timing";
 export * from "./config/streaks";
 export * from "./config/progression";

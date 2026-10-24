@@ -146,7 +146,9 @@
     "sports": "Спорт",
     "animals": "Животни",
     "technology": "Технологии",
-    "food": "Храна"
+    "food": "Храна",
+    "space": "Космос",
+    "literature": "Литература"
   },
   "lobby": {
     "roomCode": "КОД НА СТАЯТА",

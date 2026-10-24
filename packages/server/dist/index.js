@@ -33,7 +33,7 @@ app.use(generalLimit);
 app.use(express_1.default.json());
 app.get("/health", (0, httpSafety_1.asyncRoute)(async (_req, res) => {
     const database = await (0, database_2.getDatabaseStatus)();
-    res.json({ ok: true, database, endlessProtocolVersion: shared_1.ENDLESS_PROTOCOL_VERSION, customSoloTesting: shared_1.ALLOW_SOLO_CUSTOM_TESTING });
+    res.json({ ok: true, database, endlessProtocolVersion: shared_1.ENDLESS_PROTOCOL_VERSION });
 }));
 app.use("/endless", endlessRoutes_1.endlessRouter);
 app.get("/news", (0, httpSafety_1.asyncRoute)(async (req, res) => {

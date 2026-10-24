@@ -146,7 +146,9 @@
     "sports": "Sports",
     "animals": "Animals",
     "technology": "Technology",
-    "food": "Food"
+    "food": "Food",
+    "space": "Space",
+    "literature": "Literature"
   },
   "lobby": {
     "roomCode": "ROOM CODE",

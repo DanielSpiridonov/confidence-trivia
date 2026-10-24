@@ -30,6 +30,9 @@ checklist, use `PRE_PUBLISH_CHECKLIST.md`.
   development work currently happens on `master`.
 - Public legal pages are hosted on Daniel's Vercel portfolio.
 - Core modes currently include Classic, Custom, Ranked, and 1v1 Damage.
+- Custom's temporary visual-only test categories and solo-start exception have
+  been removed. Normal Custom needs two connected players; Duos needs at least
+  four in even teams. Map Shapes and Image Reveal remain in the regular pool.
 - Persistent systems include accounts, stars, daily rewards/streaks, cosmetics,
   friends, Blessings, challenges, notifications, reports, Ranked LP, and public
   or private rooms.

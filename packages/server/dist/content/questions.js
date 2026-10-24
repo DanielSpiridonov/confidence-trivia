@@ -9,8 +9,8 @@ exports.localizeAnswerItems = localizeAnswerItems;
 exports.getLocalizedCorrectAnswer = getLocalizedCorrectAnswer;
 const shared_1 = require("@confidence-trivia/shared");
 const visualQuestions_1 = require("./visualQuestions");
-const shared_2 = require("@confidence-trivia/shared");
 const generatedQuestions_1 = require("./generatedQuestions");
+const additionalQuestions_1 = require("./additionalQuestions");
 const ENABLED_TEST_TYPES = new Set([
     "multiple_choice",
     "true_false",
@@ -436,7 +436,7 @@ const SEED_QUESTIONS = [
         },
     },
 ];
-exports.QUESTIONS = [...SEED_QUESTIONS, ...generatedQuestions_1.GENERATED_QUESTIONS, ...visualQuestions_1.VISUAL_QUESTIONS].map((question) => ({
+exports.QUESTIONS = [...SEED_QUESTIONS, ...generatedQuestions_1.GENERATED_QUESTIONS, ...visualQuestions_1.VISUAL_QUESTIONS, ...additionalQuestions_1.ADDITIONAL_QUESTIONS].map((question) => ({
     ...question,
     basePoints: shared_1.DIFFICULTY_REWARDS[question.difficulty],
 }));
@@ -492,7 +492,7 @@ validateQuestionBank();
 function getQuestionSet(count, excludeIds = [], categories = [], allowVisual = true) {
     const categorySet = new Set(categories.map((category) => category.trim().toLowerCase()).filter(Boolean));
     const available = exports.QUESTIONS.filter((q) => ENABLED_TEST_TYPES.has(q.type) && (allowVisual || !q.presentation));
-    const categoryQuestions = available.filter((q) => categorySet.size === 0 || categorySet.has(q.category.toLowerCase()) || shared_2.VISUAL_TEST_CATEGORIES.some(filter => categorySet.has(filter.id) && q.presentation?.format === filter.format && (!("category" in filter) || q.category === filter.category)));
+    const categoryQuestions = available.filter((q) => categorySet.size === 0 || categorySet.has(q.category.toLowerCase()));
     const enabledQuestions = categoryQuestions.length > 0 ? categoryQuestions : available;
     const questionSet = [];
     const excluded = new Set(excludeIds);

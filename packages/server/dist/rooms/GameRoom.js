@@ -414,8 +414,6 @@ class GameRoom extends colyseus_1.Room {
             return count === shared_1.RANKED_PLAYER_COUNT;
         if (this.state.gameMode === "friends" && this.state.friendsTeamMode === "duos")
             return count >= 4 && count % 2 === 0;
-        if (shared_1.ALLOW_SOLO_CUSTOM_TESTING && this.state.gameMode === "friends")
-            return count >= 1;
         return count >= shared_1.MIN_PLAYERS_TO_START;
     }
     async refundStartingWager() {
@@ -911,7 +909,7 @@ class GameRoom extends colyseus_1.Room {
         if (this.resultsPersisted)
             return;
         this.resultsPersisted = true;
-        // Temporary solo testing must not farm completion Stars or recorded wins.
+        // Any solo practice session must not farm completion Stars or recorded wins.
         if (this.practiceMatch)
             return;
         const rankingValueFor = (player) => this.state.gameMode === "friends" && this.state.friendsTeamMode === "duos"

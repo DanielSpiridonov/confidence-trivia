@@ -1,4 +1,5 @@
 import test from "node:test";
+import { ADDITIONAL_QUESTIONS } from "../dist/content/additionalQuestions.js";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
@@ -34,7 +35,7 @@ test("sample content covers countries, continents, all visual input methods and 
   }
   assert.ok(VISUAL_QUESTIONS.some((q) => q.presentation.geography?.kind === "continent"));
   assert.doesNotThrow(() => validateQuestionBank());
-  assert.equal(QUESTIONS.length, 170 + STORAGE_IMAGE_QUESTIONS.length);
+  assert.equal(QUESTIONS.length, 170 + STORAGE_IMAGE_QUESTIONS.length + ADDITIONAL_QUESTIONS.length);
 });
 test("every raster sample has a real bundled PNG matching its manifest and source drawing", async () => {
   for (const id of ["scene_01","scene_02","scene_03"]) {

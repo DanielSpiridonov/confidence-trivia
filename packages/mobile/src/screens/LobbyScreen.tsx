@@ -4,13 +4,11 @@ import { View, Text, FlatList, Platform, StyleSheet } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { useTranslation } from "react-i18next";
 import { Room } from "colyseus.js";
-import { ALLOW_SOLO_CUSTOM_TESTING, FRAME_COSMETIC_COLORS, MIN_PLAYERS_TO_START, RANKED_PLAYER_COUNT } from "@confidence-trivia/shared";
+import { FRAME_COSMETIC_COLORS, MIN_PLAYERS_TO_START, RANKED_PLAYER_COUNT } from "@confidence-trivia/shared";
 import { ANDROID_GAME_UI_SCALE, Screen, Title, Subtitle, BigButton, theme } from "../components/ui";
 import { playSound } from "../audio/sounds";
 import { PlayerFrameEffect } from "../components/PlayerFrameEffect";
 import { MatchmakingQueueScreen } from "./MatchmakingQueueScreen";
-import { SERVER_URL } from "../network/client";
-import { requireSoloCustomServer } from "../network/customTesting";
 
 interface PublicPlayerView {
   id: string;
@@ -104,7 +102,7 @@ export function LobbyScreen({ room, state, mySessionId }: { room: Room; state: a
 
   const me = players.find((p) => p.id === mySessionId);
   const isHost = me?.isHost ?? false;
-  const requiredPlayers = state.gameMode === "damage" ? 2 : state.gameMode === "ranked" ? RANKED_PLAYER_COUNT : ALLOW_SOLO_CUSTOM_TESTING && state.gameMode === "friends" && state.friendsTeamMode !== "duos" ? 1 : MIN_PLAYERS_TO_START;
+  const requiredPlayers = state.gameMode === "damage" ? 2 : state.gameMode === "ranked" ? RANKED_PLAYER_COUNT : state.gameMode === "friends" && state.friendsTeamMode === "duos" ? 4 : MIN_PLAYERS_TO_START;
   const connectedPlayerCount = players.filter((player) => player.connected).length;
   const isRanked = state.gameMode === "ranked";
   const isChallenge = Boolean(state.isChallenge);
@@ -112,16 +110,15 @@ export function LobbyScreen({ room, state, mySessionId }: { room: Room; state: a
   const validFriendsTeamSize = state.gameMode !== "friends" || state.friendsTeamMode !== "duos" || (connectedPlayerCount >= 4 && connectedPlayerCount % 2 === 0);
   const canStart = isHost && validFriendsTeamSize && (state.gameMode === "damage" || state.gameMode === "ranked" ? connectedPlayerCount === requiredPlayers : connectedPlayerCount >= requiredPlayers);
 
-  async function handleStart() {
+  function handleStart() {
     if (!canStart || startInFlight.current) return;
     startInFlight.current = true; setStartPending(true); setStartError(null);
     try {
-      if (state.gameMode === "friends" && connectedPlayerCount === 1) await requireSoloCustomServer(SERVER_URL);
       if (!mounted.current || room.connection?.isOpen === false) throw new Error("The room connection was lost. Please leave and create a new room.");
       room.send("startGame");
       startTimer.current = setTimeout(() => {
         finishStartRequest();
-        if (mounted.current) setStartError("The server did not start this room. Please leave and create a new room after the server update.");
+        if (mounted.current) setStartError("The server did not start this room. Please try again, or leave and create a new room.");
       }, 6000);
     } catch (error) {
       finishStartRequest();

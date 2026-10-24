@@ -51,8 +51,17 @@ test("a single player cannot start Classic", async () => {
   assert.deepEqual(room.startErrors, [{ type: "gameStartError", message: { code: "not_enough_players" } }]);
 });
 
-test("temporary solo Custom starts and advances through the countdown with one connected host", async () => {
+test("a single player cannot start Custom", async () => {
   const room = roomFor("friends",1);
+  room.state.friendsTeamMode = "ffa";
+  await room.handleStartGame(room.clients[0]);
+  assert.equal(room.state.gameStarted, false);
+  assert.equal(room.state.phase, "lobby");
+  assert.deepEqual(room.startErrors, [{ type: "gameStartError", message: { code: "not_enough_players" } }]);
+});
+
+test("Custom starts and advances through countdown with two connected players", async () => {
+  const room = roomFor("friends", 2);
   room.state.friendsTeamMode = "ffa";
   room.setPhase = (phase) => { room.state.phase = phase; };
   let advanced = false;
@@ -64,7 +73,7 @@ test("temporary solo Custom starts and advances through the countdown with one c
   assert.equal(advanced,true);
 });
 
-test("solo testing does not permit duos, Ranked, Damage or disconnected Custom hosts", async () => {
+test("duos, Ranked, Damage and disconnected Custom hosts cannot start alone", async () => {
   for (const mode of ["friends","ranked","damage"]) {
     const room = roomFor(mode,1);
     if (mode === "friends") room.state.friendsTeamMode = "duos";
@@ -306,11 +315,9 @@ test("drafts, confidence and side bets cannot be changed after their deadline", 
   assert.equal(room.roundSideBetDecisions.size, 0);
 });
 
-test("solo Custom testing awards no completion Stars or recorded wins", async (t) => {
+test("solo practice sessions cannot persist completion Stars or recorded wins", async (t) => {
   const room = roomFor("friends", 1);
-  room.setPhase = () => {};
-  room.beginGame();
-  assert.equal(room.practiceMatch, true);
+  room.practiceMatch = true;
   t.mock.method(database, "saveCompletedMatch", () => assert.fail("practice must not persist rewards"));
   await GameRoom.prototype.persistFinalResults.call(room);
   assert.equal(room.resultsPersisted, true);
