@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { generateKeyPairSync } from "node:crypto";
-import { revokeAppleAuthorization, verifySupabaseIdentity } from "../dist/auth.js";
+import { AUTH_REQUEST_TIMEOUT_MS, deleteSupabaseIdentity, requestIdentity, revokeAppleAuthorization, verifySupabaseIdentity } from "../dist/auth.js";
 
 test("rejects missing bearer token", async () => {
   assert.equal(await verifySupabaseIdentity(undefined), null);
@@ -93,4 +93,49 @@ test("rejects an upstream-invalid token", async () => {
   globalThis.fetch = async () => new Response("unauthorized", { status: 401 });
   try { assert.equal(await verifySupabaseIdentity("Bearer bad-token"), null); }
   finally { globalThis.fetch = originalFetch; }
+});
+
+test("authentication aborts a stalled upstream request instead of hanging", async (t) => {
+  process.env.SUPABASE_URL = "https://example.supabase.co";
+  process.env.SUPABASE_PUBLISHABLE_KEY = "publishable";
+  const actualTimeout = AbortSignal.timeout.bind(AbortSignal);
+  t.mock.method(AbortSignal, "timeout", (ms) => {
+    assert.equal(ms, AUTH_REQUEST_TIMEOUT_MS);
+    return actualTimeout(10);
+  });
+  t.mock.method(globalThis, "fetch", (_url, options) => new Promise((_resolve, reject) => {
+    options.signal.addEventListener("abort", () => reject(options.signal.reason), { once: true });
+  }));
+  // AbortSignal.timeout does not keep Node alive on its own.
+  const keepAlive = setTimeout(() => {}, 1000);
+  try { assert.equal(await verifySupabaseIdentity("Bearer token"), null); }
+  finally { clearTimeout(keepAlive); }
+});
+
+test("rate limiting and ownership reuse verification only within one request", async (t) => {
+  process.env.SUPABASE_URL = "https://example.supabase.co";
+  process.env.SUPABASE_PUBLISHABLE_KEY = "publishable";
+  let calls = 0;
+  t.mock.method(globalThis, "fetch", async () => {
+    calls++;
+    return new Response(JSON.stringify({ id: "user" }), { status: 200 });
+  });
+  const request = { headers: { authorization: "Bearer token" } };
+  await Promise.all([requestIdentity(request), requestIdentity(request)]);
+  assert.equal(calls, 1);
+  await requestIdentity({ ...request });
+  assert.equal(calls, 2);
+});
+
+test("identity deletion uses a bounded upstream request", async (t) => {
+  const previous = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-key";
+  t.mock.method(globalThis, "fetch", async (_url, options) => {
+    assert.ok(options.signal instanceof AbortSignal);
+    return new Response(null, { status: 204 });
+  });
+  try { assert.equal(await deleteSupabaseIdentity("user"), true); }
+  finally {
+    if (previous === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY; else process.env.SUPABASE_SERVICE_ROLE_KEY = previous;
+  }
 });

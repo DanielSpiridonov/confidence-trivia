@@ -7,7 +7,8 @@ import { getDesignCanvasLayout } from "./designCanvasLayout";
 
 const CONTROL_WIDTH = "100%";
 const CONTENT_WIDTH = "100%";
-export const GAME_BACKGROUND = require("../../assets/game-background.png");
+export const GAME_BACKGROUND = require("../../assets/background-muted.png");
+export const BLURRED_GAME_BACKGROUND = require("../../assets/background-muted-blurred.png");
 const ANDROID_DESIGN_WIDTH = 844;
 const ANDROID_DESIGN_HEIGHT = 390;
 // Fit the landscape layout as a whole, keeping controls and absolute-positioned
@@ -17,20 +18,30 @@ export const ANDROID_MENU_UI_SCALE = ANDROID_UI_SCALE * 0.95;
 export const ANDROID_COMPACT_MENU_UI_SCALE = ANDROID_MENU_UI_SCALE * 0.95;
 export const ANDROID_GAME_UI_SCALE = 0.982278;
 export const ScreenScaleContext = React.createContext(1);
+// Full app-frame coordinates expressed in this Screen's scaled canvas units.
+// Decorative layers can reach the physical edges while controls stay safe.
+export const ScreenFrameContext = React.createContext({ left: 0, top: 0, width: 844, height: 390 });
 
-function DesignCanvas({ children, style, uiScale, overflowScale }: { children: React.ReactNode; style?: ViewStyle; uiScale: number; overflowScale: number }) {
+function DesignCanvas({ children, style, uiScale, overflowScale, fullBleedDecorations }: { children: React.ReactNode; style?: ViewStyle; uiScale: number; overflowScale: number; fullBleedDecorations: boolean }) {
   const insets = useSafeAreaInsets();
   const window = useWindowDimensions();
   const [bounds, setBounds] = React.useState<{ width: number; height: number } | null>(null);
   const layout = getDesignCanvasLayout(bounds?.width ?? window.width, bounds?.height ?? window.height, insets, Platform.OS === "ios", uiScale, overflowScale);
   const { scale, paddingLeft, paddingRight, paddingTop, paddingBottom } = layout;
+  const contentInset = Platform.OS === "android" ? Math.max(0, (layout.canvasWidth - 820) / 2) : 0;
+  const frame = {
+    left: -(paddingLeft + (layout.viewportWidth - layout.canvasWidth * scale) / 2) / scale - contentInset,
+    top: -(paddingTop + (layout.viewportHeight - layout.canvasHeight * scale) / 2) / scale,
+    width: (bounds?.width ?? window.width) / scale,
+    height: (bounds?.height ?? window.height) / scale,
+  };
 
   return (
     <View onLayout={(event) => setBounds(event.nativeEvent.layout)} style={[styles.androidSafeArea, { paddingLeft, paddingRight, paddingTop, paddingBottom }]}>
-      <View style={styles.androidViewport}>
+      <View style={[styles.androidViewport, fullBleedDecorations && { overflow: "visible" }]}>
         <View style={[styles.androidCanvas, { width: layout.canvasWidth, height: layout.canvasHeight, transform: [{ scale }] }]}>
           <ScreenScaleContext.Provider value={scale}>
-            <View style={[styles.content, style]}>{children}</View>
+            <ScreenFrameContext.Provider value={frame}><View style={[styles.content, style]}>{children}</View></ScreenFrameContext.Provider>
           </ScreenScaleContext.Provider>
         </View>
       </View>
@@ -38,7 +49,7 @@ function DesignCanvas({ children, style, uiScale, overflowScale }: { children: R
   );
 }
 
-export function Screen({ children, style, androidScale = ANDROID_UI_SCALE, androidOverflowScale = 1 }: { children: React.ReactNode; style?: ViewStyle; androidScale?: number; androidOverflowScale?: number }) {
+export function Screen({ children, style, androidScale = ANDROID_UI_SCALE, androidOverflowScale = 1, fullBleedDecorations = false }: { children: React.ReactNode; style?: ViewStyle; androidScale?: number; androidOverflowScale?: number; fullBleedDecorations?: boolean }) {
   return (
     <View
       onTouchStart={Keyboard.dismiss}
@@ -46,7 +57,7 @@ export function Screen({ children, style, androidScale = ANDROID_UI_SCALE, andro
       accessible={false}
     >
       <View style={styles.background}>
-        <DesignCanvas style={style} uiScale={Platform.OS === "android" ? androidScale : 1} overflowScale={Platform.OS === "android" ? androidOverflowScale : 1}>{children}</DesignCanvas>
+        <DesignCanvas style={style} uiScale={Platform.OS === "android" ? androidScale : 1} overflowScale={Platform.OS === "android" ? androidOverflowScale : 1} fullBleedDecorations={fullBleedDecorations}>{children}</DesignCanvas>
       </View>
     </View>
   );

@@ -8,6 +8,26 @@ each asset or clearly related asset family.
 
 ## Images and icons
 
+Home menu cards and their lighting are original code-drawn SVG paths in
+`packages/mobile/src/components/HomeMenuArtwork.tsx`, following the supplied UI
+concept's composition. Labels and descriptions are editable React Native text.
+No flattened interface image is used. The owner supplied `background-new.png`,
+`left-side-clump.png` and `right-side-clump.png` on 24 October 2026 for the home
+wall and foreground scenery. Both foregrounds were checked for real alpha
+transparency. `background-muted.png` is a less saturated edit of the supplied
+wallpaper, made with the built-in image editor and now used globally; its prompt
+is recorded in `packages/mobile/assets/home-scene.README.md`. The built-in image
+editor also produced `background-muted-blurred.png` for non-Home screens;
+its prompt is recorded in the same notes. Original files
+are retained. Generation/source rights evidence remains with the owner;
+this note does not claim an independently verified license or creator identity.
+
+Menu typography uses unmodified Kalam Bold/Regular by Indian Type Foundry from
+the Google Fonts repository, under SIL OFL 1.1. The original notice is in
+`packages/mobile/assets/fonts/Kalam-OFL.txt`; source URLs are recorded beside it
+in `README.md`. A bundled JSON copy makes the full license readable offline in
+Settings > Credits. These new files do not resolve other asset families below.
+
 | Asset family in `packages/mobile/assets/` | Rights status | Evidence needed |
 | --- | --- | --- |
 | `app-icon-ios.png`, `emblem-logo*.png` | Unverified | Logo creator/ownership and any source material |

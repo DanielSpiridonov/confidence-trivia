@@ -12,6 +12,8 @@
     "dev:mobile": "npm run start --workspace=packages/mobile",
     "dev:mobile:tunnel": "npm run start:tunnel --workspace=packages/mobile",
     "dev:mobile:client": "npm run start:dev-client --workspace=packages/mobile",
+    "dev:mobile:client:lan": "npm run start:dev-client:lan --workspace=packages/mobile",
+    "dev:mobile:client:clean": "npm run start:dev-client:clean --workspace=packages/mobile",
     "build:android:development": "npm run build:android:development --workspace=packages/mobile",
     "build:ios:device": "npm run build:ios:device --workspace=packages/mobile",
     "build:ios:development": "npm run build:ios:development --workspace=packages/mobile",
@@ -22,6 +24,7 @@
     "expo": "^54.0.0"
   },
   "overrides": {
-    "qs": "6.16.0"
+    "qs": "6.16.0",
+    "postcss": "8.5.23"
   }
 }

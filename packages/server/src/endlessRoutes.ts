@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { ENDLESS_PROTOCOL_VERSION } from "@confidence-trivia/shared";
-import { verifySupabaseIdentity } from "./auth";
+import { requestIdentity } from "./auth";
 import { isAuthenticatedPlayer } from "./database";
 import { endlessAction, EndlessError, endlessLeaderboard } from "./endless";
 import { EndlessCommand } from "./endlessEngine";
@@ -22,8 +22,9 @@ endlessRouter.use(async (req, res, next) => {
   res.set("X-Endless-Protocol", String(ENDLESS_PROTOCOL_VERSION));
   try {
     const playerId = req.query.playerId;
-    const identity = await verifySupabaseIdentity(req.headers.authorization);
-    if (!uuid(playerId) || !identity) throw new EndlessError(401, "Your session expired. Please sign in again.");
+    if (!uuid(playerId)) throw new EndlessError(401, "Your session expired. Please sign in again.");
+    const identity = await requestIdentity(req);
+    if (!identity) throw new EndlessError(401, "Your session expired. Please sign in again.");
     // State/actions validate ownership and moderation under their transaction's
     // player lock. Only the read-only board needs a separate ownership query.
     if (req.path === "/leaderboard" && !await isAuthenticatedPlayer(playerId, identity.userId)) throw new EndlessError(403, "This account cannot access Endless.");

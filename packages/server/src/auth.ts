@@ -1,5 +1,20 @@
 import { createPrivateKey, createSign } from "crypto";
 import { readFileSync } from "fs";
+import type { Request } from "express";
+
+export const AUTH_REQUEST_TIMEOUT_MS = 5_000;
+const requestIdentities = new WeakMap<Request, Promise<VerifiedIdentity | null>>();
+
+// Rate limits and ownership checks must use the same verified identity. Cache
+// only for this HTTP request, never beyond token expiration or sign-out.
+export function requestIdentity(request: Request): Promise<VerifiedIdentity | null> {
+  let identity = requestIdentities.get(request);
+  if (!identity) {
+    identity = verifySupabaseIdentity(request.headers.authorization);
+    requestIdentities.set(request, identity);
+  }
+  return identity;
+}
 
 export interface VerifiedIdentity {
   userId: string;
@@ -15,6 +30,7 @@ export async function verifySupabaseIdentity(authorization: string | undefined):
   if (!accessToken || !supabaseUrl || !publishableKey) return null;
   try {
     const response = await fetch(`${supabaseUrl.replace(/\/$/, "")}/auth/v1/user`, {
+      signal: AbortSignal.timeout(AUTH_REQUEST_TIMEOUT_MS),
       headers: { Authorization: `Bearer ${accessToken}`, apikey: publishableKey },
     });
     if (!response.ok) return null;
@@ -79,6 +95,7 @@ export async function revokeAppleAuthorization(authorizationCode: string, expect
   if (!clientId || !clientSecret || !authorizationCode || !expectedAppleUserId) return false;
   try {
     const tokenResponse = await fetch("https://appleid.apple.com/auth/token", {
+      signal: AbortSignal.timeout(AUTH_REQUEST_TIMEOUT_MS),
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, code: authorizationCode, grant_type: "authorization_code" }),
@@ -90,6 +107,7 @@ export async function revokeAppleAuthorization(authorizationCode: string, expect
     const token = typeof tokens.refresh_token === "string" ? tokens.refresh_token : typeof tokens.access_token === "string" ? tokens.access_token : null;
     if (!token) return false;
     const revokeResponse = await fetch("https://appleid.apple.com/auth/revoke", {
+      signal: AbortSignal.timeout(AUTH_REQUEST_TIMEOUT_MS),
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, token, token_type_hint: typeof tokens.refresh_token === "string" ? "refresh_token" : "access_token" }),
@@ -104,6 +122,7 @@ export async function deleteSupabaseIdentity(userId: string): Promise<boolean> {
   if (!supabaseUrl || !serviceRoleKey) return false;
   try {
     const response = await fetch(`${supabaseUrl.replace(/\/$/, "")}/auth/v1/admin/users/${encodeURIComponent(userId)}`, {
+      signal: AbortSignal.timeout(AUTH_REQUEST_TIMEOUT_MS),
       method: "DELETE",
       headers: { Authorization: `Bearer ${serviceRoleKey}`, apikey: serviceRoleKey },
     });

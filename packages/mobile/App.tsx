@@ -9,7 +9,8 @@ import { Room } from "colyseus.js";
 import { isOffensivePlayerName } from "@confidence-trivia/shared";
 import "./src/i18n";
 import i18n from "./src/i18n";
-import { BigButton, GAME_BACKGROUND, theme } from "./src/components/ui";
+import { BigButton, BLURRED_GAME_BACKGROUND, GAME_BACKGROUND, theme } from "./src/components/ui";
+import { HomeScenery } from "./src/components/HomeScenery";
 import { PointsIcon } from "./src/components/PointsIcon";
 import { FeedbackPopup, useFeedbackPopup } from "./src/components/FeedbackPopup";
 import { GameDialog, useGameDialog } from "./src/components/GameDialog";
@@ -93,29 +94,32 @@ function AssetPreloader({ sources, onReady }: { sources: readonly number[]; onRe
   );
 }
 
-function AppFrame({ children, highContrast = false }: { children: React.ReactNode; highContrast?: boolean }) {
-  const [backgroundRevision, setBackgroundRevision] = useState(0);
-
-  useEffect(() => {
-    const subscription = AppState.addEventListener("change", (nextState) => {
-      if (nextState === "active") {
-        setBackgroundRevision((revision) => revision + 1);
-      }
-    });
-    return () => subscription.remove();
-  }, []);
+function AppFrame({ children, highContrast = false, homeScene = false }: { children: React.ReactNode; highContrast?: boolean; homeScene?: boolean }) {
+  // Load both assets once. Navigation changes opacity only, never the image's
+  // source or key, so switching screens cannot restart background loading.
 
   return (
     <View style={styles.appFrame} collapsable={false}>
       <Image
-        key={backgroundRevision}
+        key="home-background"
+        accessible={false}
         source={GAME_BACKGROUND}
         defaultSource={GAME_BACKGROUND}
         resizeMode="cover"
         fadeDuration={0}
-        style={styles.appBackgroundImage}
+        style={[styles.appBackgroundImage, { opacity: homeScene ? 1 : 0 }]}
+      />
+      <Image
+        key="screen-background"
+        accessible={false}
+        source={BLURRED_GAME_BACKGROUND}
+        defaultSource={BLURRED_GAME_BACKGROUND}
+        resizeMode="cover"
+        fadeDuration={0}
+        style={[styles.appBackgroundImage, { opacity: homeScene ? 0 : 1 }]}
       />
       <View pointerEvents="none" style={[styles.appBackgroundShade, highContrast && styles.appBackgroundShadeHighContrast]} />
+      {homeScene ? <HomeScenery /> : null}
       <View style={styles.appContent}>{children}</View>
     </View>
   );
@@ -431,12 +435,21 @@ export default function App() {
   }, [deviceId, registeredAccount]);
 
   useEffect(() => {
-    if (nav !== "in-room" || combatPreloadStarted) return;
-    const interaction = InteractionManager.runAfterInteractions(() => {
-      setCombatPreloadStarted(true);
-    });
-    return () => interaction.cancel();
-  }, [combatPreloadStarted, nav]);
+    if (nav !== "in-room" || !room || combatPreloadStarted) return;
+    let interaction: ReturnType<typeof InteractionManager.runAfterInteractions> | undefined;
+    const preloadDamageArtwork = (state: { gameMode?: string }) => {
+      if (state?.gameMode !== "damage" || interaction) return;
+      interaction = InteractionManager.runAfterInteractions(() => setCombatPreloadStarted(true));
+    };
+    // Wait for the initial room snapshot too: it may arrive after navigation.
+    // Classic, Custom and Ranked must not download unused combat art.
+    room.onStateChange(preloadDamageArtwork);
+    preloadDamageArtwork(room.state);
+    return () => {
+      room.onStateChange.remove(preloadDamageArtwork);
+      interaction?.cancel();
+    };
+  }, [combatPreloadStarted, nav, room]);
 
   async function handleRepairClient() {
     setStartupState("loading");
@@ -897,7 +910,7 @@ export default function App() {
   configureMenuHaptics(hapticsEnabled, nav !== "in-room");
 
   return (
-    <AppFrame highContrast={highContrastEnabled}>
+    <AppFrame highContrast={highContrastEnabled} homeScene={nav === "home"}>
       {combatPreloadStarted && !combatImagesReady ? <AssetPreloader sources={COMBAT_PRELOAD_IMAGES} onReady={() => setCombatImagesReady(true)} /> : null}
       <StatusBar style="light" hidden={Platform.OS === "android"} animated />
       {nav === "startup" ? (
@@ -1253,7 +1266,7 @@ const styles = StyleSheet.create({
   },
   appBackgroundShade: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(20, 16, 31, 0.42)",
+    backgroundColor: "rgba(16, 14, 21, 0.3)",
   },
   appBackgroundShadeHighContrast: {
     backgroundColor: "rgba(8, 5, 14, 0.68)",

@@ -1,10 +1,24 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.AUTH_REQUEST_TIMEOUT_MS = void 0;
+exports.requestIdentity = requestIdentity;
 exports.verifySupabaseIdentity = verifySupabaseIdentity;
 exports.revokeAppleAuthorization = revokeAppleAuthorization;
 exports.deleteSupabaseIdentity = deleteSupabaseIdentity;
 const crypto_1 = require("crypto");
 const fs_1 = require("fs");
+exports.AUTH_REQUEST_TIMEOUT_MS = 5000;
+const requestIdentities = new WeakMap();
+// Rate limits and ownership checks must use the same verified identity. Cache
+// only for this HTTP request, never beyond token expiration or sign-out.
+function requestIdentity(request) {
+    let identity = requestIdentities.get(request);
+    if (!identity) {
+        identity = verifySupabaseIdentity(request.headers.authorization);
+        requestIdentities.set(request, identity);
+    }
+    return identity;
+}
 async function verifySupabaseIdentity(authorization) {
     const accessToken = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
     const supabaseUrl = process.env.SUPABASE_URL;
@@ -13,6 +27,7 @@ async function verifySupabaseIdentity(authorization) {
         return null;
     try {
         const response = await fetch(`${supabaseUrl.replace(/\/$/, "")}/auth/v1/user`, {
+            signal: AbortSignal.timeout(exports.AUTH_REQUEST_TIMEOUT_MS),
             headers: { Authorization: `Bearer ${accessToken}`, apikey: publishableKey },
         });
         if (!response.ok)
@@ -85,6 +100,7 @@ async function revokeAppleAuthorization(authorizationCode, expectedAppleUserId) 
         return false;
     try {
         const tokenResponse = await fetch("https://appleid.apple.com/auth/token", {
+            signal: AbortSignal.timeout(exports.AUTH_REQUEST_TIMEOUT_MS),
             method: "POST",
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
             body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, code: authorizationCode, grant_type: "authorization_code" }),
@@ -99,6 +115,7 @@ async function revokeAppleAuthorization(authorizationCode, expectedAppleUserId) 
         if (!token)
             return false;
         const revokeResponse = await fetch("https://appleid.apple.com/auth/revoke", {
+            signal: AbortSignal.timeout(exports.AUTH_REQUEST_TIMEOUT_MS),
             method: "POST",
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
             body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, token, token_type_hint: typeof tokens.refresh_token === "string" ? "refresh_token" : "access_token" }),
@@ -116,6 +133,7 @@ async function deleteSupabaseIdentity(userId) {
         return false;
     try {
         const response = await fetch(`${supabaseUrl.replace(/\/$/, "")}/auth/v1/admin/users/${encodeURIComponent(userId)}`, {
+            signal: AbortSignal.timeout(exports.AUTH_REQUEST_TIMEOUT_MS),
             method: "DELETE",
             headers: { Authorization: `Bearer ${serviceRoleKey}`, apikey: serviceRoleKey },
         });

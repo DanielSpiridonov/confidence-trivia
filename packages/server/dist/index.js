@@ -15,11 +15,12 @@ const auth_1 = require("./auth");
 const shared_1 = require("@confidence-trivia/shared");
 const rateLimit_1 = require("./rateLimit");
 const logging_1 = require("./logging");
+const httpSafety_1 = require("./httpSafety");
 const endlessRoutes_1 = require("./endlessRoutes");
 const port = Number(process.env.PORT ?? 2567);
 const app = (0, express_1.default)();
+app.disable("x-powered-by");
 app.set("trust proxy", 1);
-app.use(express_1.default.json());
 const generalLimit = (0, rateLimit_1.createRateLimiter)({ windowMs: 60000, max: 180, message: "Too many requests. Please wait a moment." });
 const accountLimit = (0, rateLimit_1.createRateLimiter)({ windowMs: 15 * 60000, max: 10, message: "Too many account attempts. Please try again later." });
 const promoLimit = (0, rateLimit_1.createRateLimiter)({ windowMs: 60 * 60000, max: 10, message: "Too many promo-code attempts. Please try again later.", key: rateLimit_1.authenticatedActorOrIpKey });
@@ -28,13 +29,14 @@ const friendRequestLimit = (0, rateLimit_1.createRateLimiter)({ windowMs: 60 * 6
 const socialActionLimit = (0, rateLimit_1.createRateLimiter)({ windowMs: 10 * 60000, max: 30, message: "Too many social actions. Please wait a few minutes.", key: rateLimit_1.authenticatedActorOrIpKey });
 const challengeLimit = (0, rateLimit_1.createRateLimiter)({ windowMs: 10 * 60000, max: 10, message: "Too many challenges. Please try again later.", key: rateLimit_1.authenticatedActorOrIpKey });
 const rewardLimit = (0, rateLimit_1.createRateLimiter)({ windowMs: 60 * 60000, max: 10, message: "Too many reward attempts. Please try again later.", key: rateLimit_1.authenticatedActorOrIpKey });
-app.get("/health", async (_req, res) => {
+app.use(generalLimit);
+app.use(express_1.default.json());
+app.get("/health", (0, httpSafety_1.asyncRoute)(async (_req, res) => {
     const database = await (0, database_2.getDatabaseStatus)();
     res.json({ ok: true, database, endlessProtocolVersion: shared_1.ENDLESS_PROTOCOL_VERSION, customSoloTesting: shared_1.ALLOW_SOLO_CUSTOM_TESTING });
-});
-app.use(generalLimit);
+}));
 app.use("/endless", endlessRoutes_1.endlessRouter);
-app.get("/news", async (req, res) => {
+app.get("/news", (0, httpSafety_1.asyncRoute)(async (req, res) => {
     const locale = req.query.locale === "bg" ? "bg" : "en";
     const posts = await (0, database_2.getNewsPosts)(locale);
     if (!posts) {
@@ -42,11 +44,11 @@ app.get("/news", async (req, res) => {
         return;
     }
     res.json(posts);
-});
-app.post("/promo-codes/redeem", promoLimit, async (req, res) => {
+}));
+app.post("/promo-codes/redeem", promoLimit, (0, httpSafety_1.asyncRoute)(async (req, res) => {
     const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
     const code = typeof req.body?.code === "string" ? req.body.code : "";
-    if (!isDeviceId(playerId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
+    if (!isDeviceId(playerId) || !await requestOwnsRegisteredPlayer(playerId, req)) {
         res.status(403).json({ error: "Sign in to redeem codes" });
         return;
     }
@@ -56,12 +58,12 @@ app.post("/promo-codes/redeem", promoLimit, async (req, res) => {
         return;
     }
     res.json(result);
-});
-app.post("/player-reports", reportLimit, async (req, res) => {
+}));
+app.post("/player-reports", reportLimit, (0, httpSafety_1.asyncRoute)(async (req, res) => {
     const reporterId = typeof req.body?.reporterId === "string" ? req.body.reporterId : "";
     const reportedName = typeof req.body?.reportedName === "string" ? req.body.reportedName.trim() : "";
     const description = typeof req.body?.description === "string" ? req.body.description.trim() : "";
-    if (!isDeviceId(reporterId) || !await requestOwnsRegisteredPlayer(reporterId, req.headers.authorization)) {
+    if (!isDeviceId(reporterId) || !await requestOwnsRegisteredPlayer(reporterId, req)) {
         res.status(403).json({ error: "Sign in to report a player" });
         return;
     }
@@ -79,15 +81,15 @@ app.post("/player-reports", reportLimit, async (req, res) => {
         return;
     }
     res.status(201).json({ ok: true });
-});
-app.post("/accounts/link", accountLimit, async (req, res) => {
+}));
+app.post("/accounts/link", accountLimit, (0, httpSafety_1.asyncRoute)(async (req, res) => {
     const guestPlayerId = typeof req.body?.guestPlayerId === "string" ? req.body.guestPlayerId : "";
     const displayName = typeof req.body?.displayName === "string" ? req.body.displayName.trim().slice(0, 20) : "Guest";
     if (!isDeviceId(guestPlayerId)) {
         res.status(400).json({ error: "Invalid guest player ID" });
         return;
     }
-    const identity = await (0, auth_1.verifySupabaseIdentity)(req.headers.authorization);
+    const identity = await (0, auth_1.requestIdentity)(req);
     if (!identity) {
         res.status(401).json({ error: "Invalid or expired account session" });
         return;
@@ -98,10 +100,10 @@ app.post("/accounts/link", accountLimit, async (req, res) => {
         return;
     }
     res.json(account);
-});
-app.get("/accounts/me", async (req, res) => {
+}));
+app.get("/accounts/me", (0, httpSafety_1.asyncRoute)(async (req, res) => {
     const playerId = typeof req.query.playerId === "string" ? req.query.playerId : "";
-    const identity = await (0, auth_1.verifySupabaseIdentity)(req.headers.authorization);
+    const identity = await (0, auth_1.requestIdentity)(req);
     if (!isDeviceId(playerId) || !identity) {
         res.status(401).json({ error: "Invalid or expired account session" });
         return;
@@ -112,11 +114,11 @@ app.get("/accounts/me", async (req, res) => {
         return;
     }
     res.json({ ...profile, email: identity.email });
-});
-app.patch("/accounts/me/name", accountLimit, async (req, res) => {
+}));
+app.patch("/accounts/me/name", accountLimit, (0, httpSafety_1.asyncRoute)(async (req, res) => {
     const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
     const displayName = typeof req.body?.displayName === "string" ? req.body.displayName.trim() : "";
-    const identity = await (0, auth_1.verifySupabaseIdentity)(req.headers.authorization);
+    const identity = await (0, auth_1.requestIdentity)(req);
     if (!isDeviceId(playerId) || !identity) {
         res.status(401).json({ error: "Invalid or expired account session" });
         return;
@@ -143,11 +145,11 @@ app.patch("/accounts/me/name", accountLimit, async (req, res) => {
         return;
     }
     res.json({ ...profile, email: identity.email });
-});
-app.delete("/accounts/me", async (req, res) => {
+}));
+app.delete("/accounts/me", (0, httpSafety_1.asyncRoute)(async (req, res) => {
     const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
     const appleAuthorizationCode = typeof req.body?.appleAuthorizationCode === "string" ? req.body.appleAuthorizationCode : "";
-    const identity = await (0, auth_1.verifySupabaseIdentity)(req.headers.authorization);
+    const identity = await (0, auth_1.requestIdentity)(req);
     if (!isDeviceId(playerId) || !identity || !await (0, database_2.ownsRegisteredPlayer)(playerId, identity.userId)) {
         res.status(401).json({ error: "Invalid or expired account session" });
         return;
@@ -170,14 +172,14 @@ app.delete("/accounts/me", async (req, res) => {
         return;
     }
     res.status(204).end();
-});
-app.get("/players/:deviceId/stars", async (req, res) => {
+}));
+app.get("/players/:deviceId/stars", (0, httpSafety_1.asyncRoute)(async (req, res) => {
     const deviceId = req.params.deviceId;
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(deviceId)) {
         res.status(400).json({ error: "Invalid device ID" });
         return;
     }
-    if (!await requestCanAccessPlayerData(req.params.deviceId, req.headers.authorization)) {
+    if (!await requestCanAccessPlayerData(req.params.deviceId, req)) {
         res.status(403).json({ error: "Player data is private" });
         return;
     }
@@ -187,13 +189,13 @@ app.get("/players/:deviceId/stars", async (req, res) => {
         return;
     }
     res.json({ stars });
-});
-app.get("/players/:deviceId/customization", async (req, res) => {
+}));
+app.get("/players/:deviceId/customization", (0, httpSafety_1.asyncRoute)(async (req, res) => {
     if (!isDeviceId(req.params.deviceId)) {
         res.status(400).json({ error: "Invalid device ID" });
         return;
     }
-    if (!await requestCanAccessPlayerData(req.params.deviceId, req.headers.authorization)) {
+    if (!await requestCanAccessPlayerData(req.params.deviceId, req)) {
         res.status(403).json({ error: "Player data is private" });
         return;
     }
@@ -203,13 +205,13 @@ app.get("/players/:deviceId/customization", async (req, res) => {
         return;
     }
     res.json(customization);
-});
-app.post("/players/:deviceId/customization/name-color", async (req, res) => {
+}));
+app.post("/players/:deviceId/customization/name-color", (0, httpSafety_1.asyncRoute)(async (req, res) => {
     if (!isDeviceId(req.params.deviceId)) {
         res.status(400).json({ error: "Invalid device ID" });
         return;
     }
-    if (!await requestOwnsRegisteredPlayer(req.params.deviceId, req.headers.authorization)) {
+    if (!await requestOwnsRegisteredPlayer(req.params.deviceId, req)) {
         res.status(403).json({ error: "Sign in to access the shop" });
         return;
     }
@@ -221,13 +223,13 @@ app.post("/players/:deviceId/customization/name-color", async (req, res) => {
         return;
     }
     res.json(customization);
-});
-app.post("/players/:deviceId/customization/avatar", async (req, res) => {
+}));
+app.post("/players/:deviceId/customization/avatar", (0, httpSafety_1.asyncRoute)(async (req, res) => {
     if (!isDeviceId(req.params.deviceId)) {
         res.status(400).json({ error: "Invalid device ID" });
         return;
     }
-    if (!await requestOwnsRegisteredPlayer(req.params.deviceId, req.headers.authorization)) {
+    if (!await requestOwnsRegisteredPlayer(req.params.deviceId, req)) {
         res.status(403).json({ error: "Sign in to access the shop" });
         return;
     }
@@ -239,13 +241,13 @@ app.post("/players/:deviceId/customization/avatar", async (req, res) => {
         return;
     }
     res.json(customization);
-});
-app.post("/players/:deviceId/customization/frame", async (req, res) => {
+}));
+app.post("/players/:deviceId/customization/frame", (0, httpSafety_1.asyncRoute)(async (req, res) => {
     if (!isDeviceId(req.params.deviceId)) {
         res.status(400).json({ error: "Invalid device ID" });
         return;
     }
-    if (!await requestOwnsRegisteredPlayer(req.params.deviceId, req.headers.authorization)) {
+    if (!await requestOwnsRegisteredPlayer(req.params.deviceId, req)) {
         res.status(403).json({ error: "Sign in to access the shop" });
         return;
     }
@@ -257,16 +259,16 @@ app.post("/players/:deviceId/customization/frame", async (req, res) => {
         return;
     }
     res.json(customization);
-});
+}));
 function isDeviceId(value) {
     return /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
-app.get("/players/:deviceId/daily-reward", async (req, res) => {
+app.get("/players/:deviceId/daily-reward", (0, httpSafety_1.asyncRoute)(async (req, res) => {
     if (!isDeviceId(req.params.deviceId)) {
         res.status(400).json({ error: "Invalid device ID" });
         return;
     }
-    if (!await requestCanAccessPlayerData(req.params.deviceId, req.headers.authorization)) {
+    if (!await requestCanAccessPlayerData(req.params.deviceId, req)) {
         res.status(403).json({ error: "Player data is private" });
         return;
     }
@@ -276,13 +278,13 @@ app.get("/players/:deviceId/daily-reward", async (req, res) => {
         return;
     }
     res.json(status);
-});
-app.post("/players/:deviceId/daily-reward/claim", rewardLimit, async (req, res) => {
+}));
+app.post("/players/:deviceId/daily-reward/claim", rewardLimit, (0, httpSafety_1.asyncRoute)(async (req, res) => {
     if (!isDeviceId(req.params.deviceId)) {
         res.status(400).json({ error: "Invalid device ID" });
         return;
     }
-    const identity = await (0, auth_1.verifySupabaseIdentity)(req.headers.authorization);
+    const identity = await (0, auth_1.requestIdentity)(req);
     if (!await (0, database_2.canPlayerEnterGame)(req.params.deviceId, identity?.userId ?? null)) {
         res.status(403).json({ error: "This account cannot claim rewards" });
         return;
@@ -294,14 +296,14 @@ app.post("/players/:deviceId/daily-reward/claim", rewardLimit, async (req, res) 
         return;
     }
     res.json(status);
-});
-app.get("/ranked/leaderboard", async (req, res) => {
+}));
+app.get("/ranked/leaderboard", (0, httpSafety_1.asyncRoute)(async (req, res) => {
     const deviceId = typeof req.query.deviceId === "string" ? req.query.deviceId : "";
     if (!isDeviceId(deviceId)) {
         res.status(400).json({ error: "Invalid device ID" });
         return;
     }
-    if (!await requestOwnsRegisteredPlayer(deviceId, req.headers.authorization)) {
+    if (!await requestOwnsRegisteredPlayer(deviceId, req)) {
         res.status(403).json({ error: "Sign in to access Ranked" });
         return;
     }
@@ -311,10 +313,10 @@ app.get("/ranked/leaderboard", async (req, res) => {
         return;
     }
     res.json(leaderboard);
-});
-app.get("/friends", async (req, res) => {
+}));
+app.get("/friends", (0, httpSafety_1.asyncRoute)(async (req, res) => {
     const playerId = typeof req.query.playerId === "string" ? req.query.playerId : "";
-    if (!isDeviceId(playerId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
+    if (!isDeviceId(playerId) || !await requestOwnsRegisteredPlayer(playerId, req)) {
         res.status(403).json({ error: "Sign in to access Friends" });
         return;
     }
@@ -324,11 +326,11 @@ app.get("/friends", async (req, res) => {
         return;
     }
     res.json(friends);
-});
-app.get("/friends/search", async (req, res) => {
+}));
+app.get("/friends/search", (0, httpSafety_1.asyncRoute)(async (req, res) => {
     const playerId = typeof req.query.playerId === "string" ? req.query.playerId : "";
     const query = typeof req.query.query === "string" ? req.query.query.trim().slice(0, 20) : "";
-    if (!isDeviceId(playerId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
+    if (!isDeviceId(playerId) || !await requestOwnsRegisteredPlayer(playerId, req)) {
         res.status(403).json({ error: "Sign in to access Friends" });
         return;
     }
@@ -342,10 +344,10 @@ app.get("/friends/search", async (req, res) => {
         return;
     }
     res.json(results);
-});
-app.get("/friends/suggestions", async (req, res) => {
+}));
+app.get("/friends/suggestions", (0, httpSafety_1.asyncRoute)(async (req, res) => {
     const playerId = typeof req.query.playerId === "string" ? req.query.playerId : "";
-    if (!isDeviceId(playerId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
+    if (!isDeviceId(playerId) || !await requestOwnsRegisteredPlayer(playerId, req)) {
         res.status(403).json({ error: "Sign in to access Friends" });
         return;
     }
@@ -355,62 +357,62 @@ app.get("/friends/suggestions", async (req, res) => {
         return;
     }
     res.json(results);
-});
-app.post("/friends/requests", friendRequestLimit, async (req, res) => {
+}));
+app.post("/friends/requests", friendRequestLimit, (0, httpSafety_1.asyncRoute)(async (req, res) => {
     const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
     const targetPlayerId = typeof req.body?.targetPlayerId === "string" ? req.body.targetPlayerId : "";
-    if (!isDeviceId(playerId) || !isDeviceId(targetPlayerId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
+    if (!isDeviceId(playerId) || !isDeviceId(targetPlayerId) || !await requestOwnsRegisteredPlayer(playerId, req)) {
         res.status(403).json({ error: "Sign in to access Friends" });
         return;
     }
     sendFriendActionResponse(res, await (0, database_2.sendFriendRequest)(playerId, targetPlayerId));
-});
-app.patch("/friends/requests/:friendshipId", socialActionLimit, async (req, res) => {
+}));
+app.patch("/friends/requests/:friendshipId", socialActionLimit, (0, httpSafety_1.asyncRoute)(async (req, res) => {
     const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
     const action = req.body?.action;
-    if (!isDeviceId(playerId) || !isDeviceId(req.params.friendshipId) || !["accept", "reject"].includes(action) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
+    if (!isDeviceId(playerId) || !isDeviceId(req.params.friendshipId) || !["accept", "reject"].includes(action) || !await requestOwnsRegisteredPlayer(playerId, req)) {
         res.status(403).json({ error: "Invalid friend request" });
         return;
     }
     sendFriendActionResponse(res, await (0, database_2.respondToFriendRequest)(playerId, req.params.friendshipId, action === "accept"));
-});
-app.patch("/friends/:friendshipId", socialActionLimit, async (req, res) => {
+}));
+app.patch("/friends/:friendshipId", socialActionLimit, (0, httpSafety_1.asyncRoute)(async (req, res) => {
     const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
     const action = req.body?.action;
-    if (!isDeviceId(playerId) || !isDeviceId(req.params.friendshipId) || !["remove", "block", "unblock"].includes(action) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
+    if (!isDeviceId(playerId) || !isDeviceId(req.params.friendshipId) || !["remove", "block", "unblock"].includes(action) || !await requestOwnsRegisteredPlayer(playerId, req)) {
         res.status(403).json({ error: "Invalid friendship action" });
         return;
     }
     sendFriendActionResponse(res, await (0, database_2.updateFriendRelationship)(playerId, req.params.friendshipId, action));
-});
-app.post("/friends/:friendshipId/gifts", socialActionLimit, async (req, res) => {
+}));
+app.post("/friends/:friendshipId/gifts", socialActionLimit, (0, httpSafety_1.asyncRoute)(async (req, res) => {
     const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
-    if (!isDeviceId(playerId) || !isDeviceId(req.params.friendshipId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
+    if (!isDeviceId(playerId) || !isDeviceId(req.params.friendshipId) || !await requestOwnsRegisteredPlayer(playerId, req)) {
         res.status(403).json({ error: "Invalid gift action" });
         return;
     }
     sendFriendActionResponse(res, await (0, database_2.sendFriendGift)(playerId, req.params.friendshipId));
-});
-app.post("/friends/gifts/claim-all", socialActionLimit, async (req, res) => {
+}));
+app.post("/friends/gifts/claim-all", socialActionLimit, (0, httpSafety_1.asyncRoute)(async (req, res) => {
     const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
-    if (!isDeviceId(playerId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
+    if (!isDeviceId(playerId) || !await requestOwnsRegisteredPlayer(playerId, req)) {
         res.status(403).json({ error: "Invalid blessing claim" });
         return;
     }
     sendFriendActionResponse(res, await (0, database_2.claimAllFriendGifts)(playerId));
-});
-app.post("/friends/gifts/:giftId/claim", socialActionLimit, async (req, res) => {
+}));
+app.post("/friends/gifts/:giftId/claim", socialActionLimit, (0, httpSafety_1.asyncRoute)(async (req, res) => {
     const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
-    if (!isDeviceId(playerId) || !isDeviceId(req.params.giftId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
+    if (!isDeviceId(playerId) || !isDeviceId(req.params.giftId) || !await requestOwnsRegisteredPlayer(playerId, req)) {
         res.status(403).json({ error: "Invalid gift claim" });
         return;
     }
     sendFriendActionResponse(res, await (0, database_2.claimFriendGift)(playerId, req.params.giftId));
-});
-app.post("/presence", async (req, res) => {
+}));
+app.post("/presence", (0, httpSafety_1.asyncRoute)(async (req, res) => {
     const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
     const available = req.body?.available === true;
-    if (!isDeviceId(playerId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
+    if (!isDeviceId(playerId) || !await requestOwnsRegisteredPlayer(playerId, req)) {
         res.status(403).json({ error: "Invalid presence update" });
         return;
     }
@@ -419,10 +421,10 @@ app.post("/presence", async (req, res) => {
         return;
     }
     res.json({ ok: true });
-});
-app.get("/challenges", async (req, res) => {
+}));
+app.get("/challenges", (0, httpSafety_1.asyncRoute)(async (req, res) => {
     const playerId = typeof req.query.playerId === "string" ? req.query.playerId : "";
-    if (!isDeviceId(playerId) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
+    if (!isDeviceId(playerId) || !await requestOwnsRegisteredPlayer(playerId, req)) {
         res.status(403).json({ error: "Invalid challenge request" });
         return;
     }
@@ -432,26 +434,26 @@ app.get("/challenges", async (req, res) => {
         return;
     }
     res.json(challenges);
-});
-app.post("/challenges", challengeLimit, async (req, res) => {
+}));
+app.post("/challenges", challengeLimit, (0, httpSafety_1.asyncRoute)(async (req, res) => {
     const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
     const challengedId = typeof req.body?.challengedId === "string" ? req.body.challengedId : "";
     const damageWager = Number(req.body?.damageWager);
-    if (!isDeviceId(playerId) || !isDeviceId(challengedId) || !(0, shared_1.isDamageWager)(damageWager) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
+    if (!isDeviceId(playerId) || !isDeviceId(challengedId) || !(0, shared_1.isDamageWager)(damageWager) || !await requestOwnsRegisteredPlayer(playerId, req)) {
         res.status(403).json({ error: "Invalid challenge" });
         return;
     }
     sendFriendActionResponse(res, await (0, database_2.createPlayerChallenge)(playerId, challengedId, damageWager));
-});
-app.patch("/challenges/:challengeId", socialActionLimit, async (req, res) => {
+}));
+app.patch("/challenges/:challengeId", socialActionLimit, (0, httpSafety_1.asyncRoute)(async (req, res) => {
     const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
     const action = req.body?.action;
-    if (!isDeviceId(playerId) || !isDeviceId(req.params.challengeId) || !["accept", "decline"].includes(action) || !await requestOwnsRegisteredPlayer(playerId, req.headers.authorization)) {
+    if (!isDeviceId(playerId) || !isDeviceId(req.params.challengeId) || !["accept", "decline"].includes(action) || !await requestOwnsRegisteredPlayer(playerId, req)) {
         res.status(403).json({ error: "Invalid challenge response" });
         return;
     }
     sendFriendActionResponse(res, await (0, database_2.respondToPlayerChallenge)(playerId, req.params.challengeId, action === "accept"));
-});
+}));
 function sendFriendActionResponse(res, result) {
     if (!result.ok) {
         res.status(409).json({ error: result.error ?? "Action unavailable" });
@@ -459,14 +461,15 @@ function sendFriendActionResponse(res, result) {
     }
     res.json(result);
 }
-async function requestOwnsRegisteredPlayer(playerId, authorization) {
-    const identity = await (0, auth_1.verifySupabaseIdentity)(authorization);
+async function requestOwnsRegisteredPlayer(playerId, request) {
+    const identity = await (0, auth_1.requestIdentity)(request);
     return Boolean(identity && await (0, database_2.isAuthenticatedPlayer)(playerId, identity.userId));
 }
-async function requestCanAccessPlayerData(playerId, authorization) {
-    const identity = await (0, auth_1.verifySupabaseIdentity)(authorization);
+async function requestCanAccessPlayerData(playerId, request) {
+    const identity = await (0, auth_1.requestIdentity)(request);
     return (0, database_1.canAccessPlayerData)(playerId, identity?.userId ?? null);
 }
+app.use(httpSafety_1.httpErrorHandler);
 const httpServer = http_1.default.createServer(app);
 const gameServer = new colyseus_1.Server({
     transport: new ws_transport_1.WebSocketTransport({ server: httpServer }),

@@ -2,12 +2,23 @@ import React from "react";
 import { Pressable } from "../components/menuHaptics";
 import { ActivityIndicator, Linking, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { IMAGE_CREDITS } from "@confidence-trivia/shared";
+import kalamLicense from "../../assets/fonts/Kalam-license.json";
 import { useTranslation } from "react-i18next";
 import { ANDROID_COMPACT_MENU_UI_SCALE, BackIconButton, Screen, Title, BigButton, theme } from "../components/ui";
 import { redeemPromoCode, submitPlayerReport } from "../network/client";
 import { FeedbackKind } from "../components/FeedbackPopup";
 
 type SettingsSection = "sounds" | "haptics" | "language" | "accessibility" | "redeem" | "report" | "credits";
+
+function KalamCredits() {
+  const [expanded, setExpanded] = React.useState(false);
+  return <View>
+    <Text style={styles.toggleLabel}>Kalam typeface · Indian Type Foundry</Text>
+    <Text style={styles.redeemHint}>SIL Open Font License 1.1</Text>
+    <Pressable accessibilityRole="button" accessibilityState={{ expanded }} onPress={() => setExpanded(value => !value)}><Text style={styles.creditLink}>{expanded ? "Hide font license" : "Read font license"}</Text></Pressable>
+    {expanded ? <Text selectable style={styles.redeemHint}>{kalamLicense.license}</Text> : null}
+  </View>;
+}
 
 function SettingsToggle({ label, value, onChange }: { label: string; value: boolean; onChange: (value: boolean) => void }) {
   return (
@@ -162,6 +173,7 @@ export function SettingsScreen({
     switch (section) {
       case "credits":
         return <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingVertical: 8, gap: 16 }}>
+          <KalamCredits />
           <View><Text style={styles.toggleLabel}>Map Shapes</Text><Text style={styles.redeemHint}>Geography: Natural Earth, public domain.</Text><Pressable accessibilityRole="link" onPress={() => void Linking.openURL("https://www.naturalearthdata.com/about/terms-of-use/").catch(() => undefined)}><Text style={styles.creditLink}>Source and terms</Text></Pressable></View>
           <View><Text style={styles.toggleLabel}>Image Reveal illustrations</Text><Text style={styles.redeemHint}>Original code-drawn pyramid, owl and apple illustrations.</Text></View>
           {IMAGE_CREDITS.some(credit => credit.license === "owner-reviewed") ? <View><Text style={styles.toggleLabel}>Unsplash photos</Text><Text style={styles.redeemHint}>{IMAGE_CREDITS.filter(credit => credit.license === "owner-reviewed").length} photographs supplied by the game owner.</Text></View> : null}

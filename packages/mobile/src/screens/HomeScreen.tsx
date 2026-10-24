@@ -2,11 +2,12 @@ import React from "react";
 import { Pressable } from "../components/menuHaptics";
 import { Animated, Image, Platform, StyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
-import { Ionicons } from "@expo/vector-icons";
+import { HomeModeCards } from "../components/HomeModeCards";
+import { HomeForeground } from "../components/HomeScenery";
+import { HomeControlBackdrop } from "../components/HomeControlBackdrop";
 import { ANDROID_MENU_UI_SCALE, Screen } from "../components/ui";
 import { PointsIcon } from "../components/PointsIcon";
 import { getPlayerCustomization } from "../network/client";
-import { playSound } from "../audio/sounds";
 
 const DAILY_REWARD_PLATFORM_IMAGE: number = require("../../assets/popup-platform.png");
 const DAILY_REWARD_PRESENT_IMAGE: number = require("../../assets/stars-gift.png");
@@ -35,26 +36,6 @@ function NotificationBadge({ count }: { count: number }) {
   return <View pointerEvents="none" style={styles.notificationBadge}><Text style={styles.notificationBadgeText}>{count > 99 ? "99+" : count}</Text></View>;
 }
 
-function HomeActionButton({ label, icon, secondary, onPress }: { label: string; icon: keyof typeof Ionicons.glyphMap; secondary?: boolean; onPress: () => void }) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      onPress={() => { playSound("button"); onPress(); }}
-      style={({ pressed }) => [styles.homeActionButton, secondary ? styles.homeActionButtonSecondary : styles.homeActionButtonPrimary, pressed && styles.homeActionButtonPressed]}
-    >
-      <View style={[styles.homeActionAccent, secondary && styles.homeActionAccentSecondary]} />
-      <View style={styles.homeActionContent}>
-        <Ionicons name={icon} size={31} color={secondary ? "#B6A9E8" : "#D0C4F5"} style={styles.homeActionIcon} />
-        <Text maxFontSizeMultiplier={1.25} numberOfLines={1} style={styles.homeActionLabel}>{label}</Text>
-        <View style={[styles.homeActionArrow, secondary && styles.homeActionArrowSecondary]}>
-          <Ionicons name="chevron-forward" size={19} color="#FFFFFF" />
-        </View>
-      </View>
-    </Pressable>
-  );
-}
-
 function HomePopup({ label, amount, streakLabel, claimed, claimedLabel, countdown, platformImage, featureImage, disabled, onPress }: {
   label: string;
   amount: number;
@@ -75,6 +56,7 @@ function HomePopup({ label, amount, streakLabel, claimed, claimedLabel, countdow
       onPress={onPress}
       style={({ pressed }) => [styles.popup, disabled && !claimed && styles.popupDisabled, pressed && !disabled && styles.popupPressed]}
     >
+      <HomeControlBackdrop />
       <View style={styles.popupArtwork}>
         {platformImage ? <Image source={platformImage} defaultSource={platformImage} fadeDuration={0} resizeMode="contain" style={[styles.popupPlatformImage, claimed && styles.popupPlatformClaimed]} /> : null}
         {featureImage ? (
@@ -212,7 +194,9 @@ export function HomeScreen({
     remainingSeconds % 60,
   ].map((value) => String(value).padStart(2, "0")).join(":");
   return (
-    <Screen androidScale={ANDROID_MENU_UI_SCALE * 1.21} androidOverflowScale={1.1}>
+    <Screen androidScale={ANDROID_MENU_UI_SCALE * 1.21} androidOverflowScale={1.1} fullBleedDecorations>
+      <HomeModeCards onCreate={onCreate} onJoin={onJoin} onEndless={onEndless} />
+      <HomeForeground />
       <View style={styles.popupRail}>
         {dailyReward ? (
           <HomePopup
@@ -240,6 +224,7 @@ export function HomeScreen({
           onPress={onRanked}
           style={({ pressed }) => [styles.popup, pressed && styles.popupPressed]}
         >
+          <HomeControlBackdrop />
           <View style={styles.popupArtwork}>
             <Image source={DAILY_REWARD_PLATFORM_IMAGE} defaultSource={DAILY_REWARD_PLATFORM_IMAGE} fadeDuration={0} resizeMode="contain" style={styles.popupPlatformImage} />
             <Image source={RANKED_TROPHY_IMAGE} defaultSource={RANKED_TROPHY_IMAGE} fadeDuration={0} resizeMode="contain" style={styles.rankedTrophyImage} />
@@ -247,18 +232,12 @@ export function HomeScreen({
           <Text numberOfLines={1} style={styles.popupLabel}>{t("ranked.shortTitle")}</Text>
         </Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel={t("shop.title")} onPress={onShop} style={({ pressed }) => [styles.popup, pressed && styles.popupPressed]}>
+          <HomeControlBackdrop />
           <View style={styles.popupArtwork}>
             <Image source={SHOP_IMAGE} defaultSource={SHOP_IMAGE} fadeDuration={0} resizeMode="contain" style={styles.shopFeatureImage} />
           </View>
           <Text numberOfLines={1} style={styles.popupLabel}>{t("shop.shortTitle")}</Text>
         </Pressable>
-      </View>
-      <View style={styles.mainActionsBlock}>
-        <View style={styles.actions}>
-          <HomeActionButton label={t("home.createGame")} icon="add-circle-outline" onPress={onCreate} />
-          <HomeActionButton label={t("home.joinGame")} icon="enter-outline" secondary onPress={onJoin} />
-          <HomeActionButton label="Endless" icon="infinite-outline" onPress={onEndless} />
-        </View>
       </View>
       <View pointerEvents="box-none" style={styles.homeMenuDock}>
         <Animated.View renderToHardwareTextureAndroid={isAndroid} pointerEvents={menuOpen ? "auto" : "none"} style={[styles.homeMenuItems, { opacity: menuProgress, transform: isAndroid
@@ -271,7 +250,14 @@ export function HomeScreen({
           <Pressable accessibilityRole="button" accessibilityLabel={t("home.profile")} onPress={() => openFromMenu(onProfile)} style={({ pressed }) => [styles.menuItemButton, pressed && styles.profileButtonPressed]}><Image source={avatarHead} defaultSource={avatarHead} fadeDuration={0} resizeMode="contain" style={styles.profileAvatar} /><Text numberOfLines={1} style={styles.profileLabel}>{t("home.profile")}</Text></Pressable>
         </Animated.View>
         <Pressable accessibilityRole="button" accessibilityLabel={t("home.menu")} accessibilityState={{ expanded: menuOpen }} onPress={toggleMenu} style={({ pressed }) => [styles.hamburgerButton, pressed && styles.profileButtonPressed]}>
-          <Animated.View style={isAndroid ? undefined : { transform: [{ rotate: menuProgress.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "90deg"] }) }] }}><Text style={styles.hamburgerIcon}>{menuOpen ? "×" : "☰"}</Text></Animated.View>
+          <Animated.View style={isAndroid ? undefined : { transform: [{ rotate: menuProgress.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "90deg"] }) }] }}>
+            <View style={styles.hamburgerGlyph}>
+              {menuOpen ? <>
+                <View style={[styles.hamburgerBar, styles.closeBar, { transform: [{ rotate: "45deg" }] }]} />
+                <View style={[styles.hamburgerBar, styles.closeBar, { transform: [{ rotate: "-45deg" }] }]} />
+              </> : [0, 1, 2].map(line => <View key={line} style={styles.hamburgerBar} />)}
+            </View>
+          </Animated.View>
           <NotificationBadge count={totalNotifications} />
         </Pressable>
       </View>
@@ -293,7 +279,7 @@ export function HomeScreen({
                   <View key={day} style={styles.rewardStage}>
                     <Text style={[styles.rewardDay, completed && styles.rewardDayCompleted, current && styles.rewardDayCurrent]}>{t("home.rewardDay", { count: day })}</Text>
                     <View style={[styles.rewardNode, completed && styles.rewardNodeCompleted, current && styles.rewardNodeCurrent]}>
-                      <PointsIcon size={current ? 27 : 22} color={current ? "#F7D85B" : completed ? "#B5A5FF" : "#777184"} />
+                      <PointsIcon size={current ? 35 : 29} color={current ? "#F7D85B" : completed ? "#B5A5FF" : "#777184"} />
                     </View>
                     <Text style={[styles.rewardAmount, completed && styles.rewardAmountCompleted, current && styles.rewardAmountCurrent]}>+{amount}</Text>
                   </View>
@@ -308,29 +294,13 @@ export function HomeScreen({
 }
 
 const styles = StyleSheet.create({
-  mainActionsBlock: Platform.OS === "android" ? { width: "100%", alignItems: "center", transform: [{ translateY: -24 }] } : { width: "100%", alignItems: "center" },
-  actions: {
-    width: "100%",
-    maxWidth: Platform.OS === "android" ? 510 : 480,
-    alignSelf: "center",
-    gap: 8,
-  },
-  homeActionButton: { width: "88%", height: Platform.OS === "android" ? 61 : 65, alignSelf: "center", overflow: "hidden", borderWidth: 2, borderRadius: 5, transform: [{ skewX: "-7deg" }], shadowColor: "#000000", shadowOpacity: 0.34, shadowRadius: 5, shadowOffset: { width: 0, height: 4 }, elevation: 6 },
-  homeActionButtonPrimary: { marginLeft: -25, backgroundColor: "#5039A0", borderColor: "#8975CC" },
-  homeActionButtonSecondary: { marginLeft: 25, backgroundColor: "#29233F", borderColor: "#6F6398" },
-  homeActionButtonPressed: { opacity: 0.72 },
-  homeActionAccent: { position: "absolute", left: 0, top: 0, bottom: 0, width: 9, backgroundColor: "#A996E5" },
-  homeActionAccentSecondary: { backgroundColor: "#746A98" },
-  homeActionContent: { flex: 1, paddingLeft: 22, paddingRight: 13, flexDirection: "row", alignItems: "center", transform: [{ skewX: "7deg" }] },
-  homeActionIcon: { width: 48 },
-  homeActionLabel: { flex: 1, color: "#FFFFFF", fontSize: Platform.OS === "android" ? 17 : 18, fontWeight: "900", textAlign: "center", textTransform: "uppercase" },
-  homeActionArrow: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(188,169,238,0.18)", borderWidth: 1, borderColor: "rgba(202,188,242,0.42)" },
-  homeActionArrowSecondary: { backgroundColor: "rgba(151,137,190,0.12)", borderColor: "rgba(177,163,216,0.3)" },
   homeMenuDock: { position: "absolute", right: Platform.OS === "android" ? 44 : 12, bottom: Platform.OS === "android" ? 26 : 12, width: Platform.OS === "android" ? 554 : 566, height: 44, alignItems: "flex-end", zIndex: 12 },
   homeMenuItems: { position: "absolute", right: Platform.OS === "android" ? 72 : 60, bottom: 0, width: Platform.OS === "android" ? 482 : 506, height: 44, flexDirection: "row", gap: 6 },
   menuItemButton: { minWidth: 106, width: Platform.OS === "android" ? 116 : 122, height: 44, paddingHorizontal: 10, borderRadius: 14, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, borderWidth: 2, borderColor: "#7C5CFF", backgroundColor: "rgba(42,25,72,0.97)" },
-  hamburgerButton: { width: 44, height: 44, borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#7C5CFF", backgroundColor: "rgba(12,9,23,0.96)" },
-  hamburgerIcon: { width: 32, color: "#B9AAFF", fontSize: 27, lineHeight: 30, fontWeight: "900", textAlign: "center", includeFontPadding: false },
+  hamburgerButton: { width: 44, height: 44, borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#B5A0EF", backgroundColor: "#1A142A", shadowColor: "#000000", shadowOpacity: 0.5, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 8 },
+  hamburgerGlyph: { width: 20, height: 17, justifyContent: "space-between" },
+  hamburgerBar: { width: 20, height: 2.5, borderRadius: 2, backgroundColor: "#FAF5FF" },
+  closeBar: { position: "absolute", top: 7.25 },
   menuItemIcon: { width: 32, height: 32 },
   notificationBadge: { position: "absolute", top: -7, right: -7, minWidth: 20, height: 20, paddingHorizontal: 5, borderRadius: 10, alignItems: "center", justifyContent: "center", backgroundColor: "#F04464", borderWidth: 2, borderColor: "#171025", zIndex: 20, elevation: 10 },
   notificationBadgeText: { color: "#FFFFFF", fontSize: 10, lineHeight: 12, fontWeight: "900", textAlign: "center" },
@@ -349,27 +319,27 @@ const styles = StyleSheet.create({
   popupStreakLabel: { position: "absolute", top: 0, zIndex: 2, color: "#FFFFFF", fontSize: 8, fontWeight: "900", textShadowColor: "#000000", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   popupCountdown: { position: "absolute", top: 24, zIndex: 2, color: "#FFFFFF", fontSize: 9, fontWeight: "900", textShadowColor: "#000000", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   popupFeatureFallback: { position: "absolute", width: 68, height: 68, bottom: 18, alignItems: "center", justifyContent: "center" },
-  popupLabel: { color: "#FFFFFF", fontSize: 9, fontWeight: "800", textAlign: "center", width: "100%" },
+  popupLabel: { color: "#FFFFFF", fontSize: 9, fontWeight: "800", textAlign: "center", width: "100%", textShadowColor: "rgba(0,0,0,0.7)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   popupAmount: { color: "#F7D85B", fontSize: 10, fontWeight: "900", textAlign: "center" },
-  popupTextClaimed: { color: "rgba(255, 255, 255, 0.68)" },
+  popupTextClaimed: { color: "rgba(255, 255, 255, 0.86)" },
   rankedTrophyImage: { position: "absolute", width: 55, height: 53, bottom: 9 },
   shopFeatureImage: { position: "absolute", width: 57, height: 57, bottom: 5 },
   celebrationBackdrop: { ...StyleSheet.absoluteFillObject, zIndex: 30, alignItems: "center", justifyContent: "center" },
-  celebrationPanel: { width: "78%", maxWidth: 620, minHeight: 204, borderRadius: 8, backgroundColor: "rgba(31, 26, 51, 0.98)", borderWidth: 1, borderColor: "rgba(181, 165, 255, 0.35)", paddingHorizontal: 28, paddingVertical: 18, alignItems: "center" },
-  celebrationClose: { position: "absolute", top: 8, right: 10, zIndex: 2, width: 30, height: 30, alignItems: "center", justifyContent: "center" },
-  celebrationCloseText: { color: "#B9B0D6", fontSize: 17, fontWeight: "900" },
-  celebrationTitle: { color: "#FFFFFF", fontSize: 20, fontWeight: "900" },
-  celebrationEarned: { color: "#F7D85B", fontSize: 16, fontWeight: "900", marginTop: 2 },
-  rewardTrack: { width: "100%", flexDirection: "row", justifyContent: "space-between", marginTop: 20, position: "relative" },
-  rewardTrackLine: { position: "absolute", left: "10%", right: "10%", top: 37, height: 3, backgroundColor: "rgba(124, 92, 255, 0.34)" },
+  celebrationPanel: { width: "90%", maxWidth: 760, minHeight: 250, borderRadius: 12, backgroundColor: "rgba(31, 26, 51, 0.98)", borderWidth: 1, borderColor: "rgba(181, 165, 255, 0.35)", paddingHorizontal: 32, paddingVertical: 22, alignItems: "center", justifyContent: "center" },
+  celebrationClose: { position: "absolute", top: 10, right: 12, zIndex: 2, width: 38, height: 38, alignItems: "center", justifyContent: "center" },
+  celebrationCloseText: { color: "#B9B0D6", fontSize: 22, fontWeight: "900" },
+  celebrationTitle: { color: "#FFFFFF", fontSize: 26, fontWeight: "900", maxWidth: "82%", textAlign: "center" },
+  celebrationEarned: { color: "#F7D85B", fontSize: 21, fontWeight: "900", marginTop: 3 },
+  rewardTrack: { width: "100%", flexDirection: "row", justifyContent: "space-between", marginTop: 24, position: "relative" },
+  rewardTrackLine: { position: "absolute", left: "10%", right: "10%", top: 50, height: 4, backgroundColor: "rgba(124, 92, 255, 0.34)" },
   rewardStage: { width: "18%", alignItems: "center", zIndex: 1 },
-  rewardDay: { color: "#777184", fontSize: 10, fontWeight: "800", marginBottom: 5 },
+  rewardDay: { color: "#777184", fontSize: 13, fontWeight: "800", marginBottom: 7 },
   rewardDayCompleted: { color: "#B5A5FF" },
   rewardDayCurrent: { color: "#F7D85B" },
-  rewardNode: { width: 42, height: 42, borderRadius: 21, alignItems: "center", justifyContent: "center", backgroundColor: "#292438", borderWidth: 2, borderColor: "#504A5E" },
+  rewardNode: { width: 54, height: 54, borderRadius: 27, alignItems: "center", justifyContent: "center", backgroundColor: "#292438", borderWidth: 2, borderColor: "#504A5E" },
   rewardNodeCompleted: { borderColor: "#7C5CFF", backgroundColor: "#342A59" },
-  rewardNodeCurrent: { width: 48, height: 48, borderRadius: 24, marginTop: -3, marginBottom: -3, borderColor: "#F7D85B", backgroundColor: "#3C3355" },
-  rewardAmount: { color: "#777184", fontSize: 11, fontWeight: "900", marginTop: 5 },
+  rewardNodeCurrent: { width: 62, height: 62, borderRadius: 31, marginTop: -4, marginBottom: -4, borderColor: "#F7D85B", backgroundColor: "#3C3355" },
+  rewardAmount: { color: "#777184", fontSize: 15, fontWeight: "900", marginTop: 7 },
   rewardAmountCompleted: { color: "#B5A5FF" },
   rewardAmountCurrent: { color: "#F7D85B" },
 });

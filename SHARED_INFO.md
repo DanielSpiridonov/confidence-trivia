@@ -38,6 +38,16 @@ checklist, use `PRE_PUBLISH_CHECKLIST.md`.
 
 ## Current state
 
+- Home menu redesign: three illustrated, editable SVG chalkboard cards (purple
+  Create, blue Join, orange Endless) replace the horizontal buttons. Existing
+  callbacks, side shortcuts and root HUD remain in place. Native transform
+  animations respect reduced motion. Kalam handwriting fonts and full OFL notice
+  are bundled; no new backend behavior or native module is required. See
+  `MAIN_MENU_REDESIGN.md` for structure and verification limits.
+  Home now layers the owner's purple wall and transparent books/owl/mug PNGs,
+  with purple/blue/orange card glows. The scenery spans the physical frame while
+  controls keep safe-area padding. Other screens retain their existing backdrop.
+
 - Map Shapes and Image Reveal are implemented locally. Presentation metadata
   reuses choice/written/exact-number answer types. Eleven verified sample
   questions use bundled Natural Earth silhouettes and original SVG illustrations.

@@ -29,8 +29,10 @@ exports.endlessRouter.use(async (req, res, next) => {
     res.set("X-Endless-Protocol", String(shared_1.ENDLESS_PROTOCOL_VERSION));
     try {
         const playerId = req.query.playerId;
-        const identity = await (0, auth_1.verifySupabaseIdentity)(req.headers.authorization);
-        if (!uuid(playerId) || !identity)
+        if (!uuid(playerId))
+            throw new endless_1.EndlessError(401, "Your session expired. Please sign in again.");
+        const identity = await (0, auth_1.requestIdentity)(req);
+        if (!identity)
             throw new endless_1.EndlessError(401, "Your session expired. Please sign in again.");
         // State/actions validate ownership and moderation under their transaction's
         // player lock. Only the read-only board needs a separate ownership query.

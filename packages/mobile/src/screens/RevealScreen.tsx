@@ -57,6 +57,7 @@ const PROJECTILE_BY_AVATAR: Record<string, ImageSourcePropType> = {
 
 export function RevealScreen({ room, state, active = true }: { room: Room; state: any; active?: boolean }) {
   const { t } = useTranslation();
+  const [timelineViewportWidth, setTimelineViewportWidth] = React.useState(0);
   if (!state) return null;
 
   const nameFor = (id: string) => `${state.players.get(id)?.name ?? "?"}${id === room.sessionId ? " (You)" : ""}`;
@@ -118,6 +119,7 @@ export function RevealScreen({ room, state, active = true }: { room: Room; state
         return distanceDifference || a.numericAnswer - b.numericAnswer;
       });
     const timelineWidth = Math.max(
+      timelineViewportWidth,
       Platform.OS === "android" ? 800 : 650,
       rankedGuesses.length * (Platform.OS === "android" ? 122 : 110) + 150,
     );
@@ -134,6 +136,7 @@ export function RevealScreen({ room, state, active = true }: { room: Room; state
         <ScrollView
           horizontal
           style={styles.timelineScroll}
+          onLayout={(event) => setTimelineViewportWidth(event.nativeEvent.layout.width)}
           contentContainerStyle={styles.timelineScrollContent}
           showsHorizontalScrollIndicator={rankedGuesses.length > 5}
         >

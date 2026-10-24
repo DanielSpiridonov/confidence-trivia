@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const database = require("../dist/database.js");
 const { GameRoom } = require("../dist/rooms/GameRoom.js");
+const { matchMaker } = require("colyseus");
 const { RoomStateSchema, PlayerSchema } = require("../dist/state/schema.js");
 
 // Exercise real room transitions with transport and storage replaced. Avoid
@@ -22,6 +23,7 @@ function roomFor(mode = "classic", count = 2) {
     persistFinalResults: async () => {}, broadcast: () => {},
   });
   room.state.gameMode = mode;
+  room.state.phaseEndsAt = Date.now() + 30_000;
   for (let index = 0; index < count; index += 1) {
     const player = new PlayerSchema();
     player.id = `p${index}`;
@@ -244,10 +246,96 @@ test("second player enters the queue before profile loading finishes", async (t)
   t.mock.method(database, "getPlayerCustomization", async () => null);
   let started = false;
   room.handleStartGame = async () => { started = true; };
-  await room.onJoin({ sessionId: "p1" }, { name: "Second", deviceId: "device1" });
+  await room.onJoin({ sessionId: "p1" }, { name: "Second", deviceId: "00000000-0000-4000-8000-000000000001" });
   assert.equal(room.state.players.size, 2);
   assert.equal(started, false);
   finishProfile(100);
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(started, true);
+});
+
+test("duplicate installations cannot occupy two seats, including UUID case variants", async () => {
+  const room = roomFor("classic", 0);
+  room.finishJoining = async () => {};
+  const deviceId = "abcdef00-0000-4000-8000-000000000001";
+  const joins = await Promise.allSettled([
+    room.onJoin({ sessionId: "first" }, { deviceId, name: "First" }),
+    room.onJoin({ sessionId: "second" }, { deviceId: deviceId.toUpperCase(), name: "Second" }),
+  ]);
+  assert.deepEqual(joins.map((join) => join.status), ["fulfilled", "rejected"]);
+  assert.equal(room.state.players.size, 1);
+});
+
+test("a player authenticated during the lobby cannot join after the game starts", async () => {
+  const room = roomFor();
+  room.state.gameStarted = true;
+  await assert.rejects(room.onJoin({ sessionId: "late" }, {
+    deviceId: "00000000-0000-4000-8000-000000000001", name: "Late",
+  }));
+  assert.equal(room.state.players.size, 2);
+});
+
+test("malformed confidence and side-bet messages do not throw", () => {
+  const room = roomFor();
+  room.roundAnswers.set("p0", { playerId: "p0", value: "answer", confidence: "none" });
+  for (const payload of [null, undefined, false, 1, [], {}]) {
+    room.state.phase = "confidence";
+    assert.doesNotThrow(() => room.handleSubmitConfidence(room.clients[0], payload));
+    room.state.phase = "board_sidebet";
+    assert.doesNotThrow(() => room.handleSubmitSideBet(room.clients[0], payload));
+  }
+  assert.equal(room.roundConfidenceDecisions.size, 0);
+  assert.equal(room.roundSideBets.size, 0);
+});
+
+test("drafts, confidence and side bets cannot be changed after their deadline", () => {
+  const room = roomFor();
+  room.state.phaseEndsAt = Date.now() - 1;
+  room.state.phase = "question";
+  room.state.currentQuestion.qType = "word";
+  room.handleSaveAnswerDraft(room.clients[0], { value: "late" });
+  room.roundAnswers.set("p0", { playerId: "p0", value: "answer", confidence: "none" });
+  room.state.phase = "confidence";
+  room.handleSubmitConfidence(room.clients[0], { value: 6 });
+  room.state.phase = "board_sidebet";
+  room.handleSubmitSideBet(room.clients[1], { targetId: "p0", prediction: "correct" });
+  room.handleSkipSideBet(room.clients[1]);
+  assert.equal(room.roundAnswerDrafts.size, 0);
+  assert.equal(room.roundAnswers.get("p0").confidence, "none");
+  assert.equal(room.roundSideBets.size, 0);
+  assert.equal(room.roundSideBetDecisions.size, 0);
+});
+
+test("solo Custom testing awards no completion Stars or recorded wins", async (t) => {
+  const room = roomFor("friends", 1);
+  room.setPhase = () => {};
+  room.beginGame();
+  assert.equal(room.practiceMatch, true);
+  t.mock.method(database, "saveCompletedMatch", () => assert.fail("practice must not persist rewards"));
+  await GameRoom.prototype.persistFinalResults.call(room);
+  assert.equal(room.resultsPersisted, true);
+});
+
+test("room creation bounds malicious counts before generating the question set", async () => {
+  await matchMaker.setup();
+  const room = roomFor("classic", 0);
+  Object.defineProperty(room, "roomId", { value: "123456", writable: true });
+  room.clock = { setInterval: () => {} };
+  room.setState = (state) => { room.state = state; };
+  room.onMessage = () => {};
+  await room.onCreate({ roundCount: 1_000_000_000, customQuestions: [null], excludeQuestionIds: {} });
+  assert.equal(room.state.totalRounds, 10);
+  assert.equal(room.questionSet.length, 10);
+});
+
+test("disposing a room cancels its phase timer and prevents scheduling more", async () => {
+  const room = roomFor();
+  let transitions = 0;
+  room.advancePhase = () => { transitions++; };
+  room.setPhase("question", 10);
+  room.onDispose();
+  room.setPhase("reveal", 10);
+  await new Promise((resolve) => setTimeout(resolve, 25));
+  assert.equal(transitions, 0);
+  assert.equal(room.state.phase, "question");
 });

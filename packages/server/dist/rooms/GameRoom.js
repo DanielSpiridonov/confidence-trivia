@@ -9,6 +9,7 @@ const questions_1 = require("../content/questions");
 const database_1 = require("../database");
 const auth_1 = require("../auth");
 const logging_1 = require("../logging");
+const options_1 = require("./options");
 const PLAYER_NAME_PATTERN = /^[\p{L}\p{N} ]+$/u;
 const DEVICE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 function isValidPlayerName(name) {
@@ -49,14 +50,22 @@ class GameRoom extends colyseus_1.Room {
         this.matchId = (0, crypto_1.randomUUID)();
         this.gameStartedAt = new Date();
         this.resultsPersisted = false;
+        this.practiceMatch = false;
         this.damageKnockout = false;
         this.damageWagerReserved = false;
         this.gameStartPending = false;
         this.lobbyWasPublic = false;
         this.hasCustomQuestions = false;
         this.visualReady = new Set();
+        this.disposed = false;
+    }
+    onDispose() {
+        this.disposed = true;
+        if (this.phaseTimeout)
+            clearTimeout(this.phaseTimeout);
     }
     async onCreate(options = {}) {
+        options = (0, options_1.normalizeCreateOptions)(options);
         // Use the public six-digit code as the actual Colyseus room id so
         // clients can continue joining directly through joinById().
         for (let attempt = 0; attempt < 20; attempt += 1) {
@@ -120,8 +129,12 @@ class GameRoom extends colyseus_1.Room {
         await this.setPrivate(isMatchmade ? false : !this.isPublic);
         await this.updateLobbyMetadata();
         this.onMessage("toggleReady", (client) => this.handleToggleReady(client));
-        this.onMessage("toggleRoomVisibility", (client) => void this.handleToggleRoomVisibility(client));
-        this.onMessage("startGame", (client) => void this.handleStartGame(client));
+        this.onMessage("toggleRoomVisibility", (client) => void this.handleToggleRoomVisibility(client).catch((error) => (0, logging_1.logServerError)("Could not update room visibility", error)));
+        this.onMessage("startGame", (client) => void this.handleStartGame(client).catch((error) => {
+            this.gameStartPending = false;
+            client.send("gameStartError", { code: "temporarily_unavailable" });
+            (0, logging_1.logServerError)("Could not start game", error);
+        }));
         this.onMessage("submitAnswer", (client, msg) => this.handleSubmitAnswer(client, msg));
         this.onMessage("visualReady", (client, msg) => this.handleVisualReady(client, msg));
         this.onMessage("saveAnswerDraft", (client, msg) => this.handleSaveAnswerDraft(client, msg));
@@ -130,12 +143,14 @@ class GameRoom extends colyseus_1.Room {
         this.onMessage("skipSideBet", (client) => this.handleSkipSideBet(client));
     }
     async onAuth(client, options = {}) {
+        if (!options || typeof options !== "object")
+            return false;
         // Reconnecting players use Colyseus' reconnection flow and do not pass
         // through this admission path. New players may only enter the lobby.
         const basicAdmissionAllowed = !this.state.gameStarted
             && isValidPlayerName(options.name)
             && isValidDeviceId(options.deviceId)
-            && ![...this.deviceIds.values()].includes(options.deviceId);
+            && ![...this.deviceIds.values()].includes(options.deviceId.toLowerCase());
         if (!basicAdmissionAllowed)
             return false;
         const identity = options.accessToken
@@ -159,11 +174,18 @@ class GameRoom extends colyseus_1.Room {
         return Boolean(identity && await (0, database_1.isAuthenticatedPlayer)(options.deviceId, identity.userId));
     }
     async onJoin(client, options = {}) {
+        // Admission performs asynchronous authentication. Recheck synchronously so
+        // concurrent sockets for one installation cannot occupy multiple seats.
+        if (this.state.gameStarted || !isValidDeviceId(options.deviceId)
+            || [...this.deviceIds.values()].includes(options.deviceId.toLowerCase())) {
+            this.challengeRoles.delete(client.sessionId);
+            throw new colyseus_1.ServerError(403, "This player cannot join the room");
+        }
         const player = new schema_1.PlayerSchema();
         player.id = client.sessionId;
         player.name = isValidPlayerName(options.name) ? options.name.trim() : "Player";
-        this.deviceIds.set(client.sessionId, options.deviceId ?? "");
-        const deviceId = options.deviceId ?? "";
+        const deviceId = options.deviceId.toLowerCase();
+        this.deviceIds.set(client.sessionId, deviceId);
         const challengeRole = this.challengeRoles.get(client.sessionId) ?? null;
         player.isHost = this.challengeId ? challengeRole === "challenger" : this.state.players.size === 0;
         player.health = 15;
@@ -371,8 +393,10 @@ class GameRoom extends colyseus_1.Room {
         this.beginGame();
     }
     beginGame() {
-        if (this.state.gameStarted || !this.hasEnoughPlayers())
+        if (this.disposed || this.state.gameStarted || !this.hasEnoughPlayers())
             return;
+        this.practiceMatch = this.state.gameMode === "friends"
+            && [...this.state.players.values()].filter((player) => player.connected).length === 1;
         this.lobbyWasPublic = this.isPublic;
         this.state.gameStarted = true;
         this.gameStartedAt = new Date();
@@ -496,6 +520,8 @@ class GameRoom extends colyseus_1.Room {
         this.presentCurrentQuestion();
     }
     setPhase(phase, durationMs) {
+        if (this.disposed)
+            return;
         this.state.phase = phase;
         this.state.phaseEndsAt = Date.now() + durationMs;
         if (this.phaseTimeout)
@@ -575,7 +601,8 @@ class GameRoom extends colyseus_1.Room {
         }
     }
     handleSaveAnswerDraft(client, msg) {
-        if (this.state.phase !== "question" || this.roundAnswers.has(client.sessionId))
+        if (this.state.phase !== "question" || Date.now() >= this.state.phaseEndsAt
+            || !this.state.players.has(client.sessionId) || this.roundAnswers.has(client.sessionId))
             return;
         const questionType = this.state.currentQuestion.qType;
         if (questionType === "ordering") {
@@ -613,7 +640,8 @@ class GameRoom extends colyseus_1.Room {
         }
     }
     handleSubmitConfidence(client, msg) {
-        if (this.state.phase !== "confidence")
+        if (this.state.phase !== "confidence" || Date.now() >= this.state.phaseEndsAt
+            || !this.state.players.has(client.sessionId))
             return;
         const isRevision = this.roundConfidenceDecisions.has(client.sessionId);
         if (isRevision && this.state.phaseEndsAt - Date.now() <= shared_1.CONFIDENCE_ALL_DECIDED_COUNTDOWN_MS)
@@ -621,7 +649,7 @@ class GameRoom extends colyseus_1.Room {
         const existing = this.roundAnswers.get(client.sessionId);
         if (!existing)
             return; // must have answered to set confidence
-        if (!["none", 1, 3, 5, 6].includes(msg.value))
+        if (!["none", 1, 3, 5, 6].includes(msg?.value))
             return;
         existing.confidence = msg.value;
         this.roundConfidenceDecisions.add(client.sessionId);
@@ -639,7 +667,8 @@ class GameRoom extends colyseus_1.Room {
         }
     }
     handleSubmitSideBet(client, msg) {
-        if (this.state.phase !== "board_sidebet")
+        if (this.state.phase !== "board_sidebet" || Date.now() >= this.state.phaseEndsAt
+            || !this.state.players.has(client.sessionId) || !msg)
             return;
         const isRevision = this.roundSideBetDecisions.has(client.sessionId);
         if (isRevision && this.state.phaseEndsAt - Date.now() <= shared_1.SIDEBET_ALL_DECIDED_COUNTDOWN_MS)
@@ -659,7 +688,8 @@ class GameRoom extends colyseus_1.Room {
         this.shortenSideBetPhaseIfEveryoneDecided();
     }
     handleSkipSideBet(client) {
-        if (this.state.phase !== "board_sidebet")
+        if (this.state.phase !== "board_sidebet" || Date.now() >= this.state.phaseEndsAt
+            || !this.state.players.has(client.sessionId))
             return;
         const isRevision = this.roundSideBetDecisions.has(client.sessionId);
         if (isRevision && this.state.phaseEndsAt - Date.now() <= shared_1.SIDEBET_ALL_DECIDED_COUNTDOWN_MS)
@@ -881,6 +911,9 @@ class GameRoom extends colyseus_1.Room {
         if (this.resultsPersisted)
             return;
         this.resultsPersisted = true;
+        // Temporary solo testing must not farm completion Stars or recorded wins.
+        if (this.practiceMatch)
+            return;
         const rankingValueFor = (player) => this.state.gameMode === "friends" && this.state.friendsTeamMode === "duos"
             ? [...this.state.players.values()].filter((teammate) => teammate.team === player.team).reduce((total, teammate) => total + teammate.score, 0)
             : this.state.gameMode === "damage" ? player.health : player.score;

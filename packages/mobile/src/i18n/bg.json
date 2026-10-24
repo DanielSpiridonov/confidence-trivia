@@ -1,5 +1,9 @@
 {
   "home": {
+    "endless": "Endless",
+    "createSubtitle": "Play with your friends",
+    "joinSubtitle": "Enter a code and play",
+    "endlessSubtitle": "How far can you go?",
     "title": "Confivia",
     "tagline": "Да знаеш отговора е само половината игра.",
     "createGame": "Създай игра",

@@ -10,11 +10,11 @@ const auth = require("../dist/auth.js");
 const db = require("../dist/database.js");
 const service = require("../dist/endless.js");
 const logging = require("../dist/logging.js");
-const originals = [auth.verifySupabaseIdentity, db.isAuthenticatedPlayer, service.endlessAction, service.endlessLeaderboard, logging.logServerError];
+const originals = [auth.requestIdentity, db.isAuthenticatedPlayer, service.endlessAction, service.endlessLeaderboard, logging.logServerError];
 const playerId = randomUUID(), userId = randomUUID();
 let server, url, lastAction, fail = false;
 before(async () => {
-  auth.verifySupabaseIdentity = async (header) => header === "Bearer valid" ? { userId } : null;
+  auth.requestIdentity = async (request) => request.headers.authorization === "Bearer valid" ? { userId } : null;
   db.isAuthenticatedPlayer = async (player, user) => player === playerId && user === userId;
   service.endlessAction = async (player, user, command) => { if (player !== playerId || user !== userId) throw new service.EndlessError(403, "This account cannot access Endless."); if (fail) throw new Error("private database detail"); lastAction = { player, user, command }; return { protocolVersion: ENDLESS_PROTOCOL_VERSION, run: null, personalBest: 0, claimed: [], stars: 0, serverNow: 123 }; };
   service.endlessLeaderboard = async () => ({ top: [], currentPlayer: null });
@@ -26,7 +26,7 @@ before(async () => {
 });
 after(async () => {
   if (server) await new Promise((resolve) => server.close(resolve));
-  [auth.verifySupabaseIdentity, db.isAuthenticatedPlayer, service.endlessAction, service.endlessLeaderboard, logging.logServerError] = originals;
+  [auth.requestIdentity, db.isAuthenticatedPlayer, service.endlessAction, service.endlessLeaderboard, logging.logServerError] = originals;
 });
 const request = (path = "state", options = {}, id = playerId) => fetch(`${url}/${path}?playerId=${id}`, { ...options, headers: { Authorization: "Bearer valid", "Content-Type": "application/json", ...options.headers } });
 
