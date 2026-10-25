@@ -1,8 +1,10 @@
+import { MenuPageHeading } from "../components/MenuPageHeading";
+import { FontAwesome5 } from "@expo/vector-icons";
 import React from "react";
 import { Pressable } from "../components/menuHaptics";
 import { FlatList, Image, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
-import { ANDROID_MENU_UI_SCALE, BackIconButton, Screen, Title, theme } from "../components/ui";
+import { ANDROID_MENU_UI_SCALE, BackIconButton, Screen, theme } from "../components/ui";
 import { PointsIcon } from "../components/PointsIcon";
 import { FRAME_COSMETIC_COLORS, getCosmeticStarPrice, NAME_COLOR_COSMETICS } from "@confidence-trivia/shared";
 import { equipAvatar, equipFrame, equipNameColor, getPlayerCustomization } from "../network/client";
@@ -241,7 +243,7 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
       </View>
       <BackIconButton label={t("common.back")} onPress={onBack} />
       <View style={styles.headerRow}>
-        <Title>{tab === "inventory" ? t("shop.tabs.inventory") : t("shop.title")}</Title>
+        <MenuPageHeading title={tab === "inventory" ? t("shop.tabs.inventory") : t("shop.title")} icon={tab === "inventory" ? "box-open" : "store"} accent={tab === "inventory" ? "#D4B0ED" : "#E4C18A"} />
       </View>
       <View style={styles.shopBody}>
         <View pointerEvents={tab === "inventory" ? "none" : "auto"} style={[styles.tabRail, Platform.OS === "ios" && styles.tabRailIos, tab === "inventory" && styles.tabRailHidden]}>
@@ -259,7 +261,7 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
           </Pressable>
         </View>
 
-        <View style={[styles.catalogue, Platform.OS === "ios" && styles.catalogueIosWide, tab !== "inventory" && styles.catalogueWithTabRail, tab !== "inventory" && Platform.OS === "ios" && styles.catalogueWithTabRailIos]}>
+        <View style={[styles.catalogue, tab === "inventory" && styles.inventoryCatalogue, Platform.OS === "ios" && styles.catalogueIosWide, tab !== "inventory" && styles.catalogueWithTabRail, tab !== "inventory" && Platform.OS === "ios" && styles.catalogueWithTabRailIos]}>
           <View style={styles.catalogueHeader}>
             <Text style={styles.sectionTitle}>{t(`shop.tabs.${tab}`)}</Text>
             <Text style={styles.previewBadge}>{tab === "inventory" ? t("shop.ownedItems") : tab === "frames" ? t("shop.playerBordersPreview") : t("shop.starPricedCosmetics")}</Text>
@@ -297,7 +299,7 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
           </View>
           {tab === "inventory" ? (
             <ScrollView style={styles.inventoryScroll} contentContainerStyle={styles.inventoryContent} showsVerticalScrollIndicator={false}>
-              <InventoryCategory title={t("shop.inventoryCategories.nameColors")}>
+              <InventoryCategory title={t("shop.inventoryCategories.nameColors")} icon="palette" accent="#E4C18A">
                 <View style={styles.inventoryItems}>
                   {NAME_COLOR_COSMETICS.filter((item) => ownedCosmeticIds.has(item.id)).map((item) => (
                     <Pressable key={item.id} onPress={() => void equipColor(item.id)} style={[styles.inventoryColorItem, item.id === equippedNameColorId && styles.inventoryItemEquipped]}>
@@ -308,7 +310,7 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
                   ))}
                 </View>
               </InventoryCategory>
-              <InventoryCategory title={t("shop.inventoryCategories.avatars")}>
+              <InventoryCategory title={t("shop.inventoryCategories.avatars")} icon="user-astronaut" accent="#A4C5E8">
                 <View style={styles.inventoryItems}>
                   {COSMETICS.avatars.filter((item) => ownedCosmeticIds.has(item.id) || item.id === "smart_owl").map((item) => (
                     <Pressable key={item.id} onPress={() => void equipPlayerAvatar(item.id)} style={[styles.inventoryCosmeticItem, item.id === equippedAvatarId && styles.inventoryItemEquipped]}>
@@ -319,7 +321,7 @@ export function ShopScreen({ deviceId, displayName, stars, onStarsChange, reques
                   ))}
                 </View>
               </InventoryCategory>
-              <InventoryCategory title={t("shop.inventoryCategories.frames")}>
+              <InventoryCategory title={t("shop.inventoryCategories.frames")} icon="crop-alt" accent="#D4B0ED">
                 <View style={styles.inventoryItems}>
                   {COSMETICS.frames.filter((item) => ownedCosmeticIds.has(item.id) || item.id === "").map((item) => (
                     <Pressable key={item.id || "no-frame"} onPress={() => void equipPlayerFrame(item.id)} style={[styles.inventoryCosmeticItem, item.id === equippedFrameId && styles.inventoryItemEquipped, item.id ? { borderColor: FRAME_COSMETIC_COLORS[item.id as keyof typeof FRAME_COSMETIC_COLORS] } : null]}>
@@ -350,11 +352,14 @@ function CosmeticStatus({ equipped, equipping, owned, price, locked }: { equippe
   return <View style={styles.priceRow}><PointsIcon size={14} /><Text style={styles.price}>{price ?? "—"}</Text></View>;
 }
 
-function InventoryCategory({ title, children }: { title: string; children: React.ReactNode }) {
-  return <View style={styles.inventoryCategory}><Text style={styles.inventoryCategoryTitle}>{title}</Text>{children}</View>;
+function InventoryCategory({ title, children, icon, accent }: { title: string; children: React.ReactNode; icon: React.ComponentProps<typeof FontAwesome5>["name"]; accent: string }) {
+  return <View style={styles.inventoryCategory}><View style={styles.inventoryCategoryHeading}><FontAwesome5 name={icon} size={13} color={accent} /><Text style={[styles.inventoryCategoryTitle, { color: accent }]}>{title}</Text><View style={[styles.inventoryCategoryRule, { backgroundColor: accent }]} /></View>{children}</View>;
 }
 
 const styles = StyleSheet.create({
+  inventoryCatalogue: { backgroundColor: "transparent", borderRadius: 0, paddingHorizontal: 4 },
+  inventoryCategoryHeading: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10 },
+  inventoryCategoryRule: { flex: 1, height: 1, opacity: 0.28 },
   avatarPreloader: { position: "absolute", left: 0, top: 0, width: 192, height: 192, opacity: 0.001, overflow: "hidden" },
   preloadedAvatar: { position: "absolute", width: 192, height: 192 },
   screen: { justifyContent: "flex-start", paddingTop: 10 },
@@ -403,15 +408,15 @@ const styles = StyleSheet.create({
   rankLocked: { color: "#FF72D2", fontSize: 7, fontWeight: "900", marginTop: 3, textTransform: "uppercase", textAlign: "center" },
   freeItem: { color: "#7CFFA0", fontSize: 10, fontWeight: "900", marginTop: 2, textTransform: "uppercase" },
   inventoryScroll: { flex: 1, minHeight: 0 },
-  inventoryContent: { paddingBottom: 6, gap: 9 },
-  inventoryCategory: { borderRadius: 10, backgroundColor: "rgba(15,12,27,0.62)", borderWidth: 1, borderColor: "rgba(185,176,214,0.16)", padding: 9 },
-  inventoryCategoryTitle: { color: theme.text, fontSize: 12, fontWeight: "900", marginBottom: 7 },
+    inventoryContent: { paddingBottom: 10, gap: 12 },
+    inventoryCategory: { paddingVertical: 8 },
+    inventoryCategoryTitle: { fontSize: 12, fontWeight: "900", textTransform: "uppercase", letterSpacing: 1 },
   inventoryItems: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
-  inventoryColorItem: { width: "31.5%", minHeight: 58, flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 5, backgroundColor: "rgba(31,26,51,0.84)", borderWidth: 1, borderColor: "transparent" },
-  inventoryCosmeticItem: { width: "31.5%", minHeight: 58, flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 4, backgroundColor: "rgba(31,26,51,0.84)", borderWidth: 1, borderColor: "transparent" },
+    inventoryColorItem: { width: "31.5%", minHeight: 62, flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 5, backgroundColor: "rgba(30,23,42,0.55)", borderWidth: 1, borderColor: "transparent" },
+    inventoryCosmeticItem: { width: "31.5%", minHeight: 68, flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 4, backgroundColor: "rgba(30,23,42,0.55)", borderWidth: 1, borderColor: "transparent" },
   inventoryAvatarImage: { width: 43, height: 43 },
   inventoryFrameIcon: { width: 30, fontSize: 25, fontWeight: "900", textAlign: "center" },
-  inventoryItemEquipped: { borderColor: "#7CFFA0", backgroundColor: "rgba(56,104,68,0.22)" },
+    inventoryItemEquipped: { borderColor: "#B68CD8", backgroundColor: "rgba(109,74,140,0.23)" },
   colorSwatch: { width: 21, height: 21, borderRadius: 11, borderWidth: 1, borderColor: "rgba(255,255,255,0.55)" },
   inventoryItemName: { flex: 1, minWidth: 0, color: theme.text, fontSize: 10, fontWeight: "900" },
   inventoryItemState: { color: theme.textDim, fontSize: 7, fontWeight: "900", textTransform: "uppercase" },

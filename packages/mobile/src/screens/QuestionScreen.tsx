@@ -33,6 +33,12 @@ export function QuestionScreen({ room, state }: { room: Room; state: any }) {
   lockedRef.current = locked;
   const cardSizesRef = React.useRef<Record<number, { width: number; height: number }>>({});
   const dragPosition = React.useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const cardResponders = React.useRef(new Map<number, ReturnType<typeof PanResponder.create>>());
+  const cardScales = React.useRef(new Map<number, number>());
+  const dragActions = React.useRef({ beginDrag, moveDrag, finishDrag });
+  const dragPreparation = React.useRef<Promise<void> | null>(null);
+  const dragDelta = React.useRef({ dx: 0, dy: 0 });
+  dragActions.current = { beginDrag, moveDrag, finishDrag };
 
   useEffect(() => () => {
     dragGenerationRef.current += 1;
@@ -135,6 +141,7 @@ export function QuestionScreen({ room, state }: { room: Room; state: any }) {
     dragOriginRef.current = { x: rect.x, y: rect.y, scale };
     setDraggingCardSize(size);
     dragPosition.setValue({ x: rect.x, y: rect.y });
+    moveDrag(dragDelta.current.dx, dragDelta.current.dy);
     setDraggingCardIndex(cardIndex);
   }
 
@@ -160,8 +167,10 @@ export function QuestionScreen({ room, state }: { room: Room; state: any }) {
   }
 
   async function finishDrag(cardIndex: number, dx: number, dy: number) {
-    const origin = dragOriginRef.current;
     const generation = dragGenerationRef.current;
+    await dragPreparation.current;
+    if (generation !== dragGenerationRef.current) return;
+    const origin = dragOriginRef.current;
     const size = cardSizesRef.current[cardIndex];
     const targetSlotIndex = origin && size && origin.scale > 0
       ? await findDropSlotIndex(origin.x + dx / origin.scale + size.width / 2, origin.y + dy / origin.scale + size.height / 2)
@@ -185,20 +194,27 @@ export function QuestionScreen({ room, state }: { room: Room; state: any }) {
   }
 
   function getCardPanResponder(cardIndex: number, scale: number) {
-    return PanResponder.create({
+    cardScales.current.set(cardIndex, scale);
+    const existing = cardResponders.current.get(cardIndex);
+    if (existing) return existing;
+    const responder = PanResponder.create({
       onStartShouldSetPanResponder: () => !lockedRef.current,
       onMoveShouldSetPanResponder: () => !lockedRef.current,
       onPanResponderGrant: () => {
-        void beginDrag(cardIndex, scale);
+        dragDelta.current = { dx: 0, dy: 0 };
+        dragPreparation.current = dragActions.current.beginDrag(cardIndex, cardScales.current.get(cardIndex) ?? 1);
       },
       onPanResponderMove: (_event, gestureState) => {
         if (draggingCardIndexRef.current !== cardIndex) return;
-        moveDrag(gestureState.dx, gestureState.dy);
+        dragDelta.current = { dx: gestureState.dx, dy: gestureState.dy };
+        dragActions.current.moveDrag(gestureState.dx, gestureState.dy);
       },
       onPanResponderRelease: (_event, gestureState) => {
         if (draggingCardIndexRef.current !== cardIndex) return;
-        void finishDrag(cardIndex, gestureState.dx, gestureState.dy);
+        void dragActions.current.finishDrag(cardIndex, gestureState.dx, gestureState.dy);
       },
+      onPanResponderTerminationRequest: () => false,
+      onShouldBlockNativeResponder: () => true,
       onPanResponderTerminate: () => {
         if (draggingCardIndexRef.current !== cardIndex) return;
         draggingCardIndexRef.current = null;
@@ -208,6 +224,8 @@ export function QuestionScreen({ room, state }: { room: Room; state: any }) {
         dragPosition.setValue({ x: 0, y: 0 });
       },
     });
+    cardResponders.current.set(cardIndex, responder);
+    return responder;
   }
 
   function renderOrderingCard(cardIndex: number, scale: number, location: "slot" | "bank", slotIndex?: number) {

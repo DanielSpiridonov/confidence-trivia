@@ -32,6 +32,7 @@ class PlayerSchema extends schema_1.Schema {
         this.damageStreak = 0;
         this.shieldPending = false;
         this.connected = true;
+        this.forfeited = false;
         this.ready = false;
         this.isHost = false;
         this.hasActedThisPhase = false; // for "waiting on X players" UI
@@ -99,6 +100,10 @@ __decorate([
     (0, schema_1.type)("boolean"),
     __metadata("design:type", Boolean)
 ], PlayerSchema.prototype, "connected", void 0);
+__decorate([
+    (0, schema_1.type)("boolean"),
+    __metadata("design:type", Boolean)
+], PlayerSchema.prototype, "forfeited", void 0);
 __decorate([
     (0, schema_1.type)("boolean"),
     __metadata("design:type", Boolean)

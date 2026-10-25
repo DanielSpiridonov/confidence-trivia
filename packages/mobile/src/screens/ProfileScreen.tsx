@@ -1,11 +1,12 @@
+import { MenuPageHeading } from "../components/MenuPageHeading";
 import React from "react";
 import { Pressable } from "../components/menuHaptics";
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, StyleSheet, Text, TextInput, View } from "react-native";
 import * as AppleAuthentication from "expo-apple-authentication";
 import { isOffensivePlayerName } from "@confidence-trivia/shared";
 import { useTranslation } from "react-i18next";
 import { AccountProfile } from "../network/client";
-import { ANDROID_MENU_UI_SCALE, BackIconButton, Screen, Title, theme } from "../components/ui";
+import { ANDROID_MENU_UI_SCALE, BackIconButton, Screen, theme } from "../components/ui";
 
 interface Props {
   displayName: string; registered: boolean; provider: string | null; profile: AccountProfile | null;
@@ -31,8 +32,8 @@ export function ProfileScreen(props: Props) {
 
   return <Screen style={s.screen} androidScale={ANDROID_MENU_UI_SCALE}>
     <BackIconButton label={t("common.back")} onPress={onBack} disabled={busy} />
-    <Title>{t("account.title")}</Title>
-    <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+    <MenuPageHeading title={t("account.title")} icon="user-edit" accent="#E4C18A" />
+    <View style={s.profileContent}>
       <View style={s.surface}>
         <View style={s.identityColumn}>
           <View style={s.identityHeader}>
@@ -110,7 +111,7 @@ export function ProfileScreen(props: Props) {
         </View>
         {busy ? <View style={s.loader} pointerEvents="none"><ActivityIndicator color={theme.primary} /></View> : null}
       </View>
-    </ScrollView>
+    </View>
   </Screen>;
 }
 
@@ -130,24 +131,24 @@ function ProviderButton({ label, linked, disabled, onPress }: { label: string; l
 }
 
 const s = StyleSheet.create({
-  screen: { justifyContent: "flex-start", paddingTop: 10 }, scroll: { flex: 1, width: "100%" },
-  scrollContent: { flexGrow: 1, justifyContent: "center", paddingHorizontal: 16, paddingVertical: 8 },
-  surface: { width: "92%", maxWidth: 820, minHeight: 224, alignSelf: "center", flexDirection: "row", borderRadius: 8, borderWidth: 1, borderColor: "rgba(185,176,214,.28)", backgroundColor: "rgba(31,26,51,.94)", overflow: "hidden" },
-  identityColumn: { width: "38%", padding: 16 }, detailsColumn: { flex: 1, justifyContent: "center", padding: 16 },
-  divider: { width: 1, marginVertical: 14, backgroundColor: "rgba(185,176,214,.2)" }, identityHeader: { flexDirection: "row", alignItems: "center" },
-  avatar: { width: 46, height: 46, borderRadius: 23, alignItems: "center", justifyContent: "center", backgroundColor: "#7C5CFF", borderWidth: 2, borderColor: "#B9AAFF" },
-  avatarText: { color: "#FFF", fontSize: 17, fontWeight: "900" }, identityText: { flex: 1, minWidth: 0, marginLeft: 10 },
-  name: { color: theme.text, fontSize: 20, fontWeight: "900" }, status: { color: "#9FE5B1", fontSize: 10, fontWeight: "800", marginTop: 2 },
+  screen: { justifyContent: "flex-start", paddingTop: 10 },
+  profileContent: { flex: 1, minHeight: 0, width: "100%", paddingVertical: 4 },
+    surface: { flex: 1, minHeight: 0, width: "100%", alignSelf: "center", flexDirection: "row" },
+    identityColumn: { width: "37%", padding: 16 }, detailsColumn: { flex: 1, justifyContent: "center", padding: 16 },
+  divider: { width: 1, marginVertical: 14, backgroundColor: "rgba(185,176,214,.2)" },   identityHeader: { alignItems: "flex-start", gap: 10 },
+    avatar: { width: 66, height: 66, borderRadius: 21, alignItems: "center", justifyContent: "center", backgroundColor: "#574535", transform: [{ rotate: "-4deg" }] },
+    avatarText: { color: "#F6DDAF", fontSize: 22, fontWeight: "900" },   identityText: { width: "100%", minWidth: 0 },
+    name: { color: "#F5EBDC", fontSize: 27, fontWeight: "900" }, status: { color: "#9FE5B1", fontSize: 10, fontWeight: "800", marginTop: 2 },
   badge: { alignSelf: "flex-start", color: "#CABFFF", fontSize: 9, fontWeight: "900", marginTop: 10, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, borderWidth: 1, borderColor: "rgba(155,131,255,.55)" },
   protectedBadge: { color: "#9FE5B1", borderColor: "rgba(124,255,160,.45)" }, emailBlock: { marginTop: 13 },
   eyebrow: { color: theme.textDim, fontSize: 9, fontWeight: "900", textTransform: "uppercase" }, email: { color: theme.text, fontSize: 11, fontWeight: "700", marginTop: 3 },
   guestIntro: { marginTop: 12 }, sectionTitle: { color: theme.text, fontSize: 15, fontWeight: "900" }, bodyText: { color: theme.textDim, fontSize: 10, lineHeight: 15, marginTop: 5 },
   moderationNotice: { marginTop: 9, padding: 8, borderRadius: 6, borderWidth: 1, borderColor: "#FF7587", backgroundColor: "rgba(255,117,135,.09)" }, moderationTitle: { color: "#FF9B9B", fontSize: 10, fontWeight: "900" }, moderationText: { color: theme.textDim, fontSize: 8, lineHeight: 11, marginTop: 2 },
-  editor: { flexDirection: "row", gap: 8, marginTop: 5 }, input: { flex: 1, minHeight: 36, borderRadius: 6, borderWidth: 1, borderColor: "#62558E", backgroundColor: "#171329", color: theme.text, paddingHorizontal: 10, paddingVertical: 5, fontSize: 12, fontWeight: "800" },
-  save: { minWidth: 70, alignItems: "center", justifyContent: "center", borderRadius: 6, backgroundColor: theme.primary }, buttonText: { color: "#FFF", fontSize: 12, fontWeight: "900" },
+  editor: { flexDirection: "row", gap: 8, marginTop: 5 },   input: { flex: 1, minHeight: 38, borderBottomWidth: 1, borderBottomColor: "#AC9373", color: theme.text, paddingHorizontal: 3, paddingVertical: 5, fontSize: 14, fontWeight: "800" },
+    save: { minWidth: 70, alignItems: "center", justifyContent: "center", borderRadius: 8, backgroundColor: "#74523B" }, buttonText: { color: "#FFF", fontSize: 12, fontWeight: "900" },
   error: { color: "#FF9B9B", fontSize: 9, marginTop: 4 }, nameChangeHint: { color: theme.textDim, fontSize: 8, marginTop: 4 }, stats: { minHeight: 58, flexDirection: "row", alignItems: "stretch", marginTop: 10, borderTopWidth: 1, borderBottomWidth: 1, borderColor: "rgba(185,176,214,.18)" },
   stat: { flex: 1, minWidth: 0, alignItems: "center", justifyContent: "center", borderRightWidth: 1, borderRightColor: "rgba(185,176,214,.18)", paddingHorizontal: 3 }, lastStat: { borderRightWidth: 0 },
-  statValue: { width: "100%", color: theme.text, fontSize: 14, fontWeight: "900", textAlign: "center" }, statLabel: { color: theme.textDim, fontSize: 8, fontWeight: "800", marginTop: 2 }, protectedText: { color: theme.textDim, fontSize: 9, textAlign: "center", marginTop: 8 },
+    statValue: { width: "100%", color: "#EDD6B2", fontSize: 19, fontWeight: "900", textAlign: "center" }, statLabel: { color: theme.textDim, fontSize: 8, fontWeight: "800", marginTop: 2 }, protectedText: { color: theme.textDim, fontSize: 9, textAlign: "center", marginTop: 8 },
   accountActions: { flexDirection: "row", gap: 7, marginTop: "auto" },
   accountAction: { flex: 1, minWidth: 0, alignItems: "center", justifyContent: "center", paddingHorizontal: 8, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: "#D96E79" },
   accountActionText: { width: "100%", color: "#FF9B9B", fontSize: 10, fontWeight: "900", textAlign: "center" },

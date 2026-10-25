@@ -1,3 +1,4 @@
+import { FontAwesome5 } from "@expo/vector-icons";
 import React from "react";
 import { Pressable } from "../components/menuHaptics";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -193,10 +194,10 @@ export function InboxScreen({
   return <View style={styles.overlay}>
     <Pressable accessibilityRole="button" accessibilityLabel={t("common.close")} onPress={onBack} style={StyleSheet.absoluteFillObject} />
     <View style={styles.panel}>
-      <View style={styles.header}><Text style={styles.title}>{t("inbox.title")}</Text><Pressable accessibilityRole="button" accessibilityLabel={t("common.close")} onPress={onBack} style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}><Text style={styles.closeText}>×</Text></Pressable></View>
+      <View style={styles.header}><View style={styles.headerTitle}><FontAwesome5 name="envelope-open-text" size={21} color="#E6C278" /><Text style={styles.title}>{t("inbox.title")}</Text></View><Pressable accessibilityRole="button" accessibilityLabel={t("common.close")} onPress={onBack} style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}><Text style={styles.closeText}>×</Text></Pressable></View>
       <View style={styles.body}>
         <View style={styles.tabs}>
-          {(["news", "challenges"] as const).map((tab) => <Pressable key={tab} accessibilityRole="tab" accessibilityLabel={t(`inbox.${tab}`)} accessibilityState={{ selected: category === tab }} onPress={() => { setCategory(tab); setError(null); }} style={({ pressed }) => [styles.tab, category === tab && styles.activeTab, pressed && styles.pressed]}><Text numberOfLines={1} style={[styles.tabText, category === tab && styles.activeTabText]}>{t(`inbox.${tab}`)}</Text>{tab === "challenges" && challenges.length > 0 ? <View style={styles.badge}><Text style={styles.badgeText}>{challenges.length}</Text></View> : null}</Pressable>)}
+          {(["news", "challenges"] as const).map((tab) => <Pressable key={tab} accessibilityRole="tab" accessibilityLabel={t(`inbox.${tab}`)} accessibilityState={{ selected: category === tab }} onPress={() => { setCategory(tab); setError(null); }} style={({ pressed }) => [styles.tab, category === tab && styles.activeTab, pressed && styles.pressed]}><FontAwesome5 name={tab === "news" ? "newspaper" : "bolt"} size={14} color={category === tab ? "#E9D5FA" : "#A18BB6"} /><Text numberOfLines={1} style={[styles.tabText, category === tab && styles.activeTabText]}>{t(`inbox.${tab}`)}</Text>{tab === "challenges" && challenges.length > 0 ? <View style={styles.badge}><Text style={styles.badgeText}>{challenges.length}</Text></View> : null}</Pressable>)}
         </View>
         <View style={styles.contentColumn}>
           <View style={styles.content}>
@@ -215,30 +216,31 @@ export function InboxScreen({
 }
 
 const styles = StyleSheet.create({
+  headerTitle: { flexDirection: "row", alignItems: "center", gap: 10 },
   overlay: { ...StyleSheet.absoluteFillObject, zIndex: 40, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(5,3,12,0.7)" },
-  panel: { width: "72%", maxWidth: 720, height: "76%", minHeight: 250, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 14, borderRadius: 18, backgroundColor: "rgba(31,26,51,0.98)", borderWidth: 2, borderColor: "rgba(185,176,214,0.38)" },
+    panel: { width: "82%", maxWidth: 850, height: "82%", minHeight: 250, paddingHorizontal: 22, paddingTop: 14, paddingBottom: 16, borderRadius: 14, backgroundColor: "#1C152A" },
   header: { minHeight: 42, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  title: { color: theme.text, fontSize: 22, fontWeight: "900" },
+    title: { color: "#F5EBDC", fontSize: 26, fontWeight: "900" },
   closeButton: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(124,92,255,0.24)" },
   closeText: { color: "#FFF", fontSize: 26, lineHeight: 28, fontWeight: "700" },
   body: { flex: 1, minHeight: 0, flexDirection: "row", gap: 12, paddingTop: 9, borderTopWidth: 1, borderTopColor: "rgba(185,176,214,0.3)" },
-  tabs: { width: 158, gap: 8, paddingRight: 12, borderRightWidth: 1, borderRightColor: "rgba(185,176,214,0.3)" },
-  tab: { width: "100%", minHeight: 42, paddingHorizontal: 12, borderRadius: 9, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 7, backgroundColor: "rgba(12,9,23,0.54)" },
-  activeTab: { backgroundColor: theme.primary },
-  tabText: { color: theme.textDim, fontSize: 12, fontWeight: "900" }, activeTabText: { color: "#FFF" },
+    tabs: { width: 158, gap: 5, paddingRight: 14, borderRightWidth: 1, borderRightColor: "#443151" },
+    tab: { width: "100%", minHeight: 44, paddingHorizontal: 8, flexDirection: "row", alignItems: "center", gap: 8, borderLeftWidth: 2, borderLeftColor: "transparent" },
+    activeTab: { borderLeftColor: "#E6C278", backgroundColor: "rgba(136,83,187,0.16)" },
+    tabText: { flex: 1, color: "#B19DC6", fontSize: 12, fontWeight: "900" }, activeTabText: { color: "#FFF" },
   badge: { minWidth: 19, height: 19, paddingHorizontal: 5, borderRadius: 10, alignItems: "center", justifyContent: "center", backgroundColor: "#FF5C7A" }, badgeText: { color: "#FFF", fontSize: 10, fontWeight: "900" },
   contentColumn: { flex: 1, minWidth: 0, minHeight: 0 }, content: { flex: 1, minWidth: 0, minHeight: 0, justifyContent: "center" }, list: { flex: 1, minHeight: 0 }, items: { gap: 10, paddingBottom: 8 },
-  item: { padding: 14, borderRadius: 12, backgroundColor: "rgba(12,9,23,0.72)", borderLeftWidth: 3, borderLeftColor: theme.primary },
+    item: { padding: 14, borderBottomWidth: 1, borderBottomColor: "#443151" },
   challengeItem: { paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10 }, challengeTitle: { fontSize: 14 }, challengeBody: { fontSize: 11, lineHeight: 15, marginTop: 3 },
   newsItem: { paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10 },
-  unreadItem: { backgroundColor: "rgba(71,45,130,0.55)", borderLeftColor: "#B9AAFF" },
+    unreadItem: { backgroundColor: "rgba(136,83,187,0.12)" },
   postHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
-  newsTitleRow: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 8 }, unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#B9AAFF" },
+  newsTitleRow: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 8 },   unreadDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#E6C278" },
   itemTitle: { flex: 1, color: theme.text, fontSize: 16, fontWeight: "900" }, newsTitle: { fontSize: 14 }, itemBody: { color: "#D8D1EA", fontSize: 12, lineHeight: 18, marginTop: 6 }, newsBody: { fontSize: 11, lineHeight: 15, marginTop: 4 }, date: { color: theme.textDim, fontSize: 10, fontWeight: "700" },
-  actions: { flexDirection: "row", justifyContent: "flex-end", gap: 8, marginTop: 12 }, actionButton: { minWidth: 86, paddingHorizontal: 13, paddingVertical: 8, borderRadius: 8, alignItems: "center", backgroundColor: theme.primary }, deleteButton: { backgroundColor: "rgba(112,103,135,0.8)" }, actionText: { color: "#FFF", fontSize: 11, fontWeight: "900" },
+  actions: { flexDirection: "row", justifyContent: "flex-end", gap: 8, marginTop: 12 },   actionButton: { minWidth: 86, paddingHorizontal: 13, paddingVertical: 8, borderRadius: 8, alignItems: "center", backgroundColor: "#503598" }, deleteButton: { backgroundColor: "rgba(112,103,135,0.8)" }, actionText: { color: "#FFF", fontSize: 11, fontWeight: "900" },
   challengeActions: { marginTop: 7 }, compactChallengeButton: { minWidth: 72, paddingVertical: 6 },
   newsActions: { flexDirection: "row", justifyContent: "flex-end", marginTop: 7 }, compactDeleteButton: { minWidth: 72, paddingVertical: 6 },
-  bulkActions: { minHeight: 44, paddingTop: 8, flexDirection: "row", justifyContent: "flex-end", alignItems: "flex-end", gap: 8, borderTopWidth: 1, borderTopColor: "rgba(185,176,214,0.2)" }, bulkButton: { minWidth: 96, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 9, alignItems: "center", backgroundColor: theme.primary }, deleteAllButton: { backgroundColor: "rgba(201,62,85,0.82)" }, bulkButtonText: { color: "#FFF", fontSize: 11, fontWeight: "900" }, disabled: { opacity: 0.4 },
+  bulkActions: { minHeight: 44, paddingTop: 8, flexDirection: "row", justifyContent: "flex-end", alignItems: "flex-end", gap: 8, borderTopWidth: 1, borderTopColor: "rgba(185,176,214,0.2)" },   bulkButton: { minWidth: 96, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 9, alignItems: "center", backgroundColor: "#503598" }, deleteAllButton: { backgroundColor: "rgba(201,62,85,0.82)" }, bulkButtonText: { color: "#FFF", fontSize: 11, fontWeight: "900" }, disabled: { opacity: 0.4 },
   center: { alignItems: "center", gap: 12 }, error: { color: "#FF9AA8", fontSize: 12, textAlign: "center" }, reload: { paddingHorizontal: 18, paddingVertical: 9, borderRadius: 9, backgroundColor: theme.primary }, reloadText: { color: "#FFF", fontWeight: "900" },
   empty: { color: theme.textDim, textAlign: "center", fontSize: 13, fontWeight: "700" }, pressed: { opacity: 0.7 },
 });

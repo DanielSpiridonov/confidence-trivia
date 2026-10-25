@@ -20,6 +20,7 @@ export class PlayerSchema extends Schema {
   @type("number") damageStreak: number = 0;
   @type("boolean") shieldPending: boolean = false;
   @type("boolean") connected: boolean = true;
+  @type("boolean") forfeited: boolean = false;
   @type("boolean") ready: boolean = false;
   @type("boolean") isHost: boolean = false;
   @type("boolean") hasActedThisPhase: boolean = false; // for "waiting on X players" UI

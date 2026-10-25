@@ -87,6 +87,9 @@
     "relationship": { "friend": "Приятел", "incoming": "Получена покана", "outgoing": "Изпратена покана", "blocked": "Недостъпен" }
   },
   "join": {
+    "inviteHint": "Имаш покана? Въведи шестцифрения код и се присъедини към приятелите си.",
+    "refresh": "Обнови публичните стаи",
+    "joinLobby": "Присъедини се към {{name}} · {{mode}}",
     "roomCode": "Код на стаята",
     "yourName": "Твоето име",
     "join": "Присъедини се",
@@ -151,6 +154,15 @@
     "literature": "Литература"
   },
   "lobby": {
+    "waitingForReady": "Изчакване всички играчи да са готови…",
+    "waitingRoom": "Чакалня",
+    "host": "Домакин",
+    "reconnecting": "Свързване…",
+    "inviteHint": "Сподели кода на стаята с приятелите си.",
+    "copyCode": "Копирай кода {{code}}",
+    "roundCount": "{{count}} рунда",
+    "hostCanStart": "Стаята е готова. Започни, когато всички са готови.",
+    "evenTeamsHint": "За отборите е нужен четен брой играчи.",
     "roomCode": "КОД НА СТАЯТА",
     "players": "Играчи",
     "team": "Отбор {{team}}",
@@ -241,6 +253,7 @@
     "result": "Резултат"
   },
   "leaderboard": {
+    "player": "Играч",
     "title": "Класиране"
   },
   "ranked": {
@@ -413,6 +426,11 @@
     }
   },
   "final": {
+    "standings": "Класиране",
+    "yourResult": "Твоят резултат",
+    "points": "Точки",
+    "playerCount": "{{count}} играчи",
+    "sharedFirst": "{{count}} на първо място",
     "title": "Финални резултати",
     "winner": "Победител",
     "draw": "Равенство",
@@ -426,6 +444,9 @@
     "backToHome": "Обратно към началото"
   },
   "settings": {
+    "audioAndFeel": "Звук и усещане",
+    "preferences": "Предпочитания",
+    "extrasAndSupport": "Екстри и помощ",
     "title": "Настройки",
     "profile": "Профил",
     "sounds": "Звуци",

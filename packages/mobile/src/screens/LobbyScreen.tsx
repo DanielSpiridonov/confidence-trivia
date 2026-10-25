@@ -1,11 +1,12 @@
 import { Pressable } from "../components/menuHaptics";
 import React, { useEffect, useRef, useState } from "react";
 import { View, Text, FlatList, Platform, StyleSheet } from "react-native";
+import { FontAwesome5 } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import { useTranslation } from "react-i18next";
 import { Room } from "colyseus.js";
 import { FRAME_COSMETIC_COLORS, MIN_PLAYERS_TO_START, RANKED_PLAYER_COUNT } from "@confidence-trivia/shared";
-import { ANDROID_GAME_UI_SCALE, Screen, Title, Subtitle, BigButton, theme } from "../components/ui";
+import { ANDROID_GAME_UI_SCALE, Screen, BigButton, theme } from "../components/ui";
 import { playSound } from "../audio/sounds";
 import { PlayerFrameEffect } from "../components/PlayerFrameEffect";
 import { MatchmakingQueueScreen } from "./MatchmakingQueueScreen";
@@ -33,6 +34,7 @@ export function LobbyScreen({ room, state, mySessionId }: { room: Room; state: a
   const startTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startInFlight = useRef(false);
   const mounted = useRef(true);
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const countdownSoundPlayed = useRef(false);
   const isStarting = state?.phase === "starting";
 
@@ -44,7 +46,7 @@ export function LobbyScreen({ room, state, mySessionId }: { room: Room; state: a
   }
   useEffect(() => {
     mounted.current = true;
-    return () => { mounted.current = false; if (startTimer.current) clearTimeout(startTimer.current); };
+    return () => { mounted.current = false; if (startTimer.current) clearTimeout(startTimer.current); if (copyTimer.current) clearTimeout(copyTimer.current); };
   }, []);
   useEffect(() => { if (isStarting) finishStartRequest(); }, [isStarting]);
 
@@ -53,6 +55,8 @@ export function LobbyScreen({ room, state, mySessionId }: { room: Room; state: a
       finishStartRequest();
       if (message.code === "insufficient_stars") {
         setStartError(t("lobby.insufficientWagerStars", { names: message.names?.join(", ") || "Player", stake: message.stake ?? 0 }));
+      } else if (message.code === "players_not_ready") {
+        setStartError(t("lobby.waitingForReady"));
       } else {
         setStartError(message.code === "not_enough_players" ? "This room does not have enough connected players to start." : "The game could not start. Please leave and create a new room.");
       }
@@ -108,7 +112,8 @@ export function LobbyScreen({ room, state, mySessionId }: { room: Room; state: a
   const isChallenge = Boolean(state.isChallenge);
   const isMatchmade = isRanked || (state.gameMode === "damage" && !isChallenge);
   const validFriendsTeamSize = state.gameMode !== "friends" || state.friendsTeamMode !== "duos" || (connectedPlayerCount >= 4 && connectedPlayerCount % 2 === 0);
-  const canStart = isHost && validFriendsTeamSize && (state.gameMode === "damage" || state.gameMode === "ranked" ? connectedPlayerCount === requiredPlayers : connectedPlayerCount >= requiredPlayers);
+  const everyoneReady = isMatchmade || players.every(player => !player.connected || player.isHost || player.ready);
+  const canStart = isHost && everyoneReady && validFriendsTeamSize && (state.gameMode === "damage" || state.gameMode === "ranked" ? connectedPlayerCount === requiredPlayers : connectedPlayerCount >= requiredPlayers);
 
   function handleStart() {
     if (!canStart || startInFlight.current) return;
@@ -127,9 +132,13 @@ export function LobbyScreen({ room, state, mySessionId }: { room: Room; state: a
   }
 
   async function handleCopyCode() {
-    await Clipboard.setStringAsync(String(state.code));
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    try {
+      await Clipboard.setStringAsync(String(state.code));
+      if (!mounted.current) return;
+      setCopied(true);
+      if (copyTimer.current) clearTimeout(copyTimer.current);
+      copyTimer.current = setTimeout(() => setCopied(false), 1500);
+    } catch { setCopied(false); }
   }
 
   if (isMatchmade) {
@@ -141,20 +150,36 @@ export function LobbyScreen({ room, state, mySessionId }: { room: Room; state: a
       <View style={styles.contentWrap}>
         <View style={styles.lobbyColumns}>
           <View style={styles.playersColumn}>
-            <Text style={styles.columnTitle}>{t("lobby.players")}</Text>
-            <FlatList style={styles.list} data={players} keyExtractor={(p) => p.id} contentContainerStyle={styles.listContent} nestedScrollEnabled showsVerticalScrollIndicator={players.length > 4} renderItem={({ item }) => (
-              <View style={[styles.playerRow, item.frameId ? { borderWidth: 2, borderColor: FRAME_COSMETIC_COLORS[item.frameId as keyof typeof FRAME_COSMETIC_COLORS] } : null]}>
+            <View style={styles.rosterHeader}>
+              <View><Text style={styles.rosterEyebrow}>{t("lobby.waitingRoom")}</Text><Text style={styles.columnTitle}>{t("lobby.players")}</Text></View>
+              <View style={styles.playerCountPill}><FontAwesome5 name="users" size={12} color="#CDB3E7" /><Text style={styles.playerCount}>{connectedPlayerCount}</Text></View>
+            </View>
+            <View style={styles.rosterDivider} />
+            <FlatList style={styles.list} data={players} keyExtractor={(p) => p.id} contentContainerStyle={styles.listContent} nestedScrollEnabled showsVerticalScrollIndicator persistentScrollbar renderItem={({ item, index }) => (
+              <View style={[styles.playerRow, item.id === mySessionId && styles.myPlayerRow, item.frameId ? { borderColor: FRAME_COSMETIC_COLORS[item.frameId as keyof typeof FRAME_COSMETIC_COLORS] } : null]}>
                 <PlayerFrameEffect frameId={item.frameId} />
-                <Text numberOfLines={1} style={[styles.playerName, { color: item.nameColor || theme.text }]}>{item.isHost ? "👑 " : ""}{item.name}{!item.connected ? " (reconnecting…)" : ""}</Text>
+                <View style={[styles.playerNumber, item.isHost && styles.hostNumber]}>{item.isHost ? <FontAwesome5 name="crown" size={13} color="#F7D887" /> : <Text style={styles.playerNumberText}>{String(index + 1).padStart(2, "0")}</Text>}</View>
+                <View style={styles.playerIdentity}>
+                  <View style={styles.playerNameLine}><Text numberOfLines={1} style={[styles.playerName, { color: item.nameColor || theme.text }]}>{item.name}</Text>{item.id === mySessionId ? <Text style={styles.youLabel}>{t("common.you")}</Text> : null}</View>
+                  {item.isHost ? <Text style={styles.hostLabel}>{t("lobby.host")}</Text> : null}
+                </View>
                 {item.team ? <Text style={[styles.teamBadge, item.team === "B" && styles.teamBadgeB]}>{t("lobby.team", { team: item.team })}</Text> : null}
-                <Text style={item.ready ? styles.readyBadge : styles.notReadyBadge}>{item.ready ? t("lobby.ready") : t("lobby.notReady")}</Text>
+                <View style={styles.playerStatus}><View style={[styles.statusDot, !item.connected ? styles.disconnectedDot : item.ready || item.isHost ? styles.readyDot : null]} /><Text numberOfLines={1} style={item.connected && (item.ready || item.isHost) ? styles.readyBadge : styles.notReadyBadge}>{!item.connected ? t("lobby.reconnecting") : item.isHost ? t("lobby.host") : item.ready ? t("lobby.ready") : t("lobby.notReady")}</Text></View>
               </View>
             )} />
+            {!isChallenge ? <View style={styles.rosterFooter}><FontAwesome5 name="user-plus" size={12} color="#A58CBF" /><Text style={styles.rosterHint}>{t("lobby.inviteHint")}</Text></View> : null}
           </View>
 
           <View style={styles.infoColumn}>
             <View style={styles.infoColumnContent}>
-            {isChallenge ? <View style={styles.rankedQueue}><Subtitle>{t("lobby.challengeLobby")}</Subtitle><Text style={styles.rankedCount}>{players.length}/{requiredPlayers}</Text><Text style={styles.copyHint}>{t("lobby.challengeManualStart")}</Text></View> : <><Subtitle>{t("lobby.roomCode")}</Subtitle><Pressable onPress={() => void handleCopyCode()} style={styles.codeWrap}><Title>{state.code}</Title><Text style={styles.copyHint}>{copied ? t("lobby.copied") : t("lobby.tapToCopy")}</Text></Pressable></>}
+            <View style={styles.roomDetails}><Text style={styles.modeLabel}>{isChallenge ? t("lobby.challengeLobby") : t(`create.${state.gameMode}`)}</Text>{state.gameMode !== "damage" ? <Text style={styles.roundsLabel}>{t("lobby.roundCount", { count: state.totalRounds })}{state.gameMode === "friends" && state.friendsTeamMode === "duos" ? " · " + t("create.duos") : ""}</Text> : null}</View>
+            {isChallenge ? <View style={styles.rankedQueue}><Text style={styles.rankedCount}>{connectedPlayerCount}/{requiredPlayers}</Text><Text style={styles.copyHint}>{t("lobby.challengeManualStart")}</Text></View> : <>
+              <Text style={styles.codeLabel}>{t("lobby.roomCode")}</Text>
+              <Pressable accessibilityRole="button" accessibilityLabel={t("lobby.copyCode", { code: state.code })} onPress={() => void handleCopyCode()} style={styles.codeWrap}>
+                <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} selectable={false} style={styles.roomCode}>{state.code}</Text>
+                <View style={styles.copyAction}><FontAwesome5 name={copied ? "check" : "copy"} size={12} color={copied ? "#9DE3BD" : "#C4A2E6"} /><Text style={styles.copyHint}>{copied ? t("lobby.copied") : t("lobby.tapToCopy")}</Text></View>
+              </Pressable>
+            </>}
             {state.gameMode === "damage" ? <View style={styles.wagerBanner}>
               <Text style={styles.wagerStake}>{t("lobby.wagerStake", { count: state.damageWager })}</Text>
               <Text style={styles.wagerPot}>{t("lobby.wagerPot", { count: state.damagePot })}</Text>
@@ -164,6 +189,7 @@ export function LobbyScreen({ room, state, mySessionId }: { room: Room; state: a
               <View style={[styles.visibilityTrack, state.isPublic && styles.visibilityTrackEnabled]}><View style={[styles.visibilityThumb, state.isPublic && styles.visibilityThumbEnabled]} /></View>
             </Pressable> : null}
             <View style={styles.actionArea}>
+              {!isStarting ? <Text style={styles.waitingHint}>{connectedPlayerCount < requiredPlayers ? t("lobby.waitingForPlayers", { count: requiredPlayers - connectedPlayerCount }) : !validFriendsTeamSize ? t("lobby.evenTeamsHint") : !everyoneReady ? t("lobby.waitingForReady") : isHost ? t("lobby.hostCanStart") : t("lobby.waitingForHost")}</Text> : null}
               {!isStarting && (isHost ? <BigButton label={startPending ? "Starting…" : t("lobby.start")} onPress={() => void handleStart()} disabled={!canStart || startPending} lobbyHaptic /> : <BigButton label={me?.ready ? t("lobby.notReady") : t("lobby.ready")} onPress={() => room.send("toggleReady")} variant="secondary" lobbyHaptic />)}
               {!isStarting && startError ? <Text style={styles.startError}>{startError}</Text> : null}
             </View>
@@ -191,7 +217,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   lobbyColumns: { flex: 1, minHeight: 0, width: "100%", flexDirection: "row", alignItems: "stretch", justifyContent: "space-between", gap: 24 },
-  playersColumn: { width: "52%", minWidth: 0, backgroundColor: "rgba(31, 26, 51, 0.55)", borderRadius: 14, padding: 12 },
+  playersColumn: { width: "58%", minWidth: 0, backgroundColor: "rgba(25,18,36,0.87)", borderRadius: 18, borderWidth: 1, borderColor: "#51405F", padding: 14 },
   infoColumn: { flex: 1, minWidth: 0, alignItems: "center", justifyContent: "center", paddingHorizontal: 10 },
   infoColumnContent: {
     width: Platform.OS === "android" ? "90.91%" : "100%",
@@ -200,19 +226,35 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     ...(Platform.OS === "android" ? { transform: [{ scale: 1.1 }] } : {}),
   },
-  columnTitle: { color: theme.text, fontSize: 18, fontWeight: "900", marginBottom: 9, textAlign: "center" },
-  codeWrap: {
-    alignSelf: "center",
-    width: "100%",
-    maxWidth: 360,
-  },
-  copyHint: {
-    color: theme.textDim,
-    textAlign: "center",
-    marginTop: -4,
-    marginBottom: 10,
-    fontSize: 13,
-  },
+  columnTitle: { color: "#F5EBDC", fontSize: 24, fontWeight: "900", marginTop: 2 },
+  roomDetails: { alignItems: "center", marginBottom: 13 },
+  modeLabel: { color: "#F5EBDC", fontSize: 26, fontWeight: "900", textAlign: "center" },
+  roundsLabel: { color: "#B6A2CA", fontSize: 11, fontWeight: "700", marginTop: 4 },
+  codeLabel: { color: "#AF95C9", fontSize: 9, letterSpacing: 1.7, fontWeight: "900", marginBottom: 6 },
+  codeWrap: { width: "100%", maxWidth: 310, paddingVertical: 12, paddingHorizontal: 12, borderRadius: 13, borderWidth: 1, borderStyle: "dashed", borderColor: "#9370B8", backgroundColor: "rgba(66,42,88,0.25)", alignItems: "center", marginBottom: 10 },
+  roomCode: { width: "100%", textAlign: "center", color: "#F6EAD5", fontSize: 37, lineHeight: 44, letterSpacing: 5, fontWeight: "900" },
+  copyAction: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
+  copyHint: { color: "#BBA3D2", textAlign: "center", fontSize: 10 },
+  rosterHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  rosterEyebrow: { color: "#AC93C5", fontSize: 9, letterSpacing: 1.3, fontWeight: "900", textTransform: "uppercase" },
+  playerCountPill: { flexDirection: "row", alignItems: "center", gap: 7, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, backgroundColor: "#382947" },
+  playerCount: { color: "#F0DFFB", fontSize: 14, fontWeight: "900" },
+  rosterDivider: { height: 1, backgroundColor: "#4A365B", marginTop: 10, marginBottom: 10 },
+  playerNumber: { width: 31, height: 31, borderRadius: 9, alignItems: "center", justifyContent: "center", backgroundColor: "#392C48" },
+  hostNumber: { backgroundColor: "#4D3A2C" },
+  playerNumberText: { color: "#BDA8D3", fontSize: 11, fontWeight: "900" },
+  playerIdentity: { flex: 1, minWidth: 0 },
+  playerNameLine: { flexDirection: "row", alignItems: "center", gap: 5 },
+  youLabel: { color: "#C5A0E6", fontSize: 9, fontWeight: "800" },
+  hostLabel: { color: "#D2B577", fontSize: 9, marginTop: 2 },
+  myPlayerRow: { borderColor: "#A075CB", backgroundColor: "#38264A" },
+  playerStatus: { flexDirection: "row", alignItems: "center", gap: 5, maxWidth: "30%" },
+  statusDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: "#8D7B9D" },
+  readyDot: { backgroundColor: "#94D6AC" },
+  disconnectedDot: { backgroundColor: "#E4B66B" },
+  rosterFooter: { flexDirection: "row", alignItems: "center", gap: 7, borderTopWidth: 1, borderTopColor: "#43324F", paddingTop: 9, marginTop: 5 },
+  rosterHint: { flex: 1, color: "#AF99C3", fontSize: 10 },
+  waitingHint: { color: "#C3AFD5", fontSize: 11, textAlign: "center", marginBottom: 6 },
   rankedQueue: { width: "100%", alignItems: "center" },
   rankedCount: { color: theme.text, fontSize: 42, fontWeight: "900", marginVertical: 8 },
   visibilityControl: {
@@ -243,7 +285,7 @@ const styles = StyleSheet.create({
   visibilityThumbEnabled: { alignSelf: "flex-end" },
   list: {
     flex: 1,
-    minHeight: Platform.OS === "android" ? 120 : 0,
+    minHeight: 0,
     width: "100%",
   },
   listContent: { paddingBottom: 4 },
@@ -284,15 +326,8 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 8,
   },
-  playerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    backgroundColor: theme.surface,
-    padding: 14,
-    borderRadius: 10,
-    marginBottom: 8,
-  },
-  playerName: { color: theme.text, fontSize: 16, fontWeight: "600", flex: 1, flexShrink: 1, paddingRight: 12 },
-  readyBadge: { color: "#7CFFA0", fontWeight: "700" },
-  notReadyBadge: { color: theme.textDim },
+  playerRow: { flexDirection: "row", alignItems: "center", gap: 9, backgroundColor: "#271F34", paddingHorizontal: 9, paddingVertical: 8, borderWidth: 1, borderColor: "#42324F", borderRadius: 10, marginBottom: 6, minHeight: 48, overflow: "hidden" },
+  playerName: { color: theme.text, fontSize: 13, fontWeight: "800", flexShrink: 1 },
+  readyBadge: { color: "#9BDDAD", fontSize: 10, fontWeight: "800", flexShrink: 1 },
+  notReadyBadge: { color: "#B4A3C4", fontSize: 10, flexShrink: 1 },
 });

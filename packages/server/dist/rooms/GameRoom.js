@@ -246,17 +246,8 @@ class GameRoom extends colyseus_1.Room {
         this.shortenConfidencePhaseIfEveryoneDecided();
         this.shortenSideBetPhaseIfEveryoneDecided();
         if (consented) {
-            if (this.state.gameMode === "damage" && this.state.gameStarted && !this.state.gameEnded) {
-                player.health = 0;
-                this.damageKnockout = true;
-                this.endGame();
-                void this.updateLobbyMetadata();
+            if (this.finishPlayerDeparture(player))
                 return;
-            }
-            if (this.state.gameMode === "ranked" && this.state.gameStarted) {
-                void this.updateLobbyMetadata();
-                return;
-            }
             const closesLobby = this.state.gameMode !== "ranked" && player.isHost && !this.state.gameStarted;
             this.deviceIds.delete(client.sessionId);
             this.state.players.delete(client.sessionId);
@@ -295,17 +286,8 @@ class GameRoom extends colyseus_1.Room {
         catch {
             if (this.state.gameEnded)
                 return;
-            if (this.state.gameMode === "damage" && this.state.gameStarted && !this.state.gameEnded) {
-                player.health = 0;
-                this.damageKnockout = true;
-                this.endGame();
-                void this.updateLobbyMetadata();
+            if (this.finishPlayerDeparture(player))
                 return;
-            }
-            if (this.state.gameMode === "ranked" && this.state.gameStarted) {
-                void this.updateLobbyMetadata();
-                return;
-            }
             this.deviceIds.delete(client.sessionId);
             this.state.players.delete(client.sessionId);
             this.reassignHostIfNeeded();
@@ -320,6 +302,26 @@ class GameRoom extends colyseus_1.Room {
             next.isHost = true;
             this.state.hostId = next.id;
         }
+    }
+    finishPlayerDeparture(player) {
+        if (!this.state.gameStarted || this.state.gameEnded)
+            return false;
+        player.forfeited = true;
+        if (this.state.gameMode === "damage") {
+            player.health = 0;
+            this.damageKnockout = true;
+            this.endGame();
+        }
+        else {
+            const remaining = [...this.state.players.values()].filter(candidate => !candidate.forfeited);
+            const emptyTeam = this.state.gameMode === "friends" && this.state.friendsTeamMode === "duos"
+                && ["A", "B"].some(team => !remaining.some(candidate => candidate.team === team));
+            if (remaining.length < shared_1.MIN_PLAYERS_TO_START || emptyTeam)
+                this.endGame();
+        }
+        // Keep departed seats and device IDs for authoritative final results.
+        void this.updateLobbyMetadata();
+        return true;
     }
     async updateLobbyMetadata() {
         const host = this.state.players.get(this.state.hostId);
@@ -338,7 +340,7 @@ class GameRoom extends colyseus_1.Room {
     // ---------------------------------------------------------------------
     handleToggleReady(client) {
         const player = this.state.players.get(client.sessionId);
-        if (!player || this.state.gameStarted)
+        if (!player || this.state.gameStarted || this.gameStartPending)
             return;
         player.ready = !player.ready;
     }
@@ -359,6 +361,10 @@ class GameRoom extends colyseus_1.Room {
             return;
         if (!this.hasEnoughPlayers()) {
             client.send("gameStartError", { code: "not_enough_players" });
+            return;
+        }
+        if (!this.playersReadyToStart()) {
+            client.send("gameStartError", { code: "players_not_ready" });
             return;
         }
         if (this.state.gameMode === "damage") {
@@ -383,7 +389,7 @@ class GameRoom extends colyseus_1.Room {
                     player.stars = balance;
             });
             this.damageWagerReserved = true;
-            if (!this.hasEnoughPlayers() || playerEntries.some(({ player }) => this.state.players.get(player.id) !== player)) {
+            if (!this.hasEnoughPlayers() || !this.playersReadyToStart() || playerEntries.some(({ player }) => this.state.players.get(player.id) !== player)) {
                 await this.refundStartingWager();
                 this.gameStartPending = false;
                 return;
@@ -393,7 +399,7 @@ class GameRoom extends colyseus_1.Room {
         this.beginGame();
     }
     beginGame() {
-        if (this.disposed || this.state.gameStarted || !this.hasEnoughPlayers())
+        if (this.disposed || this.state.gameStarted || !this.hasEnoughPlayers() || !this.playersReadyToStart())
             return;
         this.practiceMatch = this.state.gameMode === "friends"
             && [...this.state.players.values()].filter((player) => player.connected).length === 1;
@@ -405,6 +411,12 @@ class GameRoom extends colyseus_1.Room {
         void this.setPrivate(true);
         this.state.currentRoundIndex = -1;
         this.setPhase("starting", shared_1.GAME_START_COUNTDOWN_MS);
+    }
+    playersReadyToStart() {
+        // Matchmaking queues auto-start; hosted rooms require every guest's consent.
+        if (this.state.gameMode === "ranked" || (this.state.gameMode === "damage" && !this.state.isChallenge))
+            return true;
+        return [...this.state.players.values()].every(player => !player.connected || player.id === this.state.hostId || player.ready);
     }
     hasEnoughPlayers() {
         const count = [...this.state.players.values()].filter((player) => player.connected).length;
@@ -912,9 +924,13 @@ class GameRoom extends colyseus_1.Room {
         // Any solo practice session must not farm completion Stars or recorded wins.
         if (this.practiceMatch)
             return;
-        const rankingValueFor = (player) => this.state.gameMode === "friends" && this.state.friendsTeamMode === "duos"
-            ? [...this.state.players.values()].filter((teammate) => teammate.team === player.team).reduce((total, teammate) => total + teammate.score, 0)
-            : this.state.gameMode === "damage" ? player.health : player.score;
+        const rankingValueFor = (player) => {
+            if (this.state.gameMode === "friends" && this.state.friendsTeamMode === "duos") {
+                const members = [...this.state.players.values()].filter(teammate => teammate.team === player.team);
+                return members.every(member => member.forfeited) ? -Infinity : members.reduce((total, member) => total + member.score, 0);
+            }
+            return player.forfeited ? -Infinity : this.state.gameMode === "damage" ? player.health : player.score;
+        };
         const rankedPlayers = [...this.state.players.values()]
             .sort((left, right) => {
             if (this.state.gameMode === "ranked" && left.connected !== right.connected)

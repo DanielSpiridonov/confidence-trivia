@@ -13,7 +13,7 @@ export function visualImageSource(assetId: string): ImageSourcePropType | undefi
   const asset = VISUAL_ASSETS[assetId];
   if ("kind" in asset && asset.storagePath) {
     const uri = triviaImageUrl(process.env.EXPO_PUBLIC_SUPABASE_URL, asset.storagePath);
-    return uri ? { uri } : undefined;
+    return uri ? { uri, cache: "force-cache" } : undefined;
   }
   return VISUAL_IMAGE_SOURCES[assetId];
 }

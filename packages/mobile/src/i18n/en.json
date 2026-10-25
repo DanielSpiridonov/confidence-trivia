@@ -87,6 +87,9 @@
     "relationship": { "friend": "Friends", "incoming": "Request received", "outgoing": "Request sent", "blocked": "Unavailable" }
   },
   "join": {
+    "inviteHint": "Got an invite? Enter the six-digit code and meet your friends.",
+    "refresh": "Refresh public rooms",
+    "joinLobby": "Join {{name}} · {{mode}}",
     "roomCode": "Room Code",
     "yourName": "Your Name",
     "join": "Join",
@@ -151,6 +154,15 @@
     "literature": "Literature"
   },
   "lobby": {
+    "waitingForReady": "Waiting for all players to be ready…",
+    "waitingRoom": "Waiting room",
+    "host": "Host",
+    "reconnecting": "Reconnecting…",
+    "inviteHint": "Share the room code to bring your friends in.",
+    "copyCode": "Copy room code {{code}}",
+    "roundCount": "{{count}} rounds",
+    "hostCanStart": "Your room is ready. Start when everyone is set.",
+    "evenTeamsHint": "An even number of players is needed for teams.",
     "roomCode": "ROOM CODE",
     "players": "Players",
     "team": "Team {{team}}",
@@ -274,6 +286,7 @@
     "result": "Result"
   },
   "leaderboard": {
+    "player": "Player",
     "title": "Leaderboard"
   },
   "ranked": {
@@ -446,6 +459,11 @@
     }
   },
   "final": {
+    "standings": "Standings",
+    "yourResult": "Your result",
+    "points": "Points",
+    "playerCount": "{{count}} players",
+    "sharedFirst": "{{count}} tied for first",
     "title": "Final Results",
     "winner": "Winner",
     "draw": "Draw",
@@ -459,6 +477,9 @@
     "backToHome": "Back to Home"
   },
   "settings": {
+    "audioAndFeel": "Audio & feel",
+    "preferences": "Preferences",
+    "extrasAndSupport": "Extras & support",
     "title": "Settings",
     "profile": "Profile",
     "sounds": "Sounds",

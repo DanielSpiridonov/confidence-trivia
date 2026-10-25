@@ -276,7 +276,7 @@ export function HomeScreen({
                 const current = day === activeCelebration.streakDay;
                 const completed = day <= activeCelebration.streakDay;
                 return (
-                  <View key={day} style={styles.rewardStage}>
+                  <View key={day} style={[styles.rewardStage, current && styles.rewardStageCurrent]}>
                     <Text style={[styles.rewardDay, completed && styles.rewardDayCompleted, current && styles.rewardDayCurrent]}>{t("home.rewardDay", { count: day })}</Text>
                     <View style={[styles.rewardNode, completed && styles.rewardNodeCompleted, current && styles.rewardNodeCurrent]}>
                       <PointsIcon size={current ? 35 : 29} color={current ? "#F7D85B" : completed ? "#B5A5FF" : "#777184"} />
@@ -333,6 +333,7 @@ const styles = StyleSheet.create({
   rewardTrack: { width: "100%", flexDirection: "row", justifyContent: "space-between", marginTop: 24, position: "relative" },
   rewardTrackLine: { position: "absolute", left: "10%", right: "10%", top: 50, height: 4, backgroundColor: "rgba(124, 92, 255, 0.34)" },
   rewardStage: { width: "18%", alignItems: "center", zIndex: 1 },
+  rewardStageCurrent: { transform: [{ scale: 1.18 }], zIndex: 2 },
   rewardDay: { color: "#777184", fontSize: 13, fontWeight: "800", marginBottom: 7 },
   rewardDayCompleted: { color: "#B5A5FF" },
   rewardDayCurrent: { color: "#F7D85B" },

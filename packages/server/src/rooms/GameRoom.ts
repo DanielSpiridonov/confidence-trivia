@@ -270,17 +270,7 @@ export class GameRoom extends Room<RoomStateSchema> {
     this.shortenSideBetPhaseIfEveryoneDecided();
 
     if (consented) {
-      if (this.state.gameMode === "damage" && this.state.gameStarted && !this.state.gameEnded) {
-        player.health = 0;
-        this.damageKnockout = true;
-        this.endGame();
-        void this.updateLobbyMetadata();
-        return;
-      }
-      if (this.state.gameMode === "ranked" && this.state.gameStarted) {
-        void this.updateLobbyMetadata();
-        return;
-      }
+      if (this.finishPlayerDeparture(player)) return;
       const closesLobby = this.state.gameMode !== "ranked" && player.isHost && !this.state.gameStarted;
       this.deviceIds.delete(client.sessionId);
       this.state.players.delete(client.sessionId);
@@ -316,17 +306,7 @@ export class GameRoom extends Room<RoomStateSchema> {
       }
     } catch {
       if (this.state.gameEnded) return;
-      if (this.state.gameMode === "damage" && this.state.gameStarted && !this.state.gameEnded) {
-        player.health = 0;
-        this.damageKnockout = true;
-        this.endGame();
-        void this.updateLobbyMetadata();
-        return;
-      }
-      if (this.state.gameMode === "ranked" && this.state.gameStarted) {
-        void this.updateLobbyMetadata();
-        return;
-      }
+      if (this.finishPlayerDeparture(player)) return;
       this.deviceIds.delete(client.sessionId);
       this.state.players.delete(client.sessionId);
       this.reassignHostIfNeeded();
@@ -341,6 +321,24 @@ export class GameRoom extends Room<RoomStateSchema> {
       next.isHost = true;
       this.state.hostId = next.id;
     }
+  }
+
+  private finishPlayerDeparture(player: PlayerSchema) {
+    if (!this.state.gameStarted || this.state.gameEnded) return false;
+    player.forfeited = true;
+    if (this.state.gameMode === "damage") {
+      player.health = 0;
+      this.damageKnockout = true;
+      this.endGame();
+    } else {
+      const remaining = [...this.state.players.values()].filter(candidate => !candidate.forfeited);
+      const emptyTeam = this.state.gameMode === "friends" && this.state.friendsTeamMode === "duos"
+        && ["A", "B"].some(team => !remaining.some(candidate => candidate.team === team));
+      if (remaining.length < MIN_PLAYERS_TO_START || emptyTeam) this.endGame();
+    }
+    // Keep departed seats and device IDs for authoritative final results.
+    void this.updateLobbyMetadata();
+    return true;
   }
 
   private async updateLobbyMetadata() {
@@ -362,7 +360,7 @@ export class GameRoom extends Room<RoomStateSchema> {
 
   private handleToggleReady(client: Client) {
     const player = this.state.players.get(client.sessionId);
-    if (!player || this.state.gameStarted) return;
+    if (!player || this.state.gameStarted || this.gameStartPending) return;
     player.ready = !player.ready;
   }
 
@@ -380,6 +378,10 @@ export class GameRoom extends Room<RoomStateSchema> {
     if (this.state.gameStarted || this.gameStartPending) return;
     if (!this.hasEnoughPlayers()) {
       client.send("gameStartError", { code: "not_enough_players" });
+      return;
+    }
+    if (!this.playersReadyToStart()) {
+      client.send("gameStartError", { code: "players_not_ready" });
       return;
     }
     if (this.state.gameMode === "damage") {
@@ -403,7 +405,7 @@ export class GameRoom extends Room<RoomStateSchema> {
         if (balance !== undefined) player.stars = balance;
       });
       this.damageWagerReserved = true;
-      if (!this.hasEnoughPlayers() || playerEntries.some(({ player }) => this.state.players.get(player.id) !== player)) {
+      if (!this.hasEnoughPlayers() || !this.playersReadyToStart() || playerEntries.some(({ player }) => this.state.players.get(player.id) !== player)) {
         await this.refundStartingWager();
         this.gameStartPending = false;
         return;
@@ -414,7 +416,7 @@ export class GameRoom extends Room<RoomStateSchema> {
   }
 
   private beginGame() {
-    if (this.disposed || this.state.gameStarted || !this.hasEnoughPlayers()) return;
+    if (this.disposed || this.state.gameStarted || !this.hasEnoughPlayers() || !this.playersReadyToStart()) return;
     this.practiceMatch = this.state.gameMode === "friends"
       && [...this.state.players.values()].filter((player) => player.connected).length === 1;
     this.lobbyWasPublic = this.isPublic;
@@ -425,6 +427,12 @@ export class GameRoom extends Room<RoomStateSchema> {
     void this.setPrivate(true);
     this.state.currentRoundIndex = -1;
     this.setPhase("starting", GAME_START_COUNTDOWN_MS);
+  }
+
+  private playersReadyToStart() {
+    // Matchmaking queues auto-start; hosted rooms require every guest's consent.
+    if (this.state.gameMode === "ranked" || (this.state.gameMode === "damage" && !this.state.isChallenge)) return true;
+    return [...this.state.players.values()].every(player => !player.connected || player.id === this.state.hostId || player.ready);
   }
 
   private hasEnoughPlayers() {
@@ -923,9 +931,13 @@ export class GameRoom extends Room<RoomStateSchema> {
     // Any solo practice session must not farm completion Stars or recorded wins.
     if (this.practiceMatch) return;
 
-    const rankingValueFor = (player: PlayerSchema) => this.state.gameMode === "friends" && this.state.friendsTeamMode === "duos"
-      ? [...this.state.players.values()].filter((teammate) => teammate.team === player.team).reduce((total, teammate) => total + teammate.score, 0)
-      : this.state.gameMode === "damage" ? player.health : player.score;
+    const rankingValueFor = (player: PlayerSchema) => {
+      if (this.state.gameMode === "friends" && this.state.friendsTeamMode === "duos") {
+        const members = [...this.state.players.values()].filter(teammate => teammate.team === player.team);
+        return members.every(member => member.forfeited) ? -Infinity : members.reduce((total, member) => total + member.score, 0);
+      }
+      return player.forfeited ? -Infinity : this.state.gameMode === "damage" ? player.health : player.score;
+    };
     const rankedPlayers = [...this.state.players.values()]
       .sort((left, right) => {
         if (this.state.gameMode === "ranked" && left.connected !== right.connected) return left.connected ? -1 : 1;

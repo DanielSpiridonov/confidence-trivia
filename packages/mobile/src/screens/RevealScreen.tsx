@@ -11,49 +11,28 @@ import { VisualCanvas } from "../components/VisualQuestion";
 // These combat-sized assets avoid decoding and compositing the much larger
 // profile artwork during the reveal animation. This is especially important
 // on Android, where an attack can render several projectile layers at once.
-const DAMAGE_AVATARS: Record<string, ImageSourcePropType> = {
-  smart_owl: require("../../assets/combat-ios/smart-owl.png"),
-  clever_fox: require("../../assets/combat-ios/fox.png"),
-  quiz_bot: require("../../assets/combat-ios/quiz-bot.png"),
-  omniscient_avatar: require("../../assets/combat-ios/omniscient.png"),
-  trivia_wizard: require("../../assets/combat-ios/trivia-wizard.png"),
-  detective_avatar: require("../../assets/combat-ios/detective.png"),
-  living_globe: require("../../assets/combat-ios/globe.png"),
-};
-const DEFEATED_DAMAGE_AVATARS: Record<string, ImageSourcePropType> = {
-  smart_owl: require("../../assets/combat-ios-defeated/smart-owl.png"),
-  clever_fox: require("../../assets/combat-ios-defeated/fox.png"),
-  quiz_bot: require("../../assets/combat-ios-defeated/quiz-bot.png"),
-  omniscient_avatar: require("../../assets/combat-ios-defeated/omniscient.png"),
-  trivia_wizard: require("../../assets/combat-ios-defeated/trivia-wizard.png"),
-  detective_avatar: require("../../assets/combat-ios-defeated/detective.png"),
-  living_globe: require("../../assets/combat-ios-defeated/globe.png"),
-};
-const DAMAGE_AVATAR_PLACEHOLDERS: Record<string, number> = {
-  smart_owl: require("../../assets/avatar-thumbnails/smart-owl.png"),
-  clever_fox: require("../../assets/avatar-thumbnails/fox.png"),
-  quiz_bot: require("../../assets/avatar-thumbnails/quiz-bot.png"),
-  omniscient_avatar: require("../../assets/avatar-thumbnails/omniscient.png"),
-  trivia_wizard: require("../../assets/avatar-thumbnails/trivia-wizard.png"),
-  detective_avatar: require("../../assets/avatar-thumbnails/detective.png"),
-  living_globe: require("../../assets/avatar-thumbnails/globe.png"),
-};
-const QUIZ_BOT_CALCULATOR: ImageSourcePropType = require("../../assets/combat-ios/quiz-bot-calculator.png");
-const SMART_OWL_BOOK: ImageSourcePropType = require("../../assets/combat-ios/smart-owl-book.png");
-const FOX_LIGHTBULB: ImageSourcePropType = require("../../assets/combat-ios/fox-lightbulb.png");
-const OMNISCIENT_EYE: ImageSourcePropType = require("../../assets/combat-ios/omniscient-eye.png");
-const WIZARD_SPELL: ImageSourcePropType = require("../../assets/combat-ios/wizard-spell.png");
-const DETECTIVE_MAGNIFIER: ImageSourcePropType = require("../../assets/combat-ios/detective-magnifier.png");
-const GLOBE_EARTH: ImageSourcePropType = require("../../assets/combat-ios/globe-earth.png");
-const PROJECTILE_BY_AVATAR: Record<string, ImageSourcePropType> = {
-  quiz_bot: QUIZ_BOT_CALCULATOR,
-  smart_owl: SMART_OWL_BOOK,
-  clever_fox: FOX_LIGHTBULB,
-  omniscient_avatar: OMNISCIENT_EYE,
-  trivia_wizard: WIZARD_SPELL,
-  detective_avatar: DETECTIVE_MAGNIFIER,
-  living_globe: GLOBE_EARTH,
-};
+import { DAMAGE_AVATARS, DEFEATED_DAMAGE_AVATARS, DAMAGE_AVATAR_PLACEHOLDERS, PROJECTILE_BY_AVATAR } from "../components/combatAssets";
+
+function FighterImage({ source, placeholder, facingLeft }: { source: ImageSourcePropType; placeholder: number; facingLeft: boolean }) {
+  const [attempt, setAttempt] = React.useState(0);
+  const [failed, setFailed] = React.useState(false);
+  const [loaded, setLoaded] = React.useState(false);
+  const retry = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  React.useEffect(() => {
+    setAttempt(0);
+    setFailed(false);
+    setLoaded(false);
+    return () => { if (retry.current) clearTimeout(retry.current); };
+  }, [source]);
+  return <View style={[styles.damageAvatar, facingLeft && styles.damageAvatarFacingLeft]}>
+    {!loaded || failed ? <Image source={placeholder} fadeDuration={0} resizeMode="contain" style={styles.fighterImageContent} /> : null}
+    {!failed ? <Image key={attempt} source={source} fadeDuration={0} resizeMode="contain" style={styles.fighterImageContent} onLoad={() => setLoaded(true)} onError={() => {
+      setLoaded(false);
+      if (attempt >= 2) { setFailed(true); return; }
+      retry.current = setTimeout(() => setAttempt(value => value + 1), 1000 * (attempt + 1));
+    }} /> : null}
+  </View>;
+}
 
 export function RevealScreen({ room, state, active = true }: { room: Room; state: any; active?: boolean }) {
   const { t } = useTranslation();
@@ -94,7 +73,6 @@ export function RevealScreen({ room, state, active = true }: { room: Room; state
           <Text style={styles.damageCorrectAnswerLabel}>{t("reveal.correctAnswer")}</Text>
           <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={styles.damageCorrectAnswerText}>{state.correctAnswerText}</Text>
         </View>
-        {visual ? <View style={{ height: 95, width: 170, alignSelf: "center" }}>{visual}</View> : null}
         <View style={styles.damageBattleStage}>
           <DamageAvatarPane state={state} results={results} myPlayerId={room.sessionId} active={active} />
           {mutualCorrectDraw ? (
@@ -307,17 +285,12 @@ function DamageAvatarPane({ state, results, myPlayerId, active }: { state: any; 
           const defeated = defeatedPlayerIds.has(player.id);
           return (
             <DamageFighter key={player.id} isHit={isHit} defeated={defeated} fallDirection={index === 0 ? -1 : 1} deathDelay={0}>
-              <Image
+              <FighterImage
                 source={defeated
                   ? DEFEATED_DAMAGE_AVATARS[player.avatarId] ?? DEFEATED_DAMAGE_AVATARS.smart_owl
                   : DAMAGE_AVATARS[player.avatarId] ?? DAMAGE_AVATARS.smart_owl}
-                defaultSource={DAMAGE_AVATAR_PLACEHOLDERS[player.avatarId] ?? DAMAGE_AVATAR_PLACEHOLDERS.smart_owl}
-                fadeDuration={0}
-                resizeMode="contain"
-                style={[
-                  styles.damageAvatar,
-                  index === 1 && styles.damageAvatarFacingLeft,
-                ]}
+                placeholder={DAMAGE_AVATAR_PLACEHOLDERS[player.avatarId] ?? DAMAGE_AVATAR_PLACEHOLDERS.smart_owl}
+                facingLeft={index === 1}
               />
               {isHit && !defeated ? <Image source={DAMAGE_AVATARS[player.avatarId] ?? DAMAGE_AVATARS.smart_owl} resizeMode="contain" style={[styles.damageAvatarHitOverlay, index === 1 && styles.damageAvatarFacingLeft]} /> : null}
               {incomingDamage > 0 && isHit ? <DamageNumber amount={incomingDamage} /> : null}
@@ -451,6 +424,7 @@ const styles = StyleSheet.create({
   damageFighter: { width: "40%", height: "100%", alignItems: "center", justifyContent: "flex-end", overflow: "hidden" },
   damageFighterHit: { backgroundColor: "transparent" },
   damageAvatar: { width: "100%", height: "86%" },
+  fighterImageContent: { position: "absolute", left: 0, top: 0, width: "100%", height: "100%" },
   damageAvatarFacingLeft: { transform: [{ scaleX: -1 }] },
   damageAvatarHitOverlay: { position: "absolute", top: 0, width: "100%", height: "86%", tintColor: "#FF405F", opacity: 0.78, zIndex: 2 },
   damageTaken: { position: "absolute", top: "42%", color: "#FFFFFF", fontSize: 18, fontWeight: "900", textShadowColor: "#8F1028", textShadowRadius: 5, zIndex: 3 },

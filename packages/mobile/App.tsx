@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Animated, AppState, Image, InteractionManager, Keyboard, Linking, Platform, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
+import { Animated, AppState, Image, Keyboard, Linking, Platform, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { FontAwesome5 } from "@expo/vector-icons";
 import * as NavigationBar from "expo-navigation-bar";
@@ -41,6 +41,9 @@ import { pauseMusicForBackground, prepareMusic, setMusicVolume as applyMusicVolu
 import { createFreshGuestIdentity, getOrCreateDeviceId, getOrCreateGuestName } from "./src/utils/deviceId";
 import { authConfigured, getAppleDeletionAuthorizationCode, getLinkedProviders, getStoredSession, linkAppleIdentity, linkGoogleIdentity, signInWithApple, signInWithSocialProvider, signOutAccount, subscribeToAuthChanges } from "./src/auth/supabase";
 
+import { combatImagesForPlayers } from "./src/components/combatAssets";
+import { warmImageSources } from "./src/utils/warmImageSources";
+
 type Nav = "startup" | "home" | "create" | "join" | "ranked" | "endless" | "shop" | "settings" | "profile" | "friends" | "rules" | "in-room";
 type RoomRecoveryState = "reconnecting" | "failed";
 const SFX_VOLUME_STORAGE_KEY = "confidence-trivia:sfx-volume";
@@ -54,46 +57,6 @@ const COMMUNITY_URL = "https://discord.gg/BjcjJGSyxv";
 const LEGAL_URL = "https://daniel-portfolio-pied.vercel.app/projects/confivia/privacy";
 const MINIMUM_STARTUP_CHECK_MS = 900;
 const RECENT_QUESTION_LIMIT = 40;
-const COMBAT_PRELOAD_IMAGES = [
-  require("./assets/combat-ios/smart-owl.png"),
-  require("./assets/combat-ios/fox.png"),
-  require("./assets/combat-ios/quiz-bot.png"),
-  require("./assets/combat-ios/omniscient.png"),
-  require("./assets/combat-ios/trivia-wizard.png"),
-  require("./assets/combat-ios/detective.png"),
-  require("./assets/combat-ios/globe.png"),
-  require("./assets/combat-ios-defeated/smart-owl.png"),
-  require("./assets/combat-ios-defeated/fox.png"),
-  require("./assets/combat-ios-defeated/quiz-bot.png"),
-  require("./assets/combat-ios-defeated/omniscient.png"),
-  require("./assets/combat-ios-defeated/trivia-wizard.png"),
-  require("./assets/combat-ios-defeated/detective.png"),
-  require("./assets/combat-ios-defeated/globe.png"),
-  require("./assets/combat-ios/quiz-bot-calculator.png"),
-  require("./assets/combat-ios/smart-owl-book.png"),
-  require("./assets/combat-ios/fox-lightbulb.png"),
-  require("./assets/combat-ios/omniscient-eye.png"),
-  require("./assets/combat-ios/wizard-spell.png"),
-  require("./assets/combat-ios/detective-magnifier.png"),
-  require("./assets/combat-ios/globe-earth.png"),
-] as const;
-
-function AssetPreloader({ sources, onReady }: { sources: readonly number[]; onReady?: () => void }) {
-  const loaded = useRef(new Set<number>());
-
-  const handleLoadEnd = (index: number) => {
-    if (loaded.current.has(index)) return;
-    loaded.current.add(index);
-    if (loaded.current.size === sources.length) onReady?.();
-  };
-
-  return (
-    <View pointerEvents="none" style={styles.combatPreloader}>
-      {sources.map((source, index) => <Image key={index} source={source} defaultSource={source} fadeDuration={0} onLoadEnd={() => handleLoadEnd(index)} style={styles.combatPreloadImage} />)}
-    </View>
-  );
-}
-
 function AppFrame({ children, highContrast = false, homeScene = false }: { children: React.ReactNode; highContrast?: boolean; homeScene?: boolean }) {
   // Load both assets once. Navigation changes opacity only, never the image's
   // source or key, so switching screens cannot restart background loading.
@@ -171,8 +134,6 @@ export default function App() {
   const [room, setRoom] = useState<Room | null>(null);
   const [locale, setLocale] = useState<"en" | "bg">("en");
   const [localeReady, setLocaleReady] = useState(false);
-  const [combatImagesReady, setCombatImagesReady] = useState(false);
-  const [combatPreloadStarted, setCombatPreloadStarted] = useState(false);
   const [soundEffectsVolume, setSoundEffectsVolumeState] = useState(1);
   const [musicVolume, setMusicVolume] = useState(0.5);
   const [defaultPlayerName, setDefaultPlayerName] = useState("");
@@ -435,21 +396,16 @@ export default function App() {
   }, [deviceId, registeredAccount]);
 
   useEffect(() => {
-    if (nav !== "in-room" || !room || combatPreloadStarted) return;
-    let interaction: ReturnType<typeof InteractionManager.runAfterInteractions> | undefined;
-    const preloadDamageArtwork = (state: { gameMode?: string }) => {
-      if (state?.gameMode !== "damage" || interaction) return;
-      interaction = InteractionManager.runAfterInteractions(() => setCombatPreloadStarted(true));
+    if (nav !== "in-room" || !room) return;
+    const preloadDamageArtwork = (state: { gameMode?: string; players?: { values(): IterableIterator<{ avatarId?: string }> } }) => {
+      if (state?.gameMode !== "damage" || !state.players) return;
+      warmImageSources(combatImagesForPlayers(state.players.values()));
     };
-    // Wait for the initial room snapshot too: it may arrive after navigation.
-    // Classic, Custom and Ranked must not download unused combat art.
+    // Start in the lobby, including late snapshots and changed fighter selections.
     room.onStateChange(preloadDamageArtwork);
     preloadDamageArtwork(room.state);
-    return () => {
-      room.onStateChange.remove(preloadDamageArtwork);
-      interaction?.cancel();
-    };
-  }, [combatPreloadStarted, nav, room]);
+    return () => { room.onStateChange.remove(preloadDamageArtwork); };
+  }, [nav, room]);
 
   async function handleRepairClient() {
     setStartupState("loading");
@@ -911,7 +867,6 @@ export default function App() {
 
   return (
     <AppFrame highContrast={highContrastEnabled} homeScene={nav === "home"}>
-      {combatPreloadStarted && !combatImagesReady ? <AssetPreloader sources={COMBAT_PRELOAD_IMAGES} onReady={() => setCombatImagesReady(true)} /> : null}
       <StatusBar style="light" hidden={Platform.OS === "android"} animated />
       {nav === "startup" ? (
         <StartupScreen
@@ -1279,8 +1234,6 @@ const styles = StyleSheet.create({
   // work. Preserve their React state while removing their native view trees.
   persistentScreenHidden: Platform.OS === "android" ? { display: "none", opacity: 0 } : { opacity: 0 },
   starsPersistentLayer: { ...StyleSheet.absoluteFillObject, zIndex: 20 },
-  combatPreloader: { position: "absolute", left: 0, top: 0, width: 192, height: 192, opacity: 0.001, overflow: "hidden" },
-  combatPreloadImage: { position: "absolute", width: 192, height: 192 },
   starsHud: {
     position: "absolute",
     top: 18,

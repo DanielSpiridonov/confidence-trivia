@@ -29,6 +29,7 @@ function roomFor(mode = "classic", count = 2) {
     player.id = `p${index}`;
     player.name = `Player ${index}`;
     player.isHost = index === 0;
+    player.ready = true;
     room.state.players.set(player.id, player);
     room.deviceIds.set(player.id, `device${index}`);
     room.clients.push({ sessionId: player.id, send: (type, message) => room.startErrors.push({ type, message }) });
@@ -73,6 +74,32 @@ test("Custom starts and advances through countdown with two connected players", 
   assert.equal(advanced,true);
 });
 
+test("hosted games reject start until every connected guest is ready", async () => {
+  for (const mode of ["classic", "friends", "damage"]) {
+    const room = roomFor(mode, 2);
+    room.state.isChallenge = mode === "damage";
+    room.state.players.get("p1").ready = false;
+    await room.handleStartGame(room.clients[0]);
+    assert.equal(room.state.gameStarted, false);
+    assert.deepEqual(room.startErrors, [{ type: "gameStartError", message: { code: "players_not_ready" } }]);
+    room.state.players.get("p1").ready = true;
+    room.state.players.get("p0").ready = false; // Starting is the host's consent.
+    assert.equal(room.playersReadyToStart(), true);
+  }
+});
+
+test("readiness excludes disconnected guests and does not block automatic matchmaking", () => {
+  const room = roomFor("classic", 3);
+  room.state.players.get("p2").connected = false;
+  room.state.players.get("p2").ready = false;
+  assert.equal(room.playersReadyToStart(), true);
+  for (const mode of ["ranked", "damage"]) {
+    const queue = roomFor(mode, mode === "ranked" ? 4 : 2);
+    for (const player of queue.state.players.values()) player.ready = false;
+    assert.equal(queue.playersReadyToStart(), true);
+  }
+});
+
 test("duos, Ranked, Damage and disconnected Custom hosts cannot start alone", async () => {
   for (const mode of ["friends","ranked","damage"]) {
     const room = roomFor(mode,1);
@@ -93,7 +120,8 @@ test("Classic countdown continues when two players remain", async () => {
   await room.onLeave(room.clients[2], true);
   assert.equal(room.state.gameStarted, true);
   assert.equal(room.state.phase, "starting");
-  assert.equal(room.state.players.size, 2);
+  assert.equal(room.state.players.size, 3);
+  assert.equal(room.state.players.get("p2").forfeited, true);
 });
 
 test("leaving during countdown returns a one-player lobby to waiting", async () => {
@@ -197,6 +225,44 @@ test("a reconnect that expires after the match ends preserves the final rows", a
   expire(new Error("expired"));
   await leave;
   assert.equal(room.state.players.size, 2);
+});
+
+for (const mode of ["classic", "friends", "ranked"]) {
+  test(`${mode} stops when only one non-forfeited player remains`, async () => {
+    const room = roomFor(mode, mode === "ranked" ? 4 : 2);
+    room.state.gameStarted = true;
+    room.state.phase = "question";
+    room.state.players.get("p1").score = 999;
+    for (const client of room.clients.slice(1)) await room.onLeave(client, true);
+    assert.equal(room.state.gameEnded, true);
+    assert.equal(room.state.phase, "final_results");
+    assert.equal(room.state.players.size, room.clients.length);
+    assert.equal(room.state.players.get("p1").forfeited, true);
+    assert.equal(room.deviceIds.size, room.clients.length);
+  });
+}
+
+test("Classic continues with multiple opponents, but ends after reconnect grace expires for the last opponent", async () => {
+  const room = roomFor("classic", 3);
+  room.state.gameStarted = true;
+  room.state.phase = "question";
+  await room.onLeave(room.clients[2], true);
+  assert.equal(room.state.gameEnded, false);
+  room.allowReconnection = async () => { throw new Error("grace expired"); };
+  await room.onLeave(room.clients[1], false);
+  assert.equal(room.state.gameEnded, true);
+});
+
+test("Custom duos ends when an entire team departs", async () => {
+  const room = roomFor("friends", 4);
+  room.state.friendsTeamMode = "duos";
+  room.state.gameStarted = true;
+  room.state.phase = "question";
+  for (let i = 0; i < 4; i++) room.state.players.get(`p${i}`).team = i < 2 ? "A" : "B";
+  await room.onLeave(room.clients[2], true);
+  assert.equal(room.state.gameEnded, false);
+  await room.onLeave(room.clients[3], true);
+  assert.equal(room.state.gameEnded, true);
 });
 
 test("Damage question timeout submits the latest ordering draft", () => {
@@ -321,6 +387,17 @@ test("solo practice sessions cannot persist completion Stars or recorded wins", 
   t.mock.method(database, "saveCompletedMatch", () => assert.fail("practice must not persist rewards"));
   await GameRoom.prototype.persistFinalResults.call(room);
   assert.equal(room.resultsPersisted, true);
+});
+
+test("a forfeiting player cannot keep first place by leaving with the higher score", async (t) => {
+  const room = roomFor("classic", 2);
+  room.state.players.get("p0").score = 1;
+  Object.assign(room.state.players.get("p1"), { score: 999, forfeited: true, connected: false });
+  let saved;
+  t.mock.method(database, "saveCompletedMatch", async match => { saved = match; return new Map(); });
+  await GameRoom.prototype.persistFinalResults.call(room);
+  assert.equal(saved.players.find(player => player.deviceId === "device0").finalRank, 1);
+  assert.equal(saved.players.find(player => player.deviceId === "device1").finalRank, 2);
 });
 
 test("room creation bounds malicious counts before generating the question set", async () => {

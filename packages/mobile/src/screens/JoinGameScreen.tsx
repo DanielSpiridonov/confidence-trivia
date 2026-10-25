@@ -1,6 +1,7 @@
 import { Pressable } from "../components/menuHaptics";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FlatList, StyleSheet, Text, TextInput, View } from "react-native";
+import { FontAwesome5 } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { ANDROID_MENU_UI_SCALE, BackIconButton, Screen, Title, BigButton, theme } from "../components/ui";
 import { listPublicRooms, PublicRoomListing } from "../network/client";
@@ -19,7 +20,7 @@ export function JoinGameScreen({
   const { t } = useTranslation();
   const [code, setCode] = useState("");
   const [search, setSearch] = useState("");
-  const [modeFilter, setModeFilter] = useState<"all" | "classic" | "friends" | "ranked" | "damage">("all");
+  const [modeFilter, setModeFilter] = useState<"all" | "classic" | "friends">("all");
   const [rooms, setRooms] = useState<PublicRoomListing[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [joiningRoomId, setJoiningRoomId] = useState<string | null>(null);
@@ -83,10 +84,17 @@ export function JoinGameScreen({
       <Title>{t("home.joinGame")}</Title>
       <View style={styles.columns}>
         <View style={styles.leftColumn}>
-          <View style={styles.input}><Text numberOfLines={1} style={styles.playerNameText}>{initialName}</Text></View>
+          <FontAwesome5 name="ticket-alt" size={35} color="#86B7EC" style={styles.ticketIcon} />
+          <Text style={styles.sectionTitle}>{t("join.codeTab")}</Text>
+          <Text style={styles.inviteHint}>{t("join.inviteHint")}</Text>
+          <View style={styles.identityLine}><FontAwesome5 name="user" size={11} color="#A99ABF" /><Text numberOfLines={1} style={styles.playerNameText}>{initialName}</Text></View>
+          <Text style={styles.fieldLabel}>{t("join.roomCode")}</Text>
           <TextInput
             style={[styles.input, styles.codeInput]}
-            placeholder={t("join.roomCode") as string}
+            placeholder="— — — — — —"
+            accessibilityLabel={t("join.roomCode")}
+            autoCorrect={false}
+            onSubmitEditing={() => void joinWithCode()}
             placeholderTextColor={theme.textDim}
             value={code}
             onChangeText={(value) => { setCode(value.replace(/\D/g, "").slice(0, 6)); setError(null); }}
@@ -103,13 +111,15 @@ export function JoinGameScreen({
         </View>
 
         <View style={styles.rightColumn}>
-          <TextInput
+          <View style={styles.browseHeading}><Text style={styles.sectionTitle}>{t("join.browseTab")}</Text><Pressable accessibilityRole="button" accessibilityLabel={t("join.refresh")} disabled={refreshing} onPress={() => void refreshRooms(true)} style={styles.refreshButton}><FontAwesome5 name="sync-alt" size={14} color="#B5A5D0" /></Pressable></View>
+          <View style={styles.searchRow}><FontAwesome5 name="search" size={12} color="#9C8BAD" /><TextInput
             style={styles.searchInput}
             placeholder={t("join.searchLeader") as string}
             placeholderTextColor={theme.textDim}
             value={search}
             onChangeText={setSearch}
-          />
+            accessibilityLabel={t("join.searchLeader")}
+          /></View>
           <View style={styles.filterRow}>
             {(["all", "classic", "friends"] as const).map((mode) => {
               const selected = modeFilter === mode;
@@ -132,17 +142,20 @@ export function JoinGameScreen({
             renderItem={({ item }) => (
               <View style={styles.roomRow}>
                 <View style={styles.roomInfo}>
+                  <View style={styles.roomModeLine}><FontAwesome5 name={item.gameMode === "friends" ? "sliders-h" : "layer-group"} size={10} color={item.gameMode === "friends" ? "#D5AFEF" : "#95C4F2"} /><Text style={[styles.modeText, item.gameMode === "friends" && styles.customModeText]}>{t(`join.filters.${item.gameMode}`)}</Text></View>
                   <Text numberOfLines={1} style={styles.leaderName}>{item.leaderName}</Text>
                   <Text style={styles.roomMeta}>{item.gameMode === "damage"
                     ? t("join.damageRoomMeta", { players: item.playerCount, max: item.maxClients })
                     : t("join.roomMeta", { players: item.playerCount, max: item.maxClients, rounds: item.roundCount })}</Text>
                 </View>
                 <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t("join.joinLobby", { name: item.leaderName, mode: t(`join.filters.${item.gameMode}`) })}
                   onPress={() => void joinListedRoom(item.roomId)}
                   disabled={!trimmedName || Boolean(joiningRoomId)}
                   style={[styles.joinRoomButton, (!trimmedName || Boolean(joiningRoomId)) && styles.disabled]}
                 >
-                  <Text style={styles.joinRoomText}>{joiningRoomId === item.roomId ? t("join.joining") : t("join.join")}</Text>
+                  <Text style={styles.joinRoomText}>{joiningRoomId === item.roomId ? t("join.joining") : t("join.join")}</Text><FontAwesome5 name="arrow-right" size={12} color="#C4AAF1" />
                 </Pressable>
               </View>
             )}
@@ -155,29 +168,40 @@ export function JoinGameScreen({
 
 const styles = StyleSheet.create({
   screen: { justifyContent: "flex-start", paddingTop: 10 },
-  columns: { flex: 1, minHeight: 0, width: "100%", flexDirection: "row", gap: 24, alignItems: "stretch" },
-  leftColumn: { width: "38%", minWidth: 0, justifyContent: "center" },
-  rightColumn: { flex: 1, minWidth: 0 },
-  input: { width: "100%", minHeight: 54, backgroundColor: theme.surface, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 13, marginBottom: 10, justifyContent: "center" },
-  playerNameText: { color: theme.text, fontSize: 15, fontWeight: "800" },
-  codeInput: { letterSpacing: 2, textAlign: "center" },
-  searchInput: { width: "100%", color: theme.text, backgroundColor: "transparent", paddingHorizontal: 4, paddingVertical: 8, fontSize: 14, marginBottom: 4 },
-  filterRow: { width: "100%", flexDirection: "row", gap: 6, marginBottom: 7 },
-  filterChip: { flex: 1, minWidth: 0, alignItems: "center", justifyContent: "center", paddingHorizontal: 5, paddingVertical: 6, borderRadius: 8, backgroundColor: "rgba(31, 26, 51, 0.78)", borderWidth: 1, borderColor: "rgba(185, 176, 214, 0.22)" },
-  filterChipSelected: { backgroundColor: "rgba(124, 92, 255, 0.25)", borderColor: theme.primary },
-  filterText: { color: theme.textDim, fontSize: 10, fontWeight: "800" },
-  filterTextSelected: { color: theme.text },
+  columns: { flex: 1, minHeight: 0, width: "100%", flexDirection: "row", gap: 34, alignItems: "stretch" },
+  leftColumn: { width: "34%", minWidth: 0, justifyContent: "center", paddingHorizontal: 8, paddingBottom: 10 },
+  rightColumn: { flex: 1, minWidth: 0, paddingTop: 8 },
+  ticketIcon: { marginBottom: 18, transform: [{ translateY: -6 }, { rotate: "-12deg" }] },
+  sectionTitle: { color: "#F5EBDC", fontSize: 23, fontWeight: "900" },
+  inviteHint: { color: "#B3A3C7", fontSize: 11, lineHeight: 16, marginTop: 5, marginBottom: 14 },
+  identityLine: { flexDirection: "row", alignItems: "center", gap: 7, marginBottom: 12 },
+  playerNameText: { flex: 1, color: "#CDBFDF", fontSize: 17, fontWeight: "800" },
+  fieldLabel: { color: "#B19DCB", fontSize: 9, letterSpacing: 1.3, textTransform: "uppercase", fontWeight: "900" },
+  input: { width: "100%", minHeight: 52, paddingHorizontal: 0, paddingVertical: 6, marginBottom: 12, borderBottomWidth: 2, borderBottomColor: "#7AA5D5" },
+  codeInput: { color: "#F4ECDD", fontSize: 32, fontWeight: "900", letterSpacing: 6, textAlign: "left" },
+  browseHeading: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 },
+  refreshButton: { width: 36, height: 36, alignItems: "center", justifyContent: "center" },
+  searchRow: { flexDirection: "row", alignItems: "center", gap: 8, borderBottomWidth: 1, borderBottomColor: "rgba(181,164,205,0.28)", marginBottom: 8 },
+  searchInput: { flex: 1, minWidth: 0, color: theme.text, backgroundColor: "transparent", paddingHorizontal: 0, paddingVertical: 9, fontSize: 12 },
+  filterRow: { width: "100%", flexDirection: "row", gap: 18, marginBottom: 4 },
+  filterChip: { minWidth: 45, alignItems: "center", justifyContent: "center", paddingHorizontal: 3, paddingVertical: 7, borderBottomWidth: 2, borderBottomColor: "transparent" },
+  filterChipSelected: { borderBottomColor: "#BA8BE8" },
+  filterText: { color: "#9986AE", fontSize: 11, fontWeight: "800" },
+  filterTextSelected: { color: "#F0DCF9" },
   roomList: { flex: 1, minHeight: 0, width: "100%" },
   roomListContent: { paddingBottom: 6 },
   emptyList: { flexGrow: 1, justifyContent: "center" },
-  emptyText: { color: theme.textDim, textAlign: "center", fontSize: 14 },
-  roomRow: { minHeight: 54, flexDirection: "row", alignItems: "center", backgroundColor: theme.surface, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7, marginBottom: 7 },
-  roomInfo: { flex: 1, minWidth: 0, paddingRight: 12 },
-  leaderName: { color: theme.text, fontSize: 15, fontWeight: "800" },
-  roomMeta: { color: theme.textDim, fontSize: 11, marginTop: 2 },
-  joinRoomButton: { minWidth: 92, backgroundColor: theme.primary, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 9, alignItems: "center" },
-  joinRoomText: { color: theme.text, fontSize: 13, fontWeight: "800" },
+  emptyText: { color: theme.textDim, textAlign: "center", fontSize: 13 },
+  roomRow: { minHeight: 76, flexDirection: "row", alignItems: "center", paddingHorizontal: 2, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "rgba(181,164,205,0.19)" },
+  roomInfo: { flex: 1, minWidth: 0, paddingRight: 8 },
+  roomModeLine: { flexDirection: "row", alignItems: "center", gap: 5, marginBottom: 4 },
+  modeText: { color: "#95C4F2", fontSize: 9, letterSpacing: 1, textTransform: "uppercase", fontWeight: "900" },
+  customModeText: { color: "#D5AFEF" },
+  leaderName: { color: "#F5EBDC", fontSize: 15, fontWeight: "800" },
+  roomMeta: { color: "#B09DBF", fontSize: 10, marginTop: 3 },
+  joinRoomButton: { minWidth: 74, flexDirection: "row", gap: 7, paddingHorizontal: 6, paddingVertical: 12, alignItems: "center", justifyContent: "flex-end" },
+  joinRoomText: { color: "#D7B9F5", fontSize: 12, fontWeight: "900" },
   disabled: { opacity: 0.4 },
-  actionButton: { width: "100%", minWidth: 0 },
-  error: { color: theme.danger, marginBottom: 2, textAlign: "center", fontSize: 12 },
+  actionButton: { width: "100%", minWidth: 0, minHeight: 42, backgroundColor: "#42679C", paddingVertical: 9, borderRadius: 10 },
+  error: { color: theme.danger, marginBottom: 4, fontSize: 11 },
 });

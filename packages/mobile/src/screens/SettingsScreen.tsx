@@ -1,24 +1,19 @@
 import React from "react";
 import { Pressable } from "../components/menuHaptics";
-import { ActivityIndicator, Linking, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { IMAGE_CREDITS } from "@confidence-trivia/shared";
-import kalamLicense from "../../assets/fonts/Kalam-license.json";
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { FontAwesome5 } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { ANDROID_COMPACT_MENU_UI_SCALE, BackIconButton, Screen, Title, BigButton, theme } from "../components/ui";
 import { redeemPromoCode, submitPlayerReport } from "../network/client";
 import { FeedbackKind } from "../components/FeedbackPopup";
 
-type SettingsSection = "sounds" | "haptics" | "language" | "accessibility" | "redeem" | "report" | "credits";
+type SettingsSection = "sounds" | "haptics" | "language" | "accessibility" | "redeem" | "report";
 
-function KalamCredits() {
-  const [expanded, setExpanded] = React.useState(false);
-  return <View>
-    <Text style={styles.toggleLabel}>Kalam typeface · Indian Type Foundry</Text>
-    <Text style={styles.redeemHint}>SIL Open Font License 1.1</Text>
-    <Pressable accessibilityRole="button" accessibilityState={{ expanded }} onPress={() => setExpanded(value => !value)}><Text style={styles.creditLink}>{expanded ? "Hide font license" : "Read font license"}</Text></Pressable>
-    {expanded ? <Text selectable style={styles.redeemHint}>{kalamLicense.license}</Text> : null}
-  </View>;
-}
+const SETTINGS_GROUPS = [
+  { label: "audioAndFeel", sections: [{ id: "sounds", icon: "volume-up" }, { id: "haptics", icon: "mobile-alt" }] },
+  { label: "preferences", sections: [{ id: "language", icon: "globe" }, { id: "accessibility", icon: "universal-access" }] },
+  { label: "extrasAndSupport", sections: [{ id: "redeem", icon: "gift" }, { id: "report", icon: "flag" }] },
+] as const;
 
 function SettingsToggle({ label, value, onChange }: { label: string; value: boolean; onChange: (value: boolean) => void }) {
   return (
@@ -171,14 +166,6 @@ export function SettingsScreen({
 
   function renderPanel() {
     switch (section) {
-      case "credits":
-        return <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingVertical: 8, gap: 16 }}>
-          <KalamCredits />
-          <View><Text style={styles.toggleLabel}>Map Shapes</Text><Text style={styles.redeemHint}>Geography: Natural Earth, public domain.</Text><Pressable accessibilityRole="link" onPress={() => void Linking.openURL("https://www.naturalearthdata.com/about/terms-of-use/").catch(() => undefined)}><Text style={styles.creditLink}>Source and terms</Text></Pressable></View>
-          <View><Text style={styles.toggleLabel}>Image Reveal illustrations</Text><Text style={styles.redeemHint}>Original code-drawn pyramid, owl and apple illustrations.</Text></View>
-          {IMAGE_CREDITS.some(credit => credit.license === "owner-reviewed") ? <View><Text style={styles.toggleLabel}>Unsplash photos</Text><Text style={styles.redeemHint}>{IMAGE_CREDITS.filter(credit => credit.license === "owner-reviewed").length} photographs supplied by the game owner.</Text></View> : null}
-          {IMAGE_CREDITS.filter(credit => credit.license !== "owner-reviewed").map(credit => <View key={credit.assetId}><Text style={styles.toggleLabel}>{credit.photographer ?? "Image source"}</Text><Text style={styles.redeemHint}>{credit.license === "unsplash" ? "Unsplash" : "Commercial-use license documented"}</Text>{credit.sourceUrl ? <Pressable accessibilityRole="link" onPress={() => void Linking.openURL(credit.sourceUrl!).catch(() => undefined)}><Text style={styles.creditLink}>View photograph</Text></Pressable> : null}{credit.licenseUrl ? <Pressable accessibilityRole="link" onPress={() => void Linking.openURL(credit.licenseUrl!).catch(() => undefined)}><Text style={styles.creditLink}>License</Text></Pressable> : null}</View>)}
-        </ScrollView>;
       case "sounds":
         return (
           <View style={styles.panelContent}>
@@ -221,41 +208,50 @@ export function SettingsScreen({
       <BackIconButton label={t("common.back")} onPress={onBack} />
       <Title>{t("settings.title")}</Title>
       <View style={styles.settingsLayout}>
-        <View style={styles.sidebar}>
-          {(["sounds", "haptics", "language", "accessibility", "redeem", "report", "credits"] as const).map((value) => (
-            <Pressable
-              key={value}
+        <ScrollView style={styles.sidebar} contentContainerStyle={styles.sidebarContent} showsVerticalScrollIndicator={false}>
+          {SETTINGS_GROUPS.map(group => <View key={group.label} style={styles.categoryGroup}>
+            <Text style={styles.categoryLabel}>{t(`settings.${group.label}`)}</Text>
+            {group.sections.map(({ id, icon }) => <Pressable
+              key={id}
               accessibilityRole="tab"
-              accessibilityState={{ selected: section === value }}
-              onPress={() => setSection(value)}
-              style={[styles.sectionButton, section === value && styles.sectionButtonSelected]}
+              accessibilityState={{ selected: section === id }}
+              onPress={() => setSection(id)}
+              style={[styles.sectionButton, section === id && styles.sectionButtonSelected]}
             >
-              <Text style={[styles.sectionButtonText, section === value && styles.sectionButtonTextSelected]}>
-                {value === "credits" ? "Credits" : t(`settings.${value}`)}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-        <View style={styles.settingsPanel}>
-          <Text style={styles.panelTitle}>{section === "credits" ? "Credits" : t(`settings.${section}`)}</Text>
+              <FontAwesome5 name={icon} size={15} color={section === id ? "#D7B5F5" : "#9787AC"} style={styles.sectionIcon} />
+              <Text style={[styles.sectionButtonText, section === id && styles.sectionButtonTextSelected]}>{t(`settings.${id}`)}</Text>
+              {section === id ? <FontAwesome5 name="chevron-right" size={10} color="#D7B5F5" /> : null}
+            </Pressable>)}
+          </View>)}
+        </ScrollView>
+        <ScrollView key={section} style={styles.settingsPanel} contentContainerStyle={styles.settingsPanelContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <Text style={styles.panelCategory}>{t(`settings.${SETTINGS_GROUPS.find(group => group.sections.some(item => item.id === section))!.label}`)}</Text>
+          <Text style={styles.panelTitle}>{t(`settings.${section}`)}</Text>
+          <View style={styles.panelAccent} />
           {renderPanel()}
-        </View>
+        </ScrollView>
       </View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  creditLink: { color: theme.primary, fontSize: 13, paddingVertical: 4 },
   screen: { justifyContent: "flex-start", paddingTop: 14 },
   settingsLayout: { flex: 1, minHeight: 0, width: "100%", flexDirection: "row", gap: 24 },
-  sidebar: { width: "30%", minWidth: 180, justifyContent: "center" },
-  sectionButton: { width: "100%", paddingHorizontal: 14, paddingVertical: 8, marginBottom: 4, borderLeftWidth: 3, borderLeftColor: "transparent" },
-  sectionButtonSelected: { borderLeftColor: theme.primary, backgroundColor: "rgba(124, 92, 255, 0.12)" },
-  sectionButtonText: { color: theme.textDim, fontSize: 16, fontWeight: "700" },
+  sidebar: { width: "29%", minWidth: 180, flexGrow: 0, borderRightWidth: 1, borderRightColor: "rgba(185,160,215,0.18)" },
+  sidebarContent: { paddingVertical: 8, paddingRight: 16 },
+  categoryGroup: { marginBottom: 12 },
+  categoryLabel: { color: "#9984AF", fontSize: 9, fontWeight: "900", letterSpacing: 1.2, textTransform: "uppercase", paddingLeft: 13, marginBottom: 5 },
+  sectionIcon: { width: 20, textAlign: "center" },
+  sectionButton: { width: "100%", minHeight: 38, flexDirection: "row", alignItems: "center", gap: 9, paddingHorizontal: 11, paddingVertical: 8, marginBottom: 3, borderRadius: 10, borderWidth: 1, borderColor: "transparent" },
+  sectionButtonSelected: { borderColor: "rgba(174,122,225,0.45)", backgroundColor: "rgba(116,72,167,0.23)" },
+  sectionButtonText: { flex: 1, color: theme.textDim, fontSize: 14, fontWeight: "700" },
   sectionButtonTextSelected: { color: theme.text },
-  settingsPanel: { flex: 1, minWidth: 0, justifyContent: "center", paddingHorizontal: 10 },
-  panelTitle: { color: theme.text, fontSize: 18, fontWeight: "800", marginBottom: 8 },
+  settingsPanel: { flex: 1, minWidth: 0 },
+  settingsPanelContent: { flexGrow: 1, justifyContent: "center", paddingHorizontal: 10, paddingVertical: 14 },
+  panelCategory: { color: "#AA90C4", fontSize: 9, fontWeight: "900", letterSpacing: 1.3, textTransform: "uppercase", marginBottom: 5 },
+  panelAccent: { width: 42, height: 3, borderRadius: 2, backgroundColor: "#A873D8", marginBottom: 16, transform: [{ rotate: "-3deg" }] },
+  panelTitle: { color: theme.text, fontSize: 25, fontWeight: "900", marginBottom: 8 },
   panelContent: { width: "100%", maxWidth: 520 },
   languageButton: { width: "100%", minWidth: 0 },
   languageGroupLabel: { color: theme.textDim, fontSize: 13, fontWeight: "800", marginTop: 14, marginBottom: 7, textTransform: "uppercase" },
