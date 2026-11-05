@@ -18,7 +18,7 @@ This inventory describes the version-one application. It must be reviewed whenev
 | Friendships, Blessings and challenges | Social features and reward integrity | Game database | The involved players |
 | Presence timestamps | Show whether a friend can be challenged | Game database | Friends through the game server |
 | Player reports and moderator decisions | Player safety and enforcement | Game database | Trusted administrators only |
-| Promo-code redemptions | Prevent duplicate claims | Game database | Render game server |
+| Historical promo-code redemptions | Retain legacy reward records | Game database | Render game server |
 | Access tokens | Authenticate protected requests | Device secure storage and transient server requests | Supabase and Render game server; never logged |
 | IP address/request counters | Short-term abuse prevention and hosting security | Server memory and infrastructure logs | Render infrastructure |
 | Audio/accessibility preferences | Personalized app behavior | Device local storage | Not intentionally transmitted |

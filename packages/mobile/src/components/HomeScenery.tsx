@@ -7,6 +7,8 @@ export const HOME_SCENE_BACKGROUND = GAME_BACKGROUND;
 const LEFT_FOREGROUND = require("../../assets/left-side-clump.png");
 const RIGHT_FOREGROUND = require("../../assets/right-side-clump.png");
 
+
+
 function MutedSceneArtwork({ source, style }: { source: number; style: StyleProp<ViewStyle> }) {
   return <View style={[s.artwork, style]}>
     <Image accessible={false} source={source} defaultSource={source} fadeDuration={0} resizeMode="contain" style={s.artworkImage} />
@@ -36,7 +38,7 @@ export const HomeScenery = React.memo(function HomeScenery() {
 
 export const HomeForeground = React.memo(function HomeForeground() {
   const frame = React.useContext(ScreenFrameContext);
-  const leftWidth = Math.min(frame.width * 0.36, frame.height * 0.85) * 0.85;
+  const leftWidth = Math.min(frame.width * 0.36, frame.height * 0.85) * 0.75;
   const rightWidth = Math.min(frame.width * 0.46, frame.height * 1.15) * 0.85;
   return <View testID="home-foreground" pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[s.foreground, frame]}>
     <MutedSceneArtwork source={LEFT_FOREGROUND} style={[s.left, {width:leftWidth,height:leftWidth * 0.75}]} />

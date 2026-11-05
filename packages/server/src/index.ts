@@ -5,7 +5,7 @@ import { WebSocketTransport } from "@colyseus/ws-transport";
 import { GameRoom } from "./rooms/GameRoom";
 import { MATCHMAKING_FILTERS } from "./rooms/matchmaking";
 import { canAccessPlayerData } from "./database";
-import { anonymizePlayerAccount, canPlayerEnterGame, claimAllFriendGifts, claimDailyReward, claimFriendGift, createPlayerChallenge, equipFreeAvatar, equipFreeFrame, equipFreeNameColor, getAccountProfile, getDailyRewardStatus, getDatabaseStatus, getNewsPosts, getPlayerChallenges, getPlayerCustomization, getPlayerStars, getRankedLeaderboard, isAuthenticatedPlayer, linkPlayerAccount, listFriends, ownsRegisteredPlayer, redeemPromoCode, respondToFriendRequest, respondToPlayerChallenge, searchFriendPlayers, sendFriendGift, sendFriendRequest, submitPlayerReport, suggestFriendPlayers, updateAccountDisplayName, updateFriendRelationship, updatePlayerPresence } from "./database";
+import { anonymizePlayerAccount, canPlayerEnterGame, claimAllFriendGifts, claimDailyReward, claimFriendGift, createPlayerChallenge, equipFreeAvatar, equipFreeFrame, equipFreeNameColor, getAccountProfile, getDailyRewardStatus, getDatabaseStatus, getNewsPosts, getPlayerChallenges, getPlayerCustomization, getPlayerStars, getRankedLeaderboard, isAuthenticatedPlayer, linkPlayerAccount, listFriends, ownsRegisteredPlayer, respondToFriendRequest, respondToPlayerChallenge, searchFriendPlayers, sendFriendGift, sendFriendRequest, submitPlayerReport, suggestFriendPlayers, updateAccountDisplayName, updateFriendRelationship, updatePlayerPresence } from "./database";
 import { deleteSupabaseIdentity, revokeAppleAuthorization, requestIdentity } from "./auth";
 import { ENDLESS_PROTOCOL_VERSION, isDamageWager, isOffensivePlayerName } from "@confidence-trivia/shared";
 import { authenticatedActorOrIpKey, createRateLimiter } from "./rateLimit";
@@ -20,7 +20,6 @@ app.set("trust proxy", 1);
 
 const generalLimit = createRateLimiter({ windowMs: 60_000, max: 180, message: "Too many requests. Please wait a moment." });
 const accountLimit = createRateLimiter({ windowMs: 15 * 60_000, max: 10, message: "Too many account attempts. Please try again later." });
-const promoLimit = createRateLimiter({ windowMs: 60 * 60_000, max: 10, message: "Too many promo-code attempts. Please try again later.", key: authenticatedActorOrIpKey });
 const reportLimit = createRateLimiter({ windowMs: 60 * 60_000, max: 10, message: "Too many reports. Please try again later.", key: authenticatedActorOrIpKey });
 const friendRequestLimit = createRateLimiter({ windowMs: 60 * 60_000, max: 10, message: "Too many friend requests. Please try again later.", key: authenticatedActorOrIpKey });
 const socialActionLimit = createRateLimiter({ windowMs: 10 * 60_000, max: 30, message: "Too many social actions. Please wait a few minutes.", key: authenticatedActorOrIpKey });
@@ -42,15 +41,6 @@ app.get("/news", asyncRoute(async (req, res) => {
   const posts = await getNewsPosts(locale);
   if (!posts) { res.status(503).json({ error: "News is temporarily unavailable" }); return; }
   res.json(posts);
-}));
-
-app.post("/promo-codes/redeem", promoLimit, asyncRoute(async (req, res) => {
-  const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
-  const code = typeof req.body?.code === "string" ? req.body.code : "";
-  if (!isDeviceId(playerId) || !await requestOwnsRegisteredPlayer(playerId, req)) { res.status(403).json({ error: "Sign in to redeem codes" }); return; }
-  const result = await redeemPromoCode(playerId, code);
-  if (!result.ok) { res.status(409).json({ error: result.error }); return; }
-  res.json(result);
 }));
 
 app.post("/player-reports", reportLimit, asyncRoute(async (req, res) => {

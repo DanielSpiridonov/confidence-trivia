@@ -1,0 +1,33 @@
+node_modules
+.private/
+.codex-staging/
+*.private.*
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p8
+*.p12
+*.mobileprovision
+credentials.json
+/ngrok.yml
+./node_modules
+.expo/
+packages/mobile/.expo/
+
+# Local Expo environment overrides. Keep shared defaults in .env.example.
+packages/mobile/.env
+packages/mobile/.env.local
+packages/mobile/.env.*.local
+packages/server/.env
+packages/server/.env.local
+/.codex-staging/npm-cache/
+/.codex-staging/endless-smoke/
+/.codex-staging/visual-*
+
+# Standalone website is maintained separately from the game.
+/website/
+
+# Personal document unrelated to the app build.
+/packages/mobile/assets/Daniel_Spiridonov_CV.pdf

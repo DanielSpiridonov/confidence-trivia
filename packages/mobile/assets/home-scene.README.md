@@ -67,3 +67,15 @@ Sharp-version suffix:
 Blurred-version suffix:
 
 > Preserve the existing uniform soft blur of this non-menu version; do not sharpen it or alter its blur strength.
+
+## Tabletop
+
+`home-table.png` (2075 x 758) is the supplied RGB original with a baked checkerboard.
+`home-table-transparent.png` is the RGBA cutout used by `HomeTabletop`. It was
+prepared with the built-in imagegen tool: remove only the checkerboard, preserve
+the wooden surface, silhouette, perspective, rear lip, front edge, and purple /
+blue / orange lighting; output true transparent alpha. The original is retained.
+
+The tabletop is not rendered in the home menu. The files are retained as source
+artwork only and are not imported into the app. The left-side scenery is now
+about 12% smaller than the previous layout; the right-side scenery keeps its size.

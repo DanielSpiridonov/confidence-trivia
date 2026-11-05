@@ -38,8 +38,7 @@ enforce these Terms, protect players, or secure the service.
 ## Stars, rewards, and wagers
 
 Stars are an in-game virtual currency used only within Confivia. In version
-one, stars are earned through gameplay, daily rewards, and authorised
-promotional codes, as well as claimed Blessings from friends. They are not
+one, stars are earned through gameplay, daily rewards, and claimed Blessings from friends. They are not
 money, have no cash value, cannot be withdrawn,
 sold, or transferred outside supported in-game features, and do not create an
 ownership interest in Confivia.

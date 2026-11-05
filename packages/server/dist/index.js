@@ -23,7 +23,6 @@ app.disable("x-powered-by");
 app.set("trust proxy", 1);
 const generalLimit = (0, rateLimit_1.createRateLimiter)({ windowMs: 60000, max: 180, message: "Too many requests. Please wait a moment." });
 const accountLimit = (0, rateLimit_1.createRateLimiter)({ windowMs: 15 * 60000, max: 10, message: "Too many account attempts. Please try again later." });
-const promoLimit = (0, rateLimit_1.createRateLimiter)({ windowMs: 60 * 60000, max: 10, message: "Too many promo-code attempts. Please try again later.", key: rateLimit_1.authenticatedActorOrIpKey });
 const reportLimit = (0, rateLimit_1.createRateLimiter)({ windowMs: 60 * 60000, max: 10, message: "Too many reports. Please try again later.", key: rateLimit_1.authenticatedActorOrIpKey });
 const friendRequestLimit = (0, rateLimit_1.createRateLimiter)({ windowMs: 60 * 60000, max: 10, message: "Too many friend requests. Please try again later.", key: rateLimit_1.authenticatedActorOrIpKey });
 const socialActionLimit = (0, rateLimit_1.createRateLimiter)({ windowMs: 10 * 60000, max: 30, message: "Too many social actions. Please wait a few minutes.", key: rateLimit_1.authenticatedActorOrIpKey });
@@ -44,20 +43,6 @@ app.get("/news", (0, httpSafety_1.asyncRoute)(async (req, res) => {
         return;
     }
     res.json(posts);
-}));
-app.post("/promo-codes/redeem", promoLimit, (0, httpSafety_1.asyncRoute)(async (req, res) => {
-    const playerId = typeof req.body?.playerId === "string" ? req.body.playerId : "";
-    const code = typeof req.body?.code === "string" ? req.body.code : "";
-    if (!isDeviceId(playerId) || !await requestOwnsRegisteredPlayer(playerId, req)) {
-        res.status(403).json({ error: "Sign in to redeem codes" });
-        return;
-    }
-    const result = await (0, database_2.redeemPromoCode)(playerId, code);
-    if (!result.ok) {
-        res.status(409).json({ error: result.error });
-        return;
-    }
-    res.json(result);
 }));
 app.post("/player-reports", reportLimit, (0, httpSafety_1.asyncRoute)(async (req, res) => {
     const reporterId = typeof req.body?.reporterId === "string" ? req.body.reporterId : "";

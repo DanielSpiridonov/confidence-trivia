@@ -12,6 +12,29 @@ async function loadMobile(path, mocks, globals = {}) {
   return exports;
 }
 
+test("startup transition waits for every finger to lift and rechecks before navigating", async () => {
+  const { createTouchTransitionGate } = await loadMobile("src/utils/touchTransitionGate.ts", () => {});
+  const frames = [];
+  const gate = createTouchTransitionGate(callback => frames.push(callback));
+  let transitions = 0;
+  gate.update(2);
+  gate.run(() => transitions++);
+  assert.equal(frames.length, 0);
+  gate.update(1);
+  assert.equal(frames.length, 0);
+  gate.update(0);
+  gate.update(1); // A new finger lands before the queued frame.
+  frames.shift()();
+  assert.equal(transitions, 0);
+  gate.update(0);
+  frames.shift()();
+  assert.equal(transitions, 1);
+  gate.run(() => transitions++);
+  gate.cancel();
+  frames.shift()();
+  assert.equal(transitions, 1);
+});
+
 test("native socket errors keep useful diagnostics and preserve normal transport events", async () => {
   class BaseTransport { constructor(events) { this.events = events; } }
   const { WebSocketTransport, normalizeSocketError } = await loadMobile("src/network/colyseusWebSocketTransport.ts", () => ({ WebSocketTransport: BaseTransport }));

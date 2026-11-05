@@ -57,16 +57,6 @@ export async function getNews(locale: "en" | "bg"): Promise<NewsPost[]> {
   return Array.isArray(payload) ? payload : [];
 }
 
-export async function redeemPromoCode(playerId: string, code: string): Promise<{ stars: number; reward: number }> {
-  const accessToken = await getAccessToken();
-  if (!accessToken) throw new Error("Sign in to redeem codes");
-  const response = await fetch(`${HTTP_SERVER_URL}/promo-codes/redeem`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ playerId, code }) });
-  const payload = await response.json().catch(() => null) as { stars?: number; reward?: number; error?: string } | null;
-  if (!response.ok) throw new Error(payload?.error ?? `Server returned ${response.status}`);
-  if (typeof payload?.stars !== "number" || typeof payload.reward !== "number") throw new Error("Invalid reward response");
-  return { stars: payload.stars, reward: payload.reward };
-}
-
 export async function submitPlayerReport(reporterId: string, reportedName: string, description: string): Promise<void> {
   const accessToken = await getAccessToken();
   if (!accessToken) throw new Error("Sign in to report a player");

@@ -6,7 +6,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.databaseSql = void 0;
 exports.submitPlayerReport = submitPlayerReport;
 exports.getNewsPosts = getNewsPosts;
-exports.redeemPromoCode = redeemPromoCode;
 exports.getAccountProfile = getAccountProfile;
 exports.updateAccountDisplayName = updateAccountDisplayName;
 exports.anonymizePlayerAccount = anonymizePlayerAccount;
@@ -106,39 +105,6 @@ async function getNewsPosts(locale) {
     catch (error) {
         (0, logging_1.logServerError)("Could not load news", error);
         return null;
-    }
-}
-async function redeemPromoCode(playerId, rawCode) {
-    if (!sql)
-        return { ok: false, error: "Promo codes are temporarily unavailable" };
-    const code = rawCode.trim().toUpperCase();
-    if (!/^[A-Z0-9_-]{3,32}$/.test(code))
-        return { ok: false, error: "Invalid promo code" };
-    try {
-        return await sql.begin(async (transaction) => {
-            const [promo] = await transaction `
-        select id, star_reward, redemption_count, max_redemptions from public.promo_codes
-        where code = ${code} and active = true and (expires_at is null or expires_at > now()) for update
-      `;
-            if (!promo)
-                return { ok: false, error: "This code is invalid or expired" };
-            if (promo.max_redemptions !== null && promo.redemption_count >= promo.max_redemptions)
-                return { ok: false, error: "This code has reached its redemption limit" };
-            const [existing] = await transaction `select promo_code_id from public.promo_code_redemptions where promo_code_id = ${promo.id} and player_id = ${playerId}`;
-            if (existing)
-                return { ok: false, error: "You have already redeemed this code" };
-            await transaction `insert into public.promo_code_redemptions (promo_code_id, player_id) values (${promo.id}, ${playerId})`;
-            await transaction `update public.promo_codes set redemption_count = redemption_count + 1 where id = ${promo.id}`;
-            const [player] = await transaction `update public.players set stars = stars + ${promo.star_reward} where id = ${playerId} returning stars`;
-            if (!player)
-                throw new Error("player_not_found");
-            await transaction `insert into public.star_transactions (id, player_id, amount, reason) values (${(0, crypto_1.randomUUID)()}, ${playerId}, ${promo.star_reward}, ${`promo_code:${promo.id}`})`;
-            return { ok: true, stars: player.stars, reward: promo.star_reward };
-        });
-    }
-    catch (error) {
-        (0, logging_1.logServerError)("Could not redeem promo code", error);
-        return { ok: false, error: "Could not redeem this code" };
     }
 }
 async function getAccountProfile(playerId, authUserId) {

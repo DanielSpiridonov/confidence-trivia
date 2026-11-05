@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
+import type { GestureResponderEvent } from "react-native";
+import { createTouchTransitionGate } from "./src/utils/touchTransitionGate";
 import { Animated, AppState, Image, Keyboard, Linking, Platform, Pressable, StyleSheet, Text, Vibration, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { FontAwesome5 } from "@expo/vector-icons";
@@ -57,12 +59,12 @@ const COMMUNITY_URL = "https://discord.gg/BjcjJGSyxv";
 const LEGAL_URL = "https://daniel-portfolio-pied.vercel.app/projects/confivia/privacy";
 const MINIMUM_STARTUP_CHECK_MS = 900;
 const RECENT_QUESTION_LIMIT = 40;
-function AppFrame({ children, highContrast = false, homeScene = false }: { children: React.ReactNode; highContrast?: boolean; homeScene?: boolean }) {
+function AppFrame({ children, highContrast = false, homeScene = false, onTouchesChange }: { children: React.ReactNode; highContrast?: boolean; homeScene?: boolean; onTouchesChange: (event: GestureResponderEvent) => void }) {
   // Load both assets once. Navigation changes opacity only, never the image's
   // source or key, so switching screens cannot restart background loading.
 
   return (
-    <View style={styles.appFrame} collapsable={false}>
+    <View style={styles.appFrame} collapsable={false} onTouchStart={onTouchesChange} onTouchEnd={onTouchesChange} onTouchCancel={onTouchesChange}>
       <Image
         key="home-background"
         accessible={false}
@@ -116,6 +118,11 @@ function StarsBadge({ stars, gain, width, onPress }: { stars: number; gain: { id
 }
 
 export default function App() {
+  const startupTouchGate = useRef(createTouchTransitionGate(callback => { requestAnimationFrame(callback); })).current;
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", next => { if (next !== "active") startupTouchGate.update(0); });
+    return () => { subscription.remove(); startupTouchGate.cancel(); };
+  }, [startupTouchGate]);
   const { notice: appNotice, showFeedback, clearFeedback } = useFeedbackPopup();
   const { dialog: appDialog, showDialog, dismissDialog, confirmDialog } = useGameDialog();
   const [nav, setNav] = useState<Nav>("startup");
@@ -382,12 +389,14 @@ export default function App() {
       setDefaultPlayerName(profile.displayName);
       setStars(rewardStatus.stars ?? storedStars);
       setDailyReward(rewardStatus);
-      setStartupState("idle");
-      setStartupStage(null);
-      if (enterHome) {
-        setHasEnteredApp(true);
-        setNav("home");
-      }
+      startupTouchGate.run(() => {
+        setStartupState("idle");
+        setStartupStage(null);
+        if (enterHome) {
+          setHasEnteredApp(true);
+          setNav("home");
+        }
+      });
     } catch (error) {
       setStartupState("error");
       setStartupStage(null);
@@ -866,7 +875,7 @@ export default function App() {
   configureMenuHaptics(hapticsEnabled, nav !== "in-room");
 
   return (
-    <AppFrame highContrast={highContrastEnabled} homeScene={nav === "home"}>
+    <AppFrame highContrast={highContrastEnabled} homeScene={nav === "home"} onTouchesChange={event => startupTouchGate.update(event.nativeEvent.touches.length)}>
       <StatusBar style="light" hidden={Platform.OS === "android"} animated />
       {nav === "startup" ? (
         <StartupScreen
@@ -960,7 +969,6 @@ export default function App() {
               onChangeHighContrastEnabled={handleHighContrastEnabled}
               playerId={deviceId}
               registered={Boolean(registeredAccount)}
-              onStarsChange={setStars}
               onFeedback={showFeedback}
               onBack={() => setNav("home")}
             />

@@ -4,15 +4,15 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from
 import { FontAwesome5 } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { ANDROID_COMPACT_MENU_UI_SCALE, BackIconButton, Screen, Title, BigButton, theme } from "../components/ui";
-import { redeemPromoCode, submitPlayerReport } from "../network/client";
+import { submitPlayerReport } from "../network/client";
 import { FeedbackKind } from "../components/FeedbackPopup";
 
-type SettingsSection = "sounds" | "haptics" | "language" | "accessibility" | "redeem" | "report";
+type SettingsSection = "sounds" | "haptics" | "language" | "accessibility" | "report";
 
 const SETTINGS_GROUPS = [
   { label: "audioAndFeel", sections: [{ id: "sounds", icon: "volume-up" }, { id: "haptics", icon: "mobile-alt" }] },
   { label: "preferences", sections: [{ id: "language", icon: "globe" }, { id: "accessibility", icon: "universal-access" }] },
-  { label: "extrasAndSupport", sections: [{ id: "redeem", icon: "gift" }, { id: "report", icon: "flag" }] },
+  { label: "extrasAndSupport", sections: [{ id: "report", icon: "flag" }] },
 ] as const;
 
 function SettingsToggle({ label, value, onChange }: { label: string; value: boolean; onChange: (value: boolean) => void }) {
@@ -112,7 +112,6 @@ export function SettingsScreen({
   onChangeHighContrastEnabled,
   playerId,
   registered,
-  onStarsChange,
   onFeedback,
   onBack,
 }: {
@@ -126,15 +125,11 @@ export function SettingsScreen({
   onChangeHighContrastEnabled: (enabled: boolean) => void;
   playerId: string | null;
   registered: boolean;
-  onStarsChange: (stars: number) => void;
   onFeedback: (title: string, message?: string, kind?: FeedbackKind) => void;
   onBack: () => void;
 }) {
   const { t } = useTranslation();
   const [section, setSection] = React.useState<SettingsSection>("sounds");
-  const [code, setCode] = React.useState("");
-  const [redeeming, setRedeeming] = React.useState(false);
-  const [redeemMessage, setRedeemMessage] = React.useState<{ ok: boolean; text: string } | null>(null);
   const [reportedName, setReportedName] = React.useState("");
   const [reportDescription, setReportDescription] = React.useState("");
   const [reporting, setReporting] = React.useState(false);
@@ -151,17 +146,6 @@ export function SettingsScreen({
     } catch (error) {
       onFeedback(t("settings.reportFailed"), error instanceof Error ? error.message : t("feedback.tryAgain"));
     } finally { setReporting(false); }
-  }
-
-  async function handleRedeem() {
-    if (!playerId || !registered || !code.trim() || redeeming) return;
-    setRedeeming(true); setRedeemMessage(null);
-    try {
-      const result = await redeemPromoCode(playerId, code);
-      onStarsChange(result.stars); setCode("");
-      setRedeemMessage({ ok: true, text: t("settings.redeemSuccess", { count: result.reward }) });
-    } catch (error) { setRedeemMessage({ ok: false, text: error instanceof Error ? error.message : t("feedback.tryAgain") }); }
-    finally { setRedeeming(false); }
   }
 
   function renderPanel() {
@@ -196,10 +180,8 @@ export function SettingsScreen({
         );
       case "accessibility":
         return <View style={styles.panelContent}><SettingsToggle label={t("settings.highContrast")} value={highContrastEnabled} onChange={onChangeHighContrastEnabled} /></View>;
-      case "redeem":
-        return <View style={styles.panelContent}>{registered ? <><Text style={styles.redeemHint}>{t("settings.redeemHint")}</Text><View style={styles.redeemRow}><TextInput value={code} onChangeText={(value) => { setCode(value.toUpperCase()); setRedeemMessage(null); }} onSubmitEditing={() => void handleRedeem()} autoCapitalize="characters" autoCorrect={false} maxLength={32} placeholder={t("settings.redeemPlaceholder")} placeholderTextColor={theme.textDim} style={styles.codeInput} /><Pressable disabled={!code.trim() || redeeming} onPress={() => void handleRedeem()} style={[styles.redeemButton, (!code.trim() || redeeming) && styles.disabled]}>{redeeming ? <ActivityIndicator color="#FFF" size="small" /> : <Text style={styles.redeemButtonText}>{t("settings.redeemAction")}</Text>}</Pressable></View>{redeemMessage ? <Text style={[styles.redeemMessage, redeemMessage.ok ? styles.redeemSuccess : styles.redeemError]}>{redeemMessage.text}</Text> : null}</> : <Text style={styles.redeemHint}>{t("settings.redeemSignIn")}</Text>}</View>;
       case "report":
-        return <View style={styles.panelContent}>{registered ? <><Text style={styles.redeemHint}>{t("settings.reportHint")}</Text><TextInput value={reportedName} onChangeText={setReportedName} maxLength={20} autoCorrect={false} placeholder={t("settings.reportNamePlaceholder")} placeholderTextColor={theme.textDim} style={styles.reportNameInput} /><TextInput value={reportDescription} onChangeText={setReportDescription} maxLength={500} multiline textAlignVertical="top" placeholder={t("settings.reportDescriptionPlaceholder")} placeholderTextColor={theme.textDim} style={styles.reportDescriptionInput} /><View style={styles.reportFooter}><Text style={styles.characterCount}>{reportDescription.length}/500</Text><Pressable disabled={reportedName.trim().length < 3 || reportDescription.trim().length < 10 || reporting} onPress={() => void handleReport()} style={[styles.redeemButton, (reportedName.trim().length < 3 || reportDescription.trim().length < 10 || reporting) && styles.disabled]}>{reporting ? <ActivityIndicator color="#FFF" size="small" /> : <Text style={styles.redeemButtonText}>{t("settings.reportAction")}</Text>}</Pressable></View></> : <Text style={styles.redeemHint}>{t("settings.reportSignIn")}</Text>}</View>;
+        return <View style={styles.panelContent}>{registered ? <><Text style={styles.reportHint}>{t("settings.reportHint")}</Text><TextInput value={reportedName} onChangeText={setReportedName} maxLength={20} autoCorrect={false} placeholder={t("settings.reportNamePlaceholder")} placeholderTextColor={theme.textDim} style={styles.reportNameInput} /><TextInput value={reportDescription} onChangeText={setReportDescription} maxLength={500} multiline textAlignVertical="top" placeholder={t("settings.reportDescriptionPlaceholder")} placeholderTextColor={theme.textDim} style={styles.reportDescriptionInput} /><View style={styles.reportFooter}><Text style={styles.characterCount}>{reportDescription.length}/500</Text><Pressable disabled={reportedName.trim().length < 3 || reportDescription.trim().length < 10 || reporting} onPress={() => void handleReport()} style={[styles.reportButton, (reportedName.trim().length < 3 || reportDescription.trim().length < 10 || reporting) && styles.disabled]}>{reporting ? <ActivityIndicator color="#FFF" size="small" /> : <Text style={styles.reportButtonText}>{t("settings.reportAction")}</Text>}</Pressable></View></> : <Text style={styles.reportHint}>{t("settings.reportSignIn")}</Text>}</View>;
     }
   }
 
@@ -294,12 +276,9 @@ const styles = StyleSheet.create({
     borderColor: theme.primary,
   },
   volumeHint: { color: theme.textDim, fontSize: 11, marginTop: 7 },
-  redeemHint: { color: theme.textDim, fontSize: 12, fontWeight: "700", marginBottom: 10 },
-  redeemRow: { width: "100%", flexDirection: "row", gap: 8 },
-  codeInput: { flex: 1, height: 46, paddingHorizontal: 14, borderRadius: 10, color: theme.text, fontSize: 15, fontWeight: "900", letterSpacing: 1, backgroundColor: theme.surface, borderWidth: 1, borderColor: "rgba(185,176,214,0.3)" },
-  redeemButton: { minWidth: 112, height: 46, paddingHorizontal: 14, borderRadius: 10, alignItems: "center", justifyContent: "center", backgroundColor: theme.primary },
-  redeemButtonText: { color: "#FFF", fontSize: 12, fontWeight: "900" }, disabled: { opacity: 0.45 },
-  redeemMessage: { marginTop: 10, fontSize: 12, fontWeight: "800" }, redeemSuccess: { color: "#79E6A5" }, redeemError: { color: "#FF8F9C" },
+  reportHint: { color: theme.textDim, fontSize: 12, fontWeight: "700", marginBottom: 10 },
+  reportButton: { minWidth: 112, height: 46, paddingHorizontal: 14, borderRadius: 10, alignItems: "center", justifyContent: "center", backgroundColor: theme.primary },
+  reportButtonText: { color: "#FFF", fontSize: 12, fontWeight: "900" }, disabled: { opacity: 0.45 },
   reportNameInput: { width: "100%", height: 40, paddingHorizontal: 12, borderRadius: 8, color: theme.text, fontSize: 13, fontWeight: "800", backgroundColor: theme.surface, borderWidth: 1, borderColor: "rgba(185,176,214,0.3)", marginBottom: 7 },
   reportDescriptionInput: { width: "100%", minHeight: 76, maxHeight: 92, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 8, color: theme.text, fontSize: 12, backgroundColor: theme.surface, borderWidth: 1, borderColor: "rgba(185,176,214,0.3)" },
   reportFooter: { flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 10, marginTop: 7 }, characterCount: { color: theme.textDim, fontSize: 10, fontWeight: "700" },

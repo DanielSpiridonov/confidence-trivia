@@ -26,7 +26,7 @@ tested on the affected platforms, and documented where applicable.
 - [x] Define how reports are reviewed and resolved.
 - [x] Verify blocking removes friend access and prevents new challenges.
 - [x] Add server rate limits for authentication, names, friends, challenges,
-      blessings, promo codes, and daily rewards.
+      blessings and daily rewards.
 - [x] Add protections against repeated automated requests and reward abuse.
 
 ## 3. Privacy and data handling
@@ -84,7 +84,7 @@ tested on the affected platforms, and documented where applicable.
 - [ ] Stress-test concurrent public rooms, private rooms, Damage games, and Ranked queues.
 - [ ] Test reconnection, intentional leaving, timeouts, and server restarts.
 - [x] Verify wagers are reserved and settled exactly once.
-- [x] Verify stars, daily rewards, Blessings, and promo codes cannot be duplicated.
+- [x] Verify stars, daily rewards, and Blessings cannot be duplicated.
 - [ ] Add production monitoring and actionable error reporting.
 - [ ] Configure and test database backups and restoration.
 - [x] Audit production dependencies, apply compatible fixes, and document the
