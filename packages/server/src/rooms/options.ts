@@ -4,6 +4,7 @@ export interface JoinOptions {
   deviceId?: string;
   name?: string;
   accessToken?: string;
+  supportsQuestionReady?: boolean;
 }
 
 export interface CreateOptions extends JoinOptions {

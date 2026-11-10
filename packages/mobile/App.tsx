@@ -169,6 +169,7 @@ export default function App() {
   const [roomRecoveryMessage, setRoomRecoveryMessage] = useState<string | null>(null);
   const intentionalLeaveRef = useRef(false);
   const reconnectionTokenRef = useRef<string | null>(null);
+  const reconnectingRef = useRef(false);
   const intentionalSignOutRef = useRef(false);
 
   useEffect(() => {
@@ -177,6 +178,7 @@ export default function App() {
   }, [nav, deviceId, registeredAccount?.playerId]);
 
   const refreshNotificationCounts = React.useCallback(async () => {
+    if (AppState.currentState !== "active") return;
     if (!hasEnteredApp || !registeredAccount || !deviceId || nav === "in-room") return;
     const readNewsKey = `${NEWS_READ_STORAGE_PREFIX}:${deviceId}:${locale}`;
     const [friendsResult, newsResult, savedReadIds] = await Promise.all([
@@ -598,6 +600,7 @@ export default function App() {
 
   function handleExitToHome() {
     intentionalLeaveRef.current = true;
+    reconnectionTokenRef.current = null;
     stopAllSoundEffects();
     void room?.leave().catch(() => undefined);
     setRoomRecovery(null);
@@ -740,6 +743,7 @@ export default function App() {
   }, [deviceId, nav]);
 
   async function attemptReconnect() {
+    if (reconnectingRef.current || intentionalLeaveRef.current) return;
     const token = reconnectionTokenRef.current;
     if (!token) {
       setRoomRecovery("failed");
@@ -749,17 +753,35 @@ export default function App() {
 
     setRoomRecovery("reconnecting");
     setRoomRecoveryMessage(null);
-
+    reconnectingRef.current = true;
     try {
-      const reconnectedRoom = await reconnectRoom(token);
-      reconnectionTokenRef.current = reconnectedRoom.reconnectionToken;
-      setRoom(reconnectedRoom);
-      setRoomRecovery(null);
-      setRoomRecoveryMessage(null);
-      setNav("in-room");
+      const deadline = Date.now() + 25_000;
+      let delay = 500;
+      while (!intentionalLeaveRef.current && reconnectionTokenRef.current === token) {
+        try {
+          const reconnectedRoom = await reconnectRoom(token);
+          if (intentionalLeaveRef.current || reconnectionTokenRef.current !== token) {
+            void reconnectedRoom.leave().catch(() => undefined);
+            return;
+          }
+          reconnectionTokenRef.current = reconnectedRoom.reconnectionToken;
+          setRoom(reconnectedRoom);
+          setRoomRecovery(null);
+          setRoomRecoveryMessage(null);
+          setNav("in-room");
+          return;
+        } catch (error) {
+          if (Date.now() + delay >= deadline) throw error;
+          await new Promise(resolve => setTimeout(resolve, delay));
+          delay = Math.min(delay * 2, 3_000);
+        }
+      }
     } catch (error) {
+      if (intentionalLeaveRef.current || reconnectionTokenRef.current !== token) return;
       setRoomRecovery("failed");
       setRoomRecoveryMessage(error instanceof Error ? error.message : i18n.t("network.unknownError"));
+    } finally {
+      reconnectingRef.current = false;
     }
   }
 
@@ -769,7 +791,7 @@ export default function App() {
     reconnectionTokenRef.current = room.reconnectionToken;
 
     const handleUnexpectedLeave = () => {
-      if (intentionalLeaveRef.current) return;
+      if (intentionalLeaveRef.current || reconnectionTokenRef.current !== room.reconnectionToken) return;
       void attemptReconnect();
     };
 
@@ -793,7 +815,7 @@ export default function App() {
     let cancelled = false;
     let polling = false;
     const poll = async () => {
-      if (polling) return;
+      if (polling || AppState.currentState !== "active") return;
       polling = true;
       try {
         await updatePresence(deviceId, true);
@@ -812,7 +834,7 @@ export default function App() {
       }
     };
     void poll();
-    const interval = setInterval(() => void poll(), 2_000);
+    const interval = setInterval(() => void poll(), 10_000);
     return () => { cancelled = true; clearInterval(interval); };
   }, [defaultPlayerName, deviceId, hasEnteredApp, nav, registeredAccount]);
 
@@ -1123,7 +1145,7 @@ function InRoomRouter({
         return <LobbyScreen room={room} state={state} mySessionId={room.sessionId} />;
       case "question":
       case "visual_loading":
-        return <QuestionScreen room={room} state={state} />;
+        return <QuestionScreen key={state.currentQuestion.id} room={room} state={state} />;
       case "confidence":
         return <ConfidenceScreen room={room} state={state} />;
       case "board_sidebet":

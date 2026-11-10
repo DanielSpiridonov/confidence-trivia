@@ -336,6 +336,7 @@ export async function createRoom(
       damageWager,
       challengeId: challengeId ?? "",
       accessToken,
+      supportsQuestionReady: true,
       friendsTeamMode: friendsOptions?.teamMode,
       friendCategories: friendsOptions?.categories,
       customQuestions: friendsOptions?.customQuestions,
@@ -348,7 +349,7 @@ export async function createRoom(
 
 export async function joinRoom(roomCode: string, deviceId: string, playerName: string) {
   const accessToken = await getAccessToken();
-  const room = await withRoomRequestTimeout(getClient().joinById(roomCode, { deviceId, name: playerName, accessToken }));
+  const room = await withRoomRequestTimeout(getClient().joinById(roomCode, { deviceId, name: playerName, accessToken, supportsQuestionReady: true }));
   return room;
 }
 
@@ -396,7 +397,7 @@ export async function listPublicRooms(): Promise<PublicRoomListing[]> {
 
 export async function joinPublicRoom(roomId: string, deviceId: string, playerName: string) {
   const accessToken = await getAccessToken();
-  return withRoomRequestTimeout(getClient().joinById(roomId, { deviceId, name: playerName, accessToken }));
+  return withRoomRequestTimeout(getClient().joinById(roomId, { deviceId, name: playerName, accessToken, supportsQuestionReady: true }));
 }
 
 export async function reconnectRoom(reconnectionToken: string) {

@@ -59,6 +59,16 @@ export function QuestionScreen({ room, state }: { room: Room; state: any }) {
 
   if (!state) return null;
   const q = state.currentQuestion;
+  const preparing = state.phase === "visual_loading";
+  useEffect(() => {
+    if (q.visualFormat || state.phase !== "visual_loading") return;
+    const questionId = q.id;
+    let secondFrame = 0;
+    const frame = requestAnimationFrame(() => {
+      secondFrame = requestAnimationFrame(() => room.send("visualReady", { questionId }));
+    });
+    return () => { cancelAnimationFrame(frame); cancelAnimationFrame(secondFrame); };
+  }, [room, q.id, q.visualFormat, state.phase]);
   const options: string[] = [...q.options];
   const isNumericFreeTextQuestion = q.qType === "estimate" || q.qType === "closest_answer";
   const isFreeTextQuestion = q.qType === "word" || isNumericFreeTextQuestion;
@@ -88,14 +98,14 @@ export function QuestionScreen({ room, state }: { room: Room; state: any }) {
     && slotOrder.every((cardIndex) => cardIndex !== null);
 
   function submit(index: number) {
-    if (locked) return;
+    if (locked || state.phase !== "question") return;
     setSelected(index);
     setLocked(true);
     room.send("submitAnswer", { value: index });
   }
 
   function submitFreeAnswer() {
-    if (locked || !canSubmitFreeAnswer) return;
+    if (locked || !canSubmitFreeAnswer || state.phase !== "question") return;
     setLocked(true);
     room.send("submitAnswer", {
       value: isNumericFreeTextQuestion ? parsedNumericAnswer : freeAnswer.trim(),
@@ -188,7 +198,7 @@ export function QuestionScreen({ room, state }: { room: Room; state: any }) {
   }
 
   function submitOrderingAnswer() {
-    if (locked || !canSubmitOrdering) return;
+    if (locked || !canSubmitOrdering || state.phase !== "question") return;
     setLocked(true);
     room.send("submitAnswer", { value: slotOrder as number[] });
   }
@@ -271,7 +281,7 @@ export function QuestionScreen({ room, state }: { room: Room; state: any }) {
   </Screen>;
   return (
     <Screen style={styles.screen} androidScale={ANDROID_GAME_UI_SCALE}>
-      <PhaseTimer phaseEndsAt={state.phaseEndsAt} />
+      {preparing ? <Text style={styles.round}>{t("startup.loading")}</Text> : <PhaseTimer phaseEndsAt={state.phaseEndsAt} />}
       <View style={[styles.layout, state.gameMode === "damage" && styles.damageLayout]}>
         <DamageHud state={state} myPlayerId={room.sessionId} />
         <View
@@ -309,7 +319,7 @@ export function QuestionScreen({ room, state }: { room: Room; state: any }) {
                   setFreeAnswer(value);
                   room.send("saveAnswerDraft", { value });
                 }}
-                editable={!locked}
+                editable={!locked && !preparing}
                 keyboardType={isNumericFreeTextQuestion ? "number-pad" : "default"}
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -324,7 +334,7 @@ export function QuestionScreen({ room, state }: { room: Room; state: any }) {
                   label={t("question.submit")}
                   onPress={submitFreeAnswer}
                   soundEffect="answerLocked"
-                  disabled={!canSubmitFreeAnswer}
+                  disabled={preparing || !canSubmitFreeAnswer}
                   style={[styles.submitButton, state.gameMode === "damage" && styles.damageSubmitButton]}
                 />
               )}
@@ -356,7 +366,7 @@ export function QuestionScreen({ room, state }: { room: Room; state: any }) {
                   label={t("question.submit")}
                   onPress={submitOrderingAnswer}
                   soundEffect="answerLocked"
-                  disabled={!canSubmitOrdering}
+                  disabled={preparing || !canSubmitOrdering}
                   style={[styles.submitButton, state.gameMode === "damage" && styles.damageSubmitButton]}
                 />
               )}
@@ -364,7 +374,7 @@ export function QuestionScreen({ room, state }: { room: Room; state: any }) {
                 <BigButton
                   label={t("question.resetOrder")}
                   onPress={() => setSlotOrder(options.map((_, index) => index).sort(() => Math.random() - 0.5))}
-                  disabled={slotOrder.length === 0 || locked}
+                  disabled={preparing || slotOrder.length === 0 || locked}
                   variant="secondary"
                   style={styles.submitButton}
                 />
@@ -401,7 +411,7 @@ export function QuestionScreen({ room, state }: { room: Room; state: any }) {
                   onPress={() => submit(index)}
                   soundEffect="answerLocked"
                   variant={selected === index ? "primary" : "secondary"}
-                  disabled={locked && selected !== index}
+                  disabled={preparing || (locked && selected !== index)}
                   textStyle={[
                     options.length <= 2 ? styles.binaryOptionText : styles.optionText,
                     state.gameMode === "damage" && styles.damageOptionText,

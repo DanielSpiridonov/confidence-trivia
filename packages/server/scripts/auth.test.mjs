@@ -3,6 +3,40 @@ import assert from "node:assert/strict";
 import { generateKeyPairSync } from "node:crypto";
 import { AUTH_REQUEST_TIMEOUT_MS, deleteSupabaseIdentity, requestIdentity, revokeAppleAuthorization, verifySupabaseIdentity } from "../dist/auth.js";
 
+test("8000 authenticated requests share verification until the bounded cache expires", async (t) => {
+  process.env.SUPABASE_URL = "https://cache-test.supabase.co";
+  process.env.SUPABASE_PUBLISHABLE_KEY = "publishable";
+  let now = Date.now();
+  t.mock.method(Date, "now", () => now);
+  const token = `header.${Buffer.from(JSON.stringify({ exp: Math.floor(now / 1000) + 3600 })).toString("base64url")}.cache-test`;
+  let calls = 0;
+  t.mock.method(globalThis, "fetch", async () => {
+    calls++;
+    return new Response(JSON.stringify({ id: "cached-player" }), { status: 200 });
+  });
+  const identities = await Promise.all(Array.from({ length: 100 }, () => verifySupabaseIdentity(`Bearer ${token}`)));
+  assert.ok(identities.every(identity => identity?.userId === "cached-player"));
+  for (let index = 100; index < 8000; index++) await verifySupabaseIdentity(`Bearer ${token}`);
+  assert.equal(calls, 1);
+  now += 60_001;
+  await verifySupabaseIdentity(`Bearer ${token}`);
+  assert.equal(calls, 2);
+});
+
+test("failed verifications are retried and expired tokens are never cached", async (t) => {
+  process.env.SUPABASE_URL = "https://expiry-test.supabase.co";
+  process.env.SUPABASE_PUBLISHABLE_KEY = "publishable";
+  const token = `header.${Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) - 1 })).toString("base64url")}.expired`;
+  let calls = 0;
+  t.mock.method(globalThis, "fetch", async () => {
+    calls++;
+    return new Response("unauthorized", { status: 401 });
+  });
+  assert.equal(await verifySupabaseIdentity(`Bearer ${token}`), null);
+  assert.equal(await verifySupabaseIdentity(`Bearer ${token}`), null);
+  assert.equal(calls, 2);
+});
+
 test("rejects missing bearer token", async () => {
   assert.equal(await verifySupabaseIdentity(undefined), null);
 });

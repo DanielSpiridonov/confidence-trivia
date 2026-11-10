@@ -363,7 +363,8 @@ app.use(httpErrorHandler);
 
 const httpServer = http.createServer(app);
 const gameServer = new Server({
-  transport: new WebSocketTransport({ server: httpServer }),
+  // Allow short mobile network stalls before terminating an unresponsive socket.
+  transport: new WebSocketTransport({ server: httpServer, pingInterval: 5_000, pingMaxRetries: 4 }),
 });
 
 // "confidence_trivia" is the room type name the client requests by;

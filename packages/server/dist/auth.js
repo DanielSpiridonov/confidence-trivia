@@ -9,8 +9,10 @@ const crypto_1 = require("crypto");
 const fs_1 = require("fs");
 exports.AUTH_REQUEST_TIMEOUT_MS = 5000;
 const requestIdentities = new WeakMap();
+const verifiedTokens = new Map();
+const pendingTokens = new Map();
 // Rate limits and ownership checks must use the same verified identity. Cache
-// only for this HTTP request, never beyond token expiration or sign-out.
+// for this HTTP request; verified tokens have a bounded 60-second cache.
 function requestIdentity(request) {
     let identity = requestIdentities.get(request);
     if (!identity) {
@@ -20,6 +22,32 @@ function requestIdentity(request) {
     return identity;
 }
 async function verifySupabaseIdentity(authorization) {
+    const token = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
+    if (!token || !process.env.SUPABASE_URL || !(process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_ANON_KEY))
+        return null;
+    const key = (0, crypto_1.createHash)("sha256").update(`${process.env.SUPABASE_URL}:${process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_ANON_KEY}:${token}`).digest("hex");
+    const cached = verifiedTokens.get(key);
+    if (cached && cached.expiresAt > Date.now())
+        return cached.identity;
+    verifiedTokens.delete(key);
+    const pending = pendingTokens.get(key);
+    if (pending)
+        return pending;
+    const verification = fetchSupabaseIdentity(authorization).then((identity) => {
+        // Claims only bound cache lifetime; Supabase verifies identity first.
+        const exp = decodeJwtPayload(token)?.exp;
+        const expiresAt = typeof exp === "number" ? Math.min(Date.now() + 60000, exp * 1000) : 0;
+        if (identity && expiresAt > Date.now()) {
+            if (verifiedTokens.size >= 1000)
+                verifiedTokens.delete(verifiedTokens.keys().next().value);
+            verifiedTokens.set(key, { identity, expiresAt });
+        }
+        return identity;
+    }).finally(() => pendingTokens.delete(key));
+    pendingTokens.set(key, verification);
+    return verification;
+}
+async function fetchSupabaseIdentity(authorization) {
     const accessToken = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
     const supabaseUrl = process.env.SUPABASE_URL;
     const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_ANON_KEY;
@@ -137,7 +165,14 @@ async function deleteSupabaseIdentity(userId) {
             method: "DELETE",
             headers: { Authorization: `Bearer ${serviceRoleKey}`, apikey: serviceRoleKey },
         });
-        return response.ok || response.status === 404;
+        if (response.ok || response.status === 404) {
+            for (const [key, entry] of verifiedTokens) {
+                if (entry.identity.userId === userId)
+                    verifiedTokens.delete(key);
+            }
+            return true;
+        }
+        return false;
     }
     catch {
         return false;

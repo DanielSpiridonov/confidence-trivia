@@ -18,6 +18,7 @@ function roomFor(record, mode = "classic") {
   const room = Object.create(GameRoom.prototype);
   Object.assign(room, { state: new RoomStateSchema(), clients: [], locale: "en", questionSet: [record], visualReady: new Set(), roundAnswers: new Map(), roundAnswerDrafts: new Map(), roundConfidenceDecisions: new Set(), roundSideBets: new Map(), roundSideBetDecisions: new Set(), setPhase(phase,duration) { this.state.phase = phase; this.state.phaseEndsAt = Date.now()+duration; }, endGame() { this.state.gameEnded = true; } });
   room.state.gameMode = mode;
+  room.questionReadyClients = new Set(["p0", "p1"]);
   for (const id of ["p0","p1"]) { const player = new PlayerSchema(); player.id = id; room.state.players.set(id, player); room.clients.push({ sessionId: id }); }
   room.presentCurrentQuestion();
   return room;
@@ -107,8 +108,43 @@ test("failed or late-loading artwork replaces the question for everyone without 
   for (const failure of [true,false]) {
     const room = roomFor(image); room.state.currentRoundIndex = 0;
     if (failure) room.handleVisualReady(room.clients[0],{questionId:image.id,failed:true}); else room.advancePhase();
-    assert.equal(room.state.phase,"question"); assert.equal(room.state.currentQuestion.visualFormat,"");
+    assert.equal(room.state.phase,"visual_loading"); assert.equal(room.state.currentQuestion.visualFormat,"");
+    assert.equal(room.state.currentQuestion.startedAt, 0);
+    const fallbackId = room.state.currentQuestion.id;
+    room.handleVisualReady(room.clients[0], { questionId: image.id });
+    assert.equal(room.visualReady.size, 0);
+    for (const client of room.clients) room.handleVisualReady(client, { questionId: fallbackId });
+    assert.equal(room.state.phase, "question");
     assert.equal(room.roundAnswers.size,0); assert.equal(room.state.players.get("p0").score,0); assert.equal(room.state.currentRoundIndex,0);
+  }
+});
+
+test("text questions wait for rendering acknowledgements and have a bounded loading timeout", () => {
+  const text = QUESTIONS.find(question => !question.presentation);
+  const room = roomFor(text);
+  assert.equal(room.state.phase, "visual_loading");
+  assert.equal(room.state.currentQuestion.startedAt, 0);
+  room.handleSubmitAnswer(room.clients[0], { value: 0 });
+  assert.equal(room.roundAnswers.size, 0);
+  ready(room);
+  assert.equal(room.state.phase, "question");
+  assert.ok(room.state.currentQuestion.startedAt > 0);
+  const withoutAcknowledgement = roomFor(text);
+  withoutAcknowledgement.advancePhase();
+  assert.equal(withoutAcknowledgement.state.phase, "question");
+  assert.equal(withoutAcknowledgement.state.currentQuestion.id, text.id);
+});
+
+test("published and mixed-version rooms start text questions without requiring new acknowledgements", () => {
+  const text = QUESTIONS.find(question => !question.presentation);
+  for (const supported of [[], ["p0"]]) {
+    const room = roomFor(text);
+    room.questionReadyClients = new Set(supported);
+    room.presentCurrentQuestion();
+    assert.equal(room.state.phase, "question");
+    assert.ok(room.state.currentQuestion.startedAt > 0);
+    room.replaceUnavailableVisual();
+    assert.equal(room.state.phase, "question");
   }
 });
 test("reconnecting during Image Reveal preserves the shared timeline and current stage", async () => {

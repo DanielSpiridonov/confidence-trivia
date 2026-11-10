@@ -90,6 +90,7 @@ export class GameRoom extends Room<RoomStateSchema> {
   private lobbyWasPublic = false;
   private hasCustomQuestions = false;
   private visualReady = new Set<string>();
+  private questionReadyClients = new Set<string>();
   private disposed = false;
 
   onDispose() {
@@ -226,6 +227,7 @@ export class GameRoom extends Room<RoomStateSchema> {
       this.state.hostId = player.id;
     }
     this.state.players.set(client.sessionId, player);
+    if (options.supportsQuestionReady === true) this.questionReadyClients.add(client.sessionId);
     this.challengeRoles.delete(client.sessionId);
     // Return the join handshake immediately; database work must not hold the
     // second player's queue screen behind profile loading or wager reservation.
@@ -511,7 +513,12 @@ export class GameRoom extends Room<RoomStateSchema> {
     (localized.options ?? []).forEach((o) => this.state.currentQuestion.options.push(o));
 
     this.visualReady = new Set();
-    if (record.presentation) this.setPhase("visual_loading", VISUAL_READY_TIMEOUT_MS);
+    // Published clients acknowledge artwork only. Text readiness requires
+    // support from every connected player, including in mixed-version rooms.
+    const connected = [...this.state.players.values()].filter(player => player.connected);
+    const textReadySupported = connected.length > 0
+      && connected.every(player => this.questionReadyClients?.has(player.id));
+    if (record.presentation || textReadySupported) this.setPhase("visual_loading", VISUAL_READY_TIMEOUT_MS);
     else this.beginQuestion();
   }
 
@@ -553,7 +560,8 @@ export class GameRoom extends Room<RoomStateSchema> {
   private advancePhase() {
     switch (this.state.phase) {
       case "visual_loading":
-        this.replaceUnavailableVisual();
+        if (this.state.currentQuestion.visualFormat) this.replaceUnavailableVisual();
+        else this.beginQuestion();
         break;
       case "starting":
         if (!this.hasEnoughPlayers()) {

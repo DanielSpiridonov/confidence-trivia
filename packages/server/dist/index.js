@@ -457,7 +457,8 @@ async function requestCanAccessPlayerData(playerId, request) {
 app.use(httpSafety_1.httpErrorHandler);
 const httpServer = http_1.default.createServer(app);
 const gameServer = new colyseus_1.Server({
-    transport: new ws_transport_1.WebSocketTransport({ server: httpServer }),
+    // Allow short mobile network stalls before terminating an unresponsive socket.
+    transport: new ws_transport_1.WebSocketTransport({ server: httpServer, pingInterval: 5000, pingMaxRetries: 4 }),
 });
 // "confidence_trivia" is the room type name the client requests by;
 // each call to joinOrCreate/create spins up a new authoritative GameRoom

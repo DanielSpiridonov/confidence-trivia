@@ -57,6 +57,7 @@ class GameRoom extends colyseus_1.Room {
         this.lobbyWasPublic = false;
         this.hasCustomQuestions = false;
         this.visualReady = new Set();
+        this.questionReadyClients = new Set();
         this.disposed = false;
     }
     onDispose() {
@@ -199,6 +200,8 @@ class GameRoom extends colyseus_1.Room {
             this.state.hostId = player.id;
         }
         this.state.players.set(client.sessionId, player);
+        if (options.supportsQuestionReady === true)
+            this.questionReadyClients.add(client.sessionId);
         this.challengeRoles.delete(client.sessionId);
         // Return the join handshake immediately; database work must not hold the
         // second player's queue screen behind profile loading or wager reservation.
@@ -494,7 +497,12 @@ class GameRoom extends colyseus_1.Room {
         this.state.currentQuestion.options.clear();
         (localized.options ?? []).forEach((o) => this.state.currentQuestion.options.push(o));
         this.visualReady = new Set();
-        if (record.presentation)
+        // Published clients acknowledge artwork only. Text readiness requires
+        // support from every connected player, including in mixed-version rooms.
+        const connected = [...this.state.players.values()].filter(player => player.connected);
+        const textReadySupported = connected.length > 0
+            && connected.every(player => this.questionReadyClients?.has(player.id));
+        if (record.presentation || textReadySupported)
             this.setPhase("visual_loading", shared_1.VISUAL_READY_TIMEOUT_MS);
         else
             this.beginQuestion();
@@ -542,7 +550,10 @@ class GameRoom extends colyseus_1.Room {
     advancePhase() {
         switch (this.state.phase) {
             case "visual_loading":
-                this.replaceUnavailableVisual();
+                if (this.state.currentQuestion.visualFormat)
+                    this.replaceUnavailableVisual();
+                else
+                    this.beginQuestion();
                 break;
             case "starting":
                 if (!this.hasEnoughPlayers()) {

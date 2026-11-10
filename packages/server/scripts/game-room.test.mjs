@@ -44,6 +44,24 @@ function starting(room) {
   room.state.phaseEndsAt = Date.now() + 3000;
 }
 
+for (const mode of ["classic", "friends", "damage"]) {
+  test(`${mode} ends after an opponent's unexpected disconnect exhausts reconnect grace`, async () => {
+    const room = roomFor(mode);
+    room.state.gameStarted = true;
+    room.state.phase = "question";
+    room.allowReconnection = async (_client, seconds) => {
+      assert.equal(seconds, 30);
+      assert.equal(room.state.gameEnded, false);
+      throw new Error("reconnect grace expired");
+    };
+    await room.onLeave(room.clients[1], false);
+    assert.equal(room.state.gameEnded, true);
+    assert.equal(room.state.phase, "final_results");
+    assert.equal(room.state.players.get("p1").forfeited, true);
+    assert.equal(room.state.players.size, 2);
+  });
+}
+
 test("a single player cannot start Classic", async () => {
   const room = roomFor("classic", 1);
   await room.handleStartGame(room.clients[0]);
