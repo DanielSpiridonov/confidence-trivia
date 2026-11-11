@@ -2,7 +2,7 @@ import { AnswerValue, ConfidenceValue, Locale, QuestionRecord } from "@confidenc
 import { getLocalizedCorrectAnswer } from "./content/questions";
 
 export const BOT_ACCURACY = {
-  easy: { easy: 0.70, medium: 0.50, hard: 0.30 },
+  easy: { easy: 0.75, medium: 0.55, hard: 0.40 },
   normal: { easy: 0.85, medium: 0.70, hard: 0.50 },
   hard: { easy: 0.95, medium: 0.85, hard: 0.70 },
 } as const;
@@ -55,5 +55,5 @@ export function decideBot(record: QuestionRecord, locale: Locale, skill: BotSkil
   // Confidence is fallible, including occasional confident mistakes.
   const belief = Math.max(0, Math.min(1, accuracy + (knows ? 0.10 : -0.15) + (random() - 0.5) * 0.65));
   const confidence: ConfidenceValue = belief > 0.9 ? 6 : belief > 0.75 ? 5 : belief > 0.5 ? 3 : belief > 0.3 ? 1 : "none";
-  return { value, confidence, responseMs: 2500 + Math.floor(random() * 10500), confidenceMs: 800 + Math.floor(random() * 2200) };
+  return { value, confidence, responseMs: 0, confidenceMs: 800 + Math.floor(random() * 2200) };
 }

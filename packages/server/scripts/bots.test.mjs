@@ -14,7 +14,7 @@ function question(type, difficulty='medium') {
 for (const skill of Object.keys(BOT_ACCURACY)) for (const difficulty of ['easy','medium','hard']) {
   test(`accuracy ${skill}/${difficulty} follows configured rate`, () => {
     const random=botRandom('accuracy'); const q=question('multiple_choice',difficulty); let hits=0;
-    for(let i=0;i<15000;i++) { const d=decideBot(q,'en',skill,random); hits+=Number(d.value===1); assert.ok(d.responseMs>=2500&&d.responseMs<13000); }
+    for(let i=0;i<15000;i++) { const d=decideBot(q,'en',skill,random); hits+=Number(d.value===1); assert.equal(d.responseMs,0); }
     assert.ok(Math.abs(hits/15000-BOT_ACCURACY[skill][difficulty])<0.015);
   });
 }
@@ -122,7 +122,7 @@ test('bot timers submit through existing answer/confidence handlers and stop on 
  t.mock.timers.enable({apis:['setTimeout','Date']});
  const r=roomFor('classic');r.addBot('normal');r.state.currentQuestion.id='q';r.state.currentQuestion.qType='multiple_choice';r.state.currentQuestion.options.push('a','b','c');r.state.currentQuestion.startedAt=Date.now();
  r.state.players.get('human').connected=false;
- r.setPhase('question',30000);t.mock.timers.tick(13000);
+ r.setPhase('question',30000);t.mock.timers.tick(0);
  const bot=[...r.state.players.values()].find(p=>p.isBot);assert.ok(r.roundAnswers.has(bot.id));
  r.setPhase('confidence',10000);t.mock.timers.tick(3000);assert.ok(r.roundConfidenceDecisions.has(bot.id));
  r.setPhase('board_sidebet',10000);t.mock.timers.tick(1000);assert.ok(r.roundSideBetDecisions.has(bot.id));
@@ -170,3 +170,14 @@ for (const type of ['estimate', 'closest_answer']) {
     }
   });
 }
+
+
+test('5-Star entry tier uses requested accuracy and instant answers across independently seeded rounds',()=>{
+ assert.equal(wagerBotSkill(5),'easy');
+ const q=question('multiple_choice','easy');let hits=0;
+ for(let i=0;i<10000;i++){
+  const d=decideBot(q,'en',wagerBotSkill(5),botRandom('match:'+i+':round:0:bot'));
+  hits+=Number(d.value===1);assert.equal(d.responseMs,0);
+ }
+ assert.ok(Math.abs(hits/10000-0.75)<0.02);
+});

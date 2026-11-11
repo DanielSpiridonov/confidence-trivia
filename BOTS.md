@@ -28,11 +28,11 @@ packages/server/src/bots.ts contains the tunables:
 
 | Skill | Easy question | Medium question | Hard question |
 | --- | --- | --- | --- |
-| Easy | 70% | 50% | 30% |
+| Easy | 75% | 55% | 40% |
 | Normal | 85% | 70% | 50% |
 | Hard | 95% | 85% | 70% |
 
-Wager tiers: 5/15/40 = Easy; 60/75/100 = Normal; 150/300/500 = Hard. Response times: 2.5-13 seconds. Confidence decisions: 0.8-3 seconds, with noisy belief and occasional confident mistakes. Incorrect integer guesses remain whole numbers; decimal guesses use at most two decimal places. Known exact answers stay unchanged. Closest-answer accuracy describes exact knowledge; wins still depend on all submissions under existing rules.
+Wager tiers: 5/15/40 = Easy; 60/75/100 = Normal; 150/300/500 = Hard. All bot answers are immediate when the question phase starts, after human loading readiness. Confidence decisions: 0.8-3 seconds, with noisy belief and occasional confident mistakes. Incorrect integer guesses remain whole numbers; decimal guesses use at most two decimal places. Known exact answers stay unchanged. Closest-answer accuracy describes exact knowledge; wins still depend on all submissions under existing rules.
 
 ## Validation
 
