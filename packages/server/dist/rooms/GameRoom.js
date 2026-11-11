@@ -54,6 +54,7 @@ class GameRoom extends colyseus_1.Room {
         this.practiceMatch = false;
         this.damageKnockout = false;
         this.damageWagerReserved = false;
+        this.botWagerReserved = false;
         this.gameStartPending = false;
         this.lobbyWasPublic = false;
         this.hasCustomQuestions = false;
@@ -82,8 +83,7 @@ class GameRoom extends colyseus_1.Room {
             bot.team = a <= b ? "A" : "B";
         }
         this.state.players.set(bot.id, bot);
-        this.state.botPractice = true;
-        this.state.damagePot = 0;
+        this.state.botMatch = true;
     }
     async handleBotRequest(client, fallback, skill = "normal") {
         if (client.sessionId !== this.state.hostId || this.state.phase !== "lobby" || this.state.gameStarted
@@ -99,12 +99,19 @@ class GameRoom extends colyseus_1.Room {
                 if (this.disposed || this.state.players.size !== 1 || !this.state.players.get(client.sessionId)?.connected)
                     return;
                 this.addBot((0, bots_1.wagerBotSkill)(this.state.damageWager));
-                this.beginGame();
+                this.gameStartPending = false;
+                await this.handleStartGame(client);
             }
             finally {
                 this.gameStartPending = false;
-                if (!this.disposed && !this.state.gameStarted)
-                    await this.unlock();
+                if (!this.state.gameStarted) {
+                    for (const bot of this.state.players.values())
+                        if (bot.isBot)
+                            this.state.players.delete(bot.id);
+                    this.state.botMatch = false;
+                    if (!this.disposed)
+                        await this.unlock();
+                }
             }
         }
         else {
@@ -149,11 +156,13 @@ class GameRoom extends colyseus_1.Room {
             this.botTimers.add(timer);
         }
     }
-    onDispose() {
+    async onDispose() {
         this.disposed = true;
         this.clearBotTimers();
         if (this.phaseTimeout)
             clearTimeout(this.phaseTimeout);
+        if (this.damageWagerReserved && !this.state.gameEnded)
+            await this.refundStartingWager();
     }
     async onCreate(options = {}) {
         options = (0, options_1.normalizeCreateOptions)(options);
@@ -226,6 +235,7 @@ class GameRoom extends colyseus_1.Room {
                 return;
             if (this.state.players.get(msg?.id)?.isBot)
                 this.state.players.delete(msg.id);
+            this.state.botMatch = [...this.state.players.values()].some(player => player.isBot);
             void this.updateLobbyMetadata();
         });
         this.onMessage("toggleReady", (client) => this.handleToggleReady(client));
@@ -276,7 +286,7 @@ class GameRoom extends colyseus_1.Room {
     async onJoin(client, options = {}) {
         // Admission performs asynchronous authentication. Recheck synchronously so
         // concurrent sockets for one installation cannot occupy multiple seats.
-        if (this.state.gameStarted || this.gameStartPending || (this.state.botPractice && this.state.gameMode === "damage")
+        if (this.state.gameStarted || this.gameStartPending || (this.state.botMatch && this.state.gameMode === "damage")
             || this.state.players.size >= this.maxClients || !isValidDeviceId(options.deviceId)
             || [...this.deviceIds.values()].includes(options.deviceId.toLowerCase())) {
             this.challengeRoles.delete(client.sessionId);
@@ -452,7 +462,7 @@ class GameRoom extends colyseus_1.Room {
     async handleToggleRoomVisibility(client) {
         if (client.sessionId !== this.state.hostId || this.state.gameStarted || this.state.phase !== "lobby")
             return;
-        if (this.hasCustomQuestions || this.state.botPractice)
+        if (this.hasCustomQuestions || this.state.botMatch)
             return;
         const nextIsPublic = !this.isPublic;
         await this.setPrivate(!nextIsPublic);
@@ -472,7 +482,17 @@ class GameRoom extends colyseus_1.Room {
             client.send("gameStartError", { code: "players_not_ready" });
             return;
         }
-        if (this.state.gameMode === "damage" && !this.state.botPractice) {
+        // An earlier failed refund must be resolved before allocating a new escrow.
+        if (this.damageWagerReserved) {
+            this.gameStartPending = true;
+            try {
+                await this.refundStartingWager();
+            }
+            finally {
+                this.gameStartPending = false;
+            }
+        }
+        if (this.state.gameMode === "damage") {
             this.gameStartPending = true;
             const playerEntries = [...this.state.players.values()].flatMap((player) => {
                 const deviceId = this.deviceIds.get(player.id);
@@ -481,11 +501,14 @@ class GameRoom extends colyseus_1.Room {
             // A cancelled countdown may already have a refunded wager, so each new
             // attempt needs a fresh match id while keeping the wager linked to it.
             this.matchId = (0, crypto_1.randomUUID)();
-            const reservation = await (0, database_1.reserveDamageWager)(this.matchId, playerEntries.map(({ deviceId }) => deviceId), this.state.damageWager);
+            const bot = [...this.state.players.values()].find(player => player.isBot);
+            const reservation = bot && playerEntries.length === 1
+                ? await (0, database_1.reserveBotDamageWager)(this.matchId, playerEntries[0].deviceId, this.state.damageWager, bot.botSkill)
+                : await (0, database_1.reserveDamageWager)(this.matchId, playerEntries.map(({ deviceId }) => deviceId), this.state.damageWager);
             if (!reservation.ok) {
                 this.gameStartPending = false;
                 const insufficientNames = playerEntries.filter(({ deviceId }) => reservation.insufficientPlayerIds.includes(deviceId)).map(({ player }) => player.name);
-                this.broadcast("gameStartError", { code: "insufficient_stars", names: insufficientNames, stake: this.state.damageWager });
+                this.broadcast("gameStartError", { code: bot && !reservation.insufficientPlayerIds.length ? "temporarily_unavailable" : "insufficient_stars", names: insufficientNames, stake: this.state.damageWager });
                 return;
             }
             playerEntries.forEach(({ player, deviceId }) => {
@@ -494,7 +517,8 @@ class GameRoom extends colyseus_1.Room {
                     player.stars = balance;
             });
             this.damageWagerReserved = true;
-            if (!this.hasEnoughPlayers() || !this.playersReadyToStart() || playerEntries.some(({ player }) => this.state.players.get(player.id) !== player)) {
+            this.botWagerReserved = Boolean(bot);
+            if (this.disposed || !this.hasEnoughPlayers() || !this.playersReadyToStart() || playerEntries.some(({ player }) => this.state.players.get(player.id) !== player)) {
                 await this.refundStartingWager();
                 this.gameStartPending = false;
                 return;
@@ -536,13 +560,26 @@ class GameRoom extends colyseus_1.Room {
     async refundStartingWager() {
         if (!this.damageWagerReserved)
             return;
-        const balances = await (0, database_1.settleDamageWager)(this.matchId, null);
+        const balances = this.botWagerReserved
+            ? await this.settleBotWager("refund")
+            : await (0, database_1.settleDamageWager)(this.matchId, null);
         this.damageWagerReserved = false;
+        this.botWagerReserved = false;
         for (const player of this.state.players.values()) {
             const balance = balances.get(this.deviceIds.get(player.id) ?? "");
             if (balance !== undefined)
                 player.stars = balance;
         }
+    }
+    async settleBotWager(outcome) {
+        for (let attempt = 0; attempt < 3; attempt++) {
+            const balances = await (0, database_1.settleBotDamageWager)(this.matchId, outcome);
+            if (balances.size)
+                return balances;
+            if (attempt < 2)
+                await new Promise(resolve => setTimeout(resolve, 250 * (attempt + 1)));
+        }
+        throw new Error("Bot wager settlement unavailable; escrow remains pending");
     }
     async cancelStarting() {
         this.clearBotTimers();
@@ -1032,14 +1069,25 @@ class GameRoom extends colyseus_1.Room {
         this.clearBotTimers();
         if (this.phaseTimeout)
             clearTimeout(this.phaseTimeout);
-        void this.persistFinalResults();
+        this.persistResultsWithRetry();
+    }
+    persistResultsWithRetry(attempt = 0) {
+        void this.persistFinalResults().catch(error => {
+            this.resultsPersisted = false;
+            (0, logging_1.logServerError)("Could not persist match results", error);
+            if (attempt < 2) {
+                // Settlement is idempotent and must finish even after the room empties.
+                const timer = setTimeout(() => this.persistResultsWithRetry(attempt + 1), 1000 * (attempt + 1));
+                timer.unref();
+            }
+        });
     }
     async persistFinalResults() {
         if (this.resultsPersisted)
             return;
         this.resultsPersisted = true;
         // Any solo practice session must not farm completion Stars or recorded wins.
-        if (this.practiceMatch || this.state.botPractice)
+        if (this.practiceMatch)
             return;
         const rankingValueFor = (player) => {
             if (this.state.gameMode === "friends" && this.state.friendsTeamMode === "duos") {
@@ -1056,7 +1104,7 @@ class GameRoom extends colyseus_1.Room {
         });
         const completedPlayers = rankedPlayers.flatMap((player, index) => {
             const deviceId = this.deviceIds.get(player.id);
-            if (!deviceId)
+            if (!deviceId || (this.state.botMatch && player.forfeited))
                 return [];
             const priorPlayer = rankedPlayers[index - 1];
             const rankingValue = rankingValueFor(player);
@@ -1074,8 +1122,22 @@ class GameRoom extends colyseus_1.Room {
                 }];
         });
         if (this.state.gameMode === "damage" && this.damageWagerReserved) {
-            const winners = completedPlayers.filter((player) => player.finalRank === 1);
-            await (0, database_1.settleDamageWager)(this.matchId, winners.length === 1 ? winners[0].deviceId : null);
+            if (this.botWagerReserved) {
+                const winners = rankedPlayers.filter(player => rankingValueFor(player) === rankingValueFor(rankedPlayers[0]));
+                const outcome = winners.length !== 1 ? "refund" : winners[0].isBot ? "loss" : "win";
+                const balances = await this.settleBotWager(outcome);
+                for (const player of this.state.players.values()) {
+                    const balance = balances.get(this.deviceIds.get(player.id) ?? "");
+                    if (balance !== undefined)
+                        player.stars = balance;
+                }
+            }
+            else {
+                const winners = completedPlayers.filter((player) => player.finalRank === 1);
+                await (0, database_1.settleDamageWager)(this.matchId, winners.length === 1 ? winners[0].deviceId : null);
+            }
+            this.damageWagerReserved = false;
+            this.botWagerReserved = false;
         }
         const progressUpdates = await (0, database_1.saveCompletedMatch)({
             id: this.matchId,

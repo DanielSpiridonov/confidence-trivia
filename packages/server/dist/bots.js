@@ -45,7 +45,17 @@ function decideBot(record, locale, skill, random) {
     }
     else if (record.type === "estimate" || record.type === "closest_answer") {
         const target = Number(key);
-        value = knows ? target : target + (random() < 0.5 ? -1 : 1) * Math.max(1, Math.abs(target) * (0.1 + random() * 0.5));
+        value = target;
+        if (!knows) {
+            const direction = random() < 0.5 ? -1 : 1;
+            const guess = target + direction * Math.max(1, Math.abs(target) * (0.1 + random() * 0.5));
+            // Counts and years stay integral; decimal questions get concise guesses.
+            const decimalPlaces = Number.isInteger(target) ? 0 : 2;
+            value = Number(guess.toFixed(decimalPlaces));
+            // Rounding must not turn an intended mistake into an exact answer.
+            if (value === target)
+                value = Number((value + direction * 10 ** -decimalPlaces).toFixed(decimalPlaces));
+        }
     }
     else {
         const count = record.translations[locale].options?.length ?? 2;

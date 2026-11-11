@@ -3,7 +3,8 @@ import { AccessibilityInfo, Animated, Easing, Image, StyleSheet, Text, View } fr
 import Svg, { Defs, LinearGradient, Path, Rect, Stop } from "react-native-svg";
 import { useTranslation } from "react-i18next";
 import { FRAME_COSMETIC_COLORS } from "@confidence-trivia/shared";
-import { ANDROID_GAME_UI_SCALE, Screen, BigButton, theme } from "../components/ui";
+import { ANDROID_GAME_UI_SCALE, Screen, theme } from "../components/ui";
+import { Pressable } from "../components/menuHaptics";
 import { PointsIcon } from "../components/PointsIcon";
 import { PlayerFrameEffect } from "../components/PlayerFrameEffect";
 
@@ -40,10 +41,10 @@ function useReducedMotion() {
   return reduced;
 }
 
-export function MatchmakingQueueScreen({ players, mySessionId, ranked, isStarting, countdownSeconds, wager, pot, error, onPlayVsBot, botAvailableAt, botPractice }: {
+export function MatchmakingQueueScreen({ players, mySessionId, ranked, isStarting, countdownSeconds, wager, pot, error, onPlayVsBot, botAvailableAt, botMatch }: {
   onPlayVsBot: () => void;
   botAvailableAt: number;
-  botPractice: boolean;
+  botMatch: boolean;
   players: QueuePlayer[];
   mySessionId: string;
   ranked: boolean;
@@ -64,6 +65,8 @@ export function MatchmakingQueueScreen({ players, mySessionId, ranked, isStartin
   const opponents = players.filter((player) => player.id !== mySessionId);
   const slots = [players.find((player) => player.id === mySessionId), ...opponents.filter((player) => player.connected), ...opponents.filter((player) => !player.connected)];
   const tipIndex = Math.floor(elapsed / 8) % 3;
+  const botAvailable = !ranked && !isStarting && !botMatch && players.length === 1
+    && found === 1 && elapsed >= 5 && Date.now() >= botAvailableAt;
 
   useEffect(() => {
     if (isStarting) return;
@@ -128,7 +131,8 @@ export function MatchmakingQueueScreen({ players, mySessionId, ranked, isStartin
                 </View>
                 <Text style={styles.versusCaption}>{t(isStarting ? "queue.startsIn" : "queue.duel")}</Text>
               </View> : null}
-              <QueueSlot player={slots[index]} mine={index === 0} index={index} compact={ranked} reducedMotion={reducedMotion} />
+              <QueueSlot player={slots[index]} mine={index === 0} index={index} compact={ranked} reducedMotion={reducedMotion}
+                onPlayVsBot={index === 1 && botAvailable ? onPlayVsBot : undefined} />
             </React.Fragment>
           ))}
         </View>
@@ -147,16 +151,14 @@ export function MatchmakingQueueScreen({ players, mySessionId, ranked, isStartin
           <View>
             <Text style={styles.prizeLabel}>{t("queue.prize")}</Text>
             <Text style={styles.prizeAmount}>{t("queue.pot", { count: pot })}</Text>
-            {!botPractice ? <Text style={styles.stake}>{t("queue.stake", { count: wager })}</Text> : null}
+            <Text style={styles.stake}>{t("queue.stake", { count: wager })}</Text>
           </View>
         </View> : <View style={styles.rankedNote}><Text style={styles.rankedLabel}>{t("queue.rankedFormat")}</Text><Text style={styles.stake}>{t("queue.rankedRule")}</Text></View>}
       </View>
 
-      {!ranked && !isStarting && found === 1 && elapsed >= 5 && Date.now() >= botAvailableAt ? <View style={{ paddingHorizontal: 22 }}><BigButton label={t("bots.play")} onPress={onPlayVsBot} variant="secondary" /><Text style={styles.tip}>{t("bots.practice")}</Text></View> : null}
-      {botPractice ? <Text style={styles.tip}>{t("bots.practice")}</Text> : null}
       <View style={styles.tipRow}>
         <Text style={styles.tipLabel}>{t("queue.tipLabel")}</Text>
-        <Text style={styles.tip}>{t(`queue.${ranked ? "rankedTip" : "damageTip"}${tipIndex}`)}</Text>
+        <Text numberOfLines={1} style={styles.tip}>{botAvailable || botMatch ? t("bots.rewards") : t(`queue.${ranked ? "rankedTip" : "damageTip"}${tipIndex}`)}</Text>
       </View>
       {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
       <View pointerEvents="none" style={styles.scanTrack}>
@@ -169,8 +171,9 @@ export function MatchmakingQueueScreen({ players, mySessionId, ranked, isStartin
   );
 }
 
-function QueueSlot({ player, mine, index, compact, reducedMotion }: {
+function QueueSlot({ player, mine, index, compact, reducedMotion, onPlayVsBot }: {
   player?: QueuePlayer; mine: boolean; index: number; compact: boolean; reducedMotion: boolean;
+  onPlayVsBot?: () => void;
 }) {
   const { t } = useTranslation();
   const arrival = useRef(new Animated.Value(1)).current;
@@ -205,11 +208,16 @@ function QueueSlot({ player, mine, index, compact, reducedMotion }: {
           </Animated.View>
         )}
       </View>
-      <View style={[styles.nameplate, mine && styles.myNameplate, frameColor ? { borderColor: frameColor } : null]}>
+      <Pressable disabled={!onPlayVsBot} onPress={onPlayVsBot}
+        accessibilityRole={onPlayVsBot ? "button" : undefined}
+        accessibilityLabel={onPlayVsBot ? t("bots.playPrompt") : undefined}
+        accessibilityHint={onPlayVsBot ? t("bots.rewards") : undefined}
+        style={[styles.nameplate, mine && styles.myNameplate, frameColor ? { borderColor: frameColor } : null, onPlayVsBot && styles.botNameplate]}>
+        {onPlayVsBot ? <Animated.View pointerEvents="none" style={[styles.botGlow, { opacity: reducedMotion ? 0.6 : pulse.interpolate({ inputRange: [0, 1], outputRange: [0.15, 0.8] }) }]} /> : null}
         {player && !reducedMotion ? <PlayerFrameEffect frameId={player.frameId} /> : null}
-        <Text numberOfLines={1} style={[styles.name, { color: connected ? player?.nameColor || theme.text : theme.textDim }]}>{player?.name || t("queue.unknown")}</Text>
-        <Text style={[styles.playerStatus, connected && styles.playerConnected]}>{t(connected ? "queue.lockedIn" : player ? "queue.reconnecting" : "queue.searching")}</Text>
-      </View>
+        <Text numberOfLines={1} style={[styles.name, { color: onPlayVsBot ? "#FFE0A2" : connected ? player?.nameColor || theme.text : theme.textDim }]}>{onPlayVsBot ? t("bots.playPrompt") : player?.name || t("queue.unknown")}</Text>
+        <Text numberOfLines={1} style={[styles.playerStatus, connected && styles.playerConnected]}>{onPlayVsBot ? t("bots.wagerHint") : t(connected ? "queue.lockedIn" : player ? "queue.reconnecting" : "queue.searching")}</Text>
+      </Pressable>
     </Animated.View>
   );
 }
@@ -242,6 +250,8 @@ const styles = StyleSheet.create({
   questionMark: { color: "#C7A7DD", fontSize: 35, fontWeight: "300" },
   nameplate: { width: "100%", maxWidth: 216, alignItems: "center", borderWidth: 1, borderColor: "#674457", borderRadius: 7, backgroundColor: "rgba(29,20,41,0.94)", paddingHorizontal: 8, paddingVertical: 6, marginTop: 5, overflow: "hidden" },
   myNameplate: { borderColor: "#7455AF" },
+  botNameplate: { borderColor: "#F7D58A", backgroundColor: "#392B36" },
+  botGlow: { ...StyleSheet.absoluteFillObject, backgroundColor: "#8B632D", borderWidth: 2, borderColor: "#FFE0A2", borderRadius: 6 },
   name: { fontSize: 15, fontWeight: "800", width: "100%", textAlign: "center" },
   playerStatus: { color: "#A88BB1", fontSize: 8, letterSpacing: 1.3, fontWeight: "800", marginTop: 3 },
   playerConnected: { color: "#8DE3B2" },

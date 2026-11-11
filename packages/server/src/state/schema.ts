@@ -70,7 +70,7 @@ export class RevealEntrySchema extends Schema {
 }
 
 export class RoomStateSchema extends Schema {
-  @type("boolean") botPractice: boolean = false;
+  @type("boolean") botMatch: boolean = false;
   @type("number") botAvailableAt: number = 0;
   @type("number") serverNow: number = 0;
   @type("string") code: string = "";

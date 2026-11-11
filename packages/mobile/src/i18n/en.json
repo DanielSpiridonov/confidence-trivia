@@ -1,12 +1,16 @@
 {
   "bots": {
     "play": "Play vs Bot",
-    "practice": "Bot practice: no Stars staked or earned; no progression.",
     "add": "Add bot � {{skill}}",
     "remove": "Remove bot",
     "easy": "Easy",
     "normal": "Normal",
-    "hard": "Hard"
+    "hard": "Hard",
+    "playPrompt": "Play vs Bot?",
+    "addPlayer": "Add bot",
+    "chooseSkill": "Fill this seat with a bot",
+    "rewards": "Bot matches earn normal completion Stars (first 5 games/day). 1v1 wagers apply.",
+    "wagerHint": "Same Star wager applies"
   },
   "home": {
     "title": "Confivia",

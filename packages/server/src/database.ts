@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import {
   DAILY_REWARD_MAX_STREAK_DAY,
   getDailyStarReward,
+  isDamageWager,
   getPlacementStartingLp,
   getRankedDivision,
   RANKED_LP_BY_PLACEMENT,
@@ -841,6 +842,81 @@ export async function settleDamageWager(matchId: string, winnerId: string | null
   return balances;
 }
 
+/** Bot opponents are the house, never database player identities. */
+export async function reserveBotDamageWager(
+  matchId: string, playerId: string, stake: number, skill: string, connection = sql
+): Promise<DamageWagerReservation> {
+  const failed = { ok: false, balances: new Map<string, number>(), insufficientPlayerIds: [] as string[] };
+  if (!connection || !isDamageWager(stake) || !["easy", "normal", "hard"].includes(skill)) return failed;
+  try {
+    return await connection.begin(async transaction => {
+      const [player] = await transaction<{ stars: number }[]>`
+        select stars from public.players where id = ${playerId} for update
+      `;
+      if (!player) return failed;
+      const [existing] = await transaction<{ player_id: string; stake: number; bot_skill: string; status: string }[]>`
+        select player_id, stake, bot_skill, status from public.bot_damage_wagers where match_id = ${matchId}
+      `;
+      if (existing) {
+        return existing.player_id === playerId && existing.stake === stake && existing.bot_skill === skill && existing.status === "active"
+          ? { ok: true, balances: new Map([[playerId, player.stars]]), insufficientPlayerIds: [] } : failed;
+      }
+      if (player.stars < stake) return { ...failed, insufficientPlayerIds: [playerId] };
+      // A conflicting match id from another player must never debit this player.
+      const inserted = await transaction<{ match_id: string }[]>`
+        insert into public.bot_damage_wagers (match_id, player_id, stake, bot_skill)
+        values (${matchId}, ${playerId}, ${stake}, ${skill})
+        on conflict (match_id) do nothing returning match_id
+      `;
+      if (!inserted.length) return failed;
+      await transaction`update public.players set stars = stars - ${stake} where id = ${playerId}`;
+      await transaction`
+        insert into public.star_transactions (id, player_id, amount, reason, source_bot_wager_id)
+        values (${randomUUID()}, ${playerId}, ${-stake}, 'bot_wager_stake', ${matchId})
+      `;
+      return { ok: true, balances: new Map([[playerId, player.stars - stake]]), insufficientPlayerIds: [] };
+    });
+  } catch (error) {
+    logServerError("Could not reserve bot wager", error);
+    return failed;
+  }
+}
+
+export async function settleBotDamageWager(
+  matchId: string, outcome: "win" | "loss" | "refund", connection = sql
+): Promise<Map<string, number>> {
+  const balances = new Map<string, number>();
+  if (!connection || !["win", "loss", "refund"].includes(outcome)) return balances;
+  try {
+    // Return balances only after the entire transaction has committed.
+    return await connection.begin(async transaction => {
+      const [wager] = await transaction<{ player_id: string; stake: number; status: string }[]>`
+        select player_id, stake, status from public.bot_damage_wagers where match_id = ${matchId} for update
+      `;
+      if (!wager) return new Map<string, number>();
+      if (wager.status === "active") {
+        const amount = outcome === "win" ? wager.stake * 2 : outcome === "refund" ? wager.stake : 0;
+        if (amount > 0) {
+          await transaction`update public.players set stars = stars + ${amount} where id = ${wager.player_id}`;
+          await transaction`
+            insert into public.star_transactions (id, player_id, amount, reason, source_bot_wager_id)
+            values (${randomUUID()}, ${wager.player_id}, ${amount}, ${outcome === "win" ? "bot_wager_payout" : "bot_wager_refund"}, ${matchId})
+          `;
+        }
+        await transaction`
+          update public.bot_damage_wagers set status = ${outcome === "win" ? "paid" : outcome === "loss" ? "lost" : "refunded"}, settled_at = now()
+          where match_id = ${matchId}
+        `;
+      }
+      const [player] = await transaction<{ stars: number }[]>`select stars from public.players where id = ${wager.player_id}`;
+      return player ? new Map([[wager.player_id, player.stars]]) : new Map<string, number>();
+    });
+  } catch (error) {
+    logServerError("Could not settle bot wager", error);
+    return balances;
+  }
+}
+
 export interface DailyRewardStatus {
   stars: number;
   available: boolean;
@@ -1108,12 +1184,12 @@ export async function claimDailyReward(deviceId: string, displayName: string): P
   }
 }
 
-export async function saveCompletedMatch(match: CompletedMatch): Promise<Map<string, PlayerProgressUpdate>> {
+export async function saveCompletedMatch(match: CompletedMatch, connection = sql): Promise<Map<string, PlayerProgressUpdate>> {
   const progressUpdates = new Map<string, PlayerProgressUpdate>();
-  if (!sql || match.players.length === 0) return progressUpdates;
+  if (!connection || match.players.length === 0) return progressUpdates;
 
   try {
-    await sql.begin(async (transaction) => {
+    await connection.begin(async (transaction) => {
       const insertedMatches = await transaction<{ id: string }[]>`
         insert into public.matches (
           id, room_code, game_mode, locale, round_count, started_at

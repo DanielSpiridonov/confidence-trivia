@@ -32,6 +32,7 @@ export function LobbyScreen({ room, state, mySessionId }: { room: Room; state: a
   const [countdownEndsAt, setCountdownEndsAt] = useState<number | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
   const [startPending, setStartPending] = useState(false);
+  const [botPickerOpen, setBotPickerOpen] = useState(false);
   const startTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startInFlight = useRef(false);
   const mounted = useRef(true);
@@ -116,6 +117,8 @@ export function LobbyScreen({ room, state, mySessionId }: { room: Room; state: a
   const validFriendsTeamSize = state.gameMode !== "friends" || state.friendsTeamMode !== "duos" || (connectedPlayerCount >= 4 && connectedPlayerCount % 2 === 0);
   const everyoneReady = isMatchmade || players.every(player => !player.connected || player.isHost || player.ready);
   const canStart = isHost && everyoneReady && validFriendsTeamSize && (state.gameMode === "damage" || state.gameMode === "ranked" ? connectedPlayerCount === requiredPlayers : connectedPlayerCount >= requiredPlayers);
+  const canAddBot = isHost && !isStarting && !startPending && !state.isPublic && !isChallenge
+    && ["classic", "friends"].includes(state.gameMode) && players.length < 16;
 
   function handleStart() {
     if (!canStart || startInFlight.current) return;
@@ -144,7 +147,7 @@ export function LobbyScreen({ room, state, mySessionId }: { room: Room; state: a
   }
 
   if (isMatchmade) {
-    return <MatchmakingQueueScreen players={players} mySessionId={mySessionId} ranked={isRanked} isStarting={isStarting} countdownSeconds={countdownSeconds} wager={state.damageWager} pot={state.damagePot} error={startError} botAvailableAt={state.botAvailableAt} botPractice={Boolean(state.botPractice)} onPlayVsBot={() => room.send("playVsBot")} />;
+    return <MatchmakingQueueScreen players={players} mySessionId={mySessionId} ranked={isRanked} isStarting={isStarting} countdownSeconds={countdownSeconds} wager={state.damageWager} pot={state.damagePot} error={startError} botAvailableAt={state.botAvailableAt} botMatch={Boolean(state.botMatch)} onPlayVsBot={() => room.send("playVsBot")} />;
   }
 
   return (
@@ -169,7 +172,20 @@ export function LobbyScreen({ room, state, mySessionId }: { room: Room; state: a
                 {item.team ? <Text style={[styles.teamBadge, item.team === "B" && styles.teamBadgeB]}>{t("lobby.team", { team: item.team })}</Text> : null}
                 <View style={styles.playerStatus}><View style={[styles.statusDot, !item.connected ? styles.disconnectedDot : item.ready || item.isHost ? styles.readyDot : null]} /><Text numberOfLines={1} style={item.connected && (item.ready || item.isHost) ? styles.readyBadge : styles.notReadyBadge}>{!item.connected ? t("lobby.reconnecting") : item.isHost ? t("lobby.host") : item.ready ? t("lobby.ready") : t("lobby.notReady")}</Text></View>
               </View>
-            )} />
+            )} ListFooterComponent={canAddBot ? <View>
+              <Pressable accessibilityRole="button" accessibilityLabel={t("bots.addPlayer")}
+                accessibilityState={{ expanded: botPickerOpen }} onPress={() => setBotPickerOpen(value => !value)}
+                style={[styles.playerRow, styles.phantomRow]}>
+                <View style={[styles.playerNumber, styles.phantomNumber]}><FontAwesome5 name="plus" size={12} color="#BFA4D8" /></View>
+                <View style={styles.playerIdentity}><Text style={styles.phantomLabel}>{t("bots.addPlayer")}</Text><Text style={styles.phantomHint}>{t("bots.chooseSkill")}</Text></View>
+                <FontAwesome5 name={botPickerOpen ? "chevron-up" : "chevron-down"} size={10} color="#A58CBF" />
+              </Pressable>
+              {botPickerOpen ? <View style={styles.botSkills}>{(["easy", "normal", "hard"] as const).map(skill => <Pressable key={skill}
+                accessibilityRole="button" accessibilityLabel={t("bots.add", { skill: t(`bots.${skill}`) })}
+                onPress={() => { room.send("addBot", { skill }); setBotPickerOpen(false); }} style={styles.botSkillButton}>
+                <Text style={styles.botSkillText}>{t(`bots.${skill}`)}</Text>
+              </Pressable>)}</View> : null}
+            </View> : null} />
             {!isChallenge ? <View style={styles.rosterFooter}><FontAwesome5 name="user-plus" size={12} color="#A58CBF" /><Text style={styles.rosterHint}>{t("lobby.inviteHint")}</Text></View> : null}
           </View>
 
@@ -191,8 +207,7 @@ export function LobbyScreen({ room, state, mySessionId }: { room: Room; state: a
               <Text style={styles.visibilityLabel}>{state.isPublic ? t("lobby.partyPublic") : t("lobby.partyPrivate")}</Text>
               <View style={[styles.visibilityTrack, state.isPublic && styles.visibilityTrackEnabled]}><View style={[styles.visibilityThumb, state.isPublic && styles.visibilityThumbEnabled]} /></View>
             </Pressable> : null}
-            {state.botPractice ? <Text style={styles.waitingHint}>{t("bots.practice")}</Text> : null}
-            {isHost && !isStarting && !state.isPublic && !isChallenge && ["classic", "friends"].includes(state.gameMode) && players.length < 16 ? <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>{(["easy", "normal", "hard"] as const).map(skill => <Pressable key={skill} accessibilityRole="button" onPress={() => room.send("addBot", { skill })}><Text style={styles.youLabel}>{t("bots.add", { skill: t(`bots.${skill}`) })}</Text></Pressable>)}</View> : null}
+            {state.botMatch ? <Text style={styles.waitingHint}>{t("bots.rewards")}</Text> : null}
             <View style={styles.actionArea}>
               {!isStarting ? <Text style={styles.waitingHint}>{connectedPlayerCount < requiredPlayers ? t("lobby.waitingForPlayers", { count: requiredPlayers - connectedPlayerCount }) : !validFriendsTeamSize ? t("lobby.evenTeamsHint") : !everyoneReady ? t("lobby.waitingForReady") : isHost ? t("lobby.hostCanStart") : t("lobby.waitingForHost")}</Text> : null}
               {!isStarting && (isHost ? <BigButton label={startPending ? "Starting…" : t("lobby.start")} onPress={() => void handleStart()} disabled={!canStart || startPending} lobbyHaptic /> : <BigButton label={me?.ready ? t("lobby.notReady") : t("lobby.ready")} onPress={() => room.send("toggleReady")} variant="secondary" lobbyHaptic />)}
@@ -249,6 +264,13 @@ const styles = StyleSheet.create({
   hostNumber: { backgroundColor: "#4D3A2C" },
   playerNumberText: { color: "#BDA8D3", fontSize: 11, fontWeight: "900" },
   playerIdentity: { flex: 1, minWidth: 0 },
+  phantomRow: { borderStyle: "dashed", borderColor: "#806391", backgroundColor: "rgba(57,40,72,0.25)" },
+  phantomNumber: { backgroundColor: "rgba(125,94,151,0.15)", borderWidth: 1, borderStyle: "dashed", borderColor: "#806391" },
+  phantomLabel: { color: "#CDB3E7", fontSize: 13, fontWeight: "800" },
+  phantomHint: { color: "#A58CBF", fontSize: 9, marginTop: 2 },
+  botSkills: { flexDirection: "row", gap: 7, marginBottom: 8 },
+  botSkillButton: { flex: 1, alignItems: "center", justifyContent: "center", minHeight: 40, borderRadius: 8, borderWidth: 1, borderColor: "#74548C", backgroundColor: "#30213F" },
+  botSkillText: { color: "#E2CFF3", fontSize: 11, fontWeight: "800" },
   playerNameLine: { flexDirection: "row", alignItems: "center", gap: 5 },
   youLabel: { color: "#C5A0E6", fontSize: 9, fontWeight: "800" },
   hostLabel: { color: "#D2B577", fontSize: 9, marginTop: 2 },

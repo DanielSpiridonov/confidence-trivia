@@ -286,7 +286,7 @@ __decorate([
 class RoomStateSchema extends schema_1.Schema {
     constructor() {
         super(...arguments);
-        this.botPractice = false;
+        this.botMatch = false;
         this.botAvailableAt = 0;
         this.serverNow = 0;
         this.code = "";
@@ -316,7 +316,7 @@ exports.RoomStateSchema = RoomStateSchema;
 __decorate([
     (0, schema_1.type)("boolean"),
     __metadata("design:type", Boolean)
-], RoomStateSchema.prototype, "botPractice", void 0);
+], RoomStateSchema.prototype, "botMatch", void 0);
 __decorate([
     (0, schema_1.type)("number"),
     __metadata("design:type", Number)

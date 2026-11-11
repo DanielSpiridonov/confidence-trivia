@@ -35,7 +35,7 @@ import {
   RevealEntrySchema,
 } from "../state/schema";
 import { getLocalizedCorrectAnswer, getQuestionSet, localize, localizeAnswer, localizeAnswerItems } from "../content/questions";
-import { canPlayerEnterGame, getAcceptedChallengeParticipantRole, getPlayerCustomization, isAuthenticatedPlayer, reserveDamageWager, saveCompletedMatch, settleDamageWager, upsertPlayer } from "../database";
+import { canPlayerEnterGame, getAcceptedChallengeParticipantRole, getPlayerCustomization, isAuthenticatedPlayer, reserveDamageWager, reserveBotDamageWager, saveCompletedMatch, settleDamageWager, settleBotDamageWager, upsertPlayer } from "../database";
 import { verifySupabaseIdentity } from "../auth";
 import { logServerError } from "../logging";
 import { CreateOptions, JoinOptions, normalizeCreateOptions } from "./options";
@@ -87,6 +87,7 @@ export class GameRoom extends Room<RoomStateSchema> {
   private practiceMatch = false;
   private damageKnockout = false;
   private damageWagerReserved = false;
+  private botWagerReserved = false;
   private gameStartPending = false;
   private lobbyWasPublic = false;
   private hasCustomQuestions = false;
@@ -113,8 +114,7 @@ export class GameRoom extends Room<RoomStateSchema> {
       bot.team = a <= b ? "A" : "B";
     }
     this.state.players.set(bot.id, bot);
-    this.state.botPractice = true;
-    this.state.damagePot = 0;
+    this.state.botMatch = true;
   }
 
   private async handleBotRequest(client: Client, fallback: boolean, skill: unknown = "normal") {
@@ -128,10 +128,15 @@ export class GameRoom extends Room<RoomStateSchema> {
         await this.lock();
         if (this.disposed || this.state.players.size !== 1 || !this.state.players.get(client.sessionId)?.connected) return;
         this.addBot(wagerBotSkill(this.state.damageWager));
-        this.beginGame();
+        this.gameStartPending = false;
+        await this.handleStartGame(client);
       } finally {
         this.gameStartPending = false;
-        if (!this.disposed && !this.state.gameStarted) await this.unlock();
+        if (!this.state.gameStarted) {
+          for (const bot of this.state.players.values()) if (bot.isBot) this.state.players.delete(bot.id);
+          this.state.botMatch = false;
+          if (!this.disposed) await this.unlock();
+        }
       }
     } else {
       if (this.isPublic || !["classic", "friends"].includes(this.state.gameMode)
@@ -170,10 +175,11 @@ export class GameRoom extends Room<RoomStateSchema> {
     }
   }
 
-  onDispose() {
+  async onDispose() {
     this.disposed = true;
     this.clearBotTimers();
     if (this.phaseTimeout) clearTimeout(this.phaseTimeout);
+    if (this.damageWagerReserved && !this.state.gameEnded) await this.refundStartingWager();
   }
 
   async onCreate(options: CreateOptions = {}) {
@@ -244,6 +250,7 @@ export class GameRoom extends Room<RoomStateSchema> {
     this.onMessage("removeBot", (client, msg) => {
       if (client.sessionId !== this.state.hostId || this.state.phase !== "lobby" || this.gameStartPending) return;
       if (this.state.players.get(msg?.id)?.isBot) this.state.players.delete(msg.id);
+      this.state.botMatch = [...this.state.players.values()].some(player => player.isBot);
       void this.updateLobbyMetadata();
     });
     this.onMessage("toggleReady", (client) => this.handleToggleReady(client));
@@ -289,7 +296,7 @@ export class GameRoom extends Room<RoomStateSchema> {
   async onJoin(client: Client, options: JoinOptions = {}) {
     // Admission performs asynchronous authentication. Recheck synchronously so
     // concurrent sockets for one installation cannot occupy multiple seats.
-    if (this.state.gameStarted || this.gameStartPending || (this.state.botPractice && this.state.gameMode === "damage")
+    if (this.state.gameStarted || this.gameStartPending || (this.state.botMatch && this.state.gameMode === "damage")
       || this.state.players.size >= this.maxClients || !isValidDeviceId(options.deviceId)
       || [...this.deviceIds.values()].includes(options.deviceId.toLowerCase())) {
       this.challengeRoles.delete(client.sessionId);
@@ -455,7 +462,7 @@ export class GameRoom extends Room<RoomStateSchema> {
 
   private async handleToggleRoomVisibility(client: Client) {
     if (client.sessionId !== this.state.hostId || this.state.gameStarted || this.state.phase !== "lobby") return;
-    if (this.hasCustomQuestions || this.state.botPractice) return;
+    if (this.hasCustomQuestions || this.state.botMatch) return;
     const nextIsPublic = !this.isPublic;
     await this.setPrivate(!nextIsPublic);
     this.isPublic = nextIsPublic;
@@ -473,7 +480,13 @@ export class GameRoom extends Room<RoomStateSchema> {
       client.send("gameStartError", { code: "players_not_ready" });
       return;
     }
-    if (this.state.gameMode === "damage" && !this.state.botPractice) {
+    // An earlier failed refund must be resolved before allocating a new escrow.
+    if (this.damageWagerReserved) {
+      this.gameStartPending = true;
+      try { await this.refundStartingWager(); }
+      finally { this.gameStartPending = false; }
+    }
+    if (this.state.gameMode === "damage") {
       this.gameStartPending = true;
       const playerEntries = [...this.state.players.values()].flatMap((player) => {
         const deviceId = this.deviceIds.get(player.id);
@@ -482,11 +495,14 @@ export class GameRoom extends Room<RoomStateSchema> {
       // A cancelled countdown may already have a refunded wager, so each new
       // attempt needs a fresh match id while keeping the wager linked to it.
       this.matchId = randomUUID();
-      const reservation = await reserveDamageWager(this.matchId, playerEntries.map(({ deviceId }) => deviceId), this.state.damageWager);
+      const bot = [...this.state.players.values()].find(player => player.isBot);
+      const reservation = bot && playerEntries.length === 1
+        ? await reserveBotDamageWager(this.matchId, playerEntries[0].deviceId, this.state.damageWager, bot.botSkill)
+        : await reserveDamageWager(this.matchId, playerEntries.map(({ deviceId }) => deviceId), this.state.damageWager);
       if (!reservation.ok) {
         this.gameStartPending = false;
         const insufficientNames = playerEntries.filter(({ deviceId }) => reservation.insufficientPlayerIds.includes(deviceId)).map(({ player }) => player.name);
-        this.broadcast("gameStartError", { code: "insufficient_stars", names: insufficientNames, stake: this.state.damageWager });
+        this.broadcast("gameStartError", { code: bot && !reservation.insufficientPlayerIds.length ? "temporarily_unavailable" : "insufficient_stars", names: insufficientNames, stake: this.state.damageWager });
         return;
       }
       playerEntries.forEach(({ player, deviceId }) => {
@@ -494,7 +510,8 @@ export class GameRoom extends Room<RoomStateSchema> {
         if (balance !== undefined) player.stars = balance;
       });
       this.damageWagerReserved = true;
-      if (!this.hasEnoughPlayers() || !this.playersReadyToStart() || playerEntries.some(({ player }) => this.state.players.get(player.id) !== player)) {
+      this.botWagerReserved = Boolean(bot);
+      if (this.disposed || !this.hasEnoughPlayers() || !this.playersReadyToStart() || playerEntries.some(({ player }) => this.state.players.get(player.id) !== player)) {
         await this.refundStartingWager();
         this.gameStartPending = false;
         return;
@@ -534,12 +551,24 @@ export class GameRoom extends Room<RoomStateSchema> {
 
   private async refundStartingWager() {
     if (!this.damageWagerReserved) return;
-    const balances = await settleDamageWager(this.matchId, null);
+    const balances = this.botWagerReserved
+      ? await this.settleBotWager("refund")
+      : await settleDamageWager(this.matchId, null);
     this.damageWagerReserved = false;
+    this.botWagerReserved = false;
     for (const player of this.state.players.values()) {
       const balance = balances.get(this.deviceIds.get(player.id) ?? "");
       if (balance !== undefined) player.stars = balance;
     }
+  }
+
+  private async settleBotWager(outcome: "win" | "loss" | "refund") {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const balances = await settleBotDamageWager(this.matchId, outcome);
+      if (balances.size) return balances;
+      if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 250 * (attempt + 1)));
+    }
+    throw new Error("Bot wager settlement unavailable; escrow remains pending");
   }
 
   private async cancelStarting() {
@@ -1021,14 +1050,26 @@ export class GameRoom extends Room<RoomStateSchema> {
     this.state.gameEnded = true;
     this.clearBotTimers();
     if (this.phaseTimeout) clearTimeout(this.phaseTimeout);
-    void this.persistFinalResults();
+    this.persistResultsWithRetry();
+  }
+
+  private persistResultsWithRetry(attempt = 0) {
+    void this.persistFinalResults().catch(error => {
+      this.resultsPersisted = false;
+      logServerError("Could not persist match results", error);
+      if (attempt < 2) {
+        // Settlement is idempotent and must finish even after the room empties.
+        const timer = setTimeout(() => this.persistResultsWithRetry(attempt + 1), 1000 * (attempt + 1));
+        timer.unref();
+      }
+    });
   }
 
   private async persistFinalResults() {
     if (this.resultsPersisted) return;
     this.resultsPersisted = true;
     // Any solo practice session must not farm completion Stars or recorded wins.
-    if (this.practiceMatch || this.state.botPractice) return;
+    if (this.practiceMatch) return;
 
     const rankingValueFor = (player: PlayerSchema) => {
       if (this.state.gameMode === "friends" && this.state.friendsTeamMode === "duos") {
@@ -1044,7 +1085,7 @@ export class GameRoom extends Room<RoomStateSchema> {
       });
     const completedPlayers = rankedPlayers.flatMap((player, index) => {
       const deviceId = this.deviceIds.get(player.id);
-      if (!deviceId) return [];
+      if (!deviceId || (this.state.botMatch && player.forfeited)) return [];
       const priorPlayer = rankedPlayers[index - 1];
       const rankingValue = rankingValueFor(player);
       const priorRankingValue = priorPlayer ? rankingValueFor(priorPlayer) : null;
@@ -1062,8 +1103,20 @@ export class GameRoom extends Room<RoomStateSchema> {
     });
 
     if (this.state.gameMode === "damage" && this.damageWagerReserved) {
-      const winners = completedPlayers.filter((player) => player.finalRank === 1);
-      await settleDamageWager(this.matchId, winners.length === 1 ? winners[0].deviceId : null);
+      if (this.botWagerReserved) {
+        const winners = rankedPlayers.filter(player => rankingValueFor(player) === rankingValueFor(rankedPlayers[0]));
+        const outcome = winners.length !== 1 ? "refund" : winners[0].isBot ? "loss" : "win";
+        const balances = await this.settleBotWager(outcome);
+        for (const player of this.state.players.values()) {
+          const balance = balances.get(this.deviceIds.get(player.id) ?? "");
+          if (balance !== undefined) player.stars = balance;
+        }
+      } else {
+        const winners = completedPlayers.filter((player) => player.finalRank === 1);
+        await settleDamageWager(this.matchId, winners.length === 1 ? winners[0].deviceId : null);
+      }
+      this.damageWagerReserved = false;
+      this.botWagerReserved = false;
     }
 
     const progressUpdates = await saveCompletedMatch({

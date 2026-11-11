@@ -41,22 +41,27 @@ test('seeded decisions reproduce exactly and wager tiers never weaken',()=>{
 function roomFor(mode='damage') {
  const room=Object.create(GameRoom.prototype);
  Object.assign(room,{state:new RoomStateSchema(),maxClients:mode==='damage'?2:16,botTimers:new Set(),botDecisions:new Map(),roundAnswers:new Map(),roundConfidenceDecisions:new Set(),roundSideBetDecisions:new Set(),roundSideBets:new Map(),deviceIds:new Map(),questionSet:[question('multiple_choice')],locale:'en',matchId:'seed',clients:[],lock:async()=>{},unlock:async()=>{},setPrivate:async()=>{},updateLobbyMetadata:async()=>{},broadcast:()=>{}});
- room.state.gameMode=mode;room.state.damageWager=500;room.state.hostId='human';room.state.botAvailableAt=Date.now()+5000;
+ room.state.gameMode=mode;room.state.damageWager=500;room.state.damagePot=1000;room.state.hostId='human';room.state.botAvailableAt=Date.now()+5000;
  const human=new PlayerSchema();human.id='human';human.isHost=true;room.state.players.set(human.id,human);room.deviceIds.set(human.id,'device');
  return room;
 }
 const actor={sessionId:'human'};
-test('fallback waits five seconds, then starts and locks a practice bot game',async()=>{
+const database=require('../dist/database.js');
+// Room tests stub storage; separate PostgreSQL tests exercise the real ledger.
+database.reserveBotDamageWager=async (_id, playerId, stake) => ({ok:true,balances:new Map([[playerId,1000-stake]]),insufficientPlayerIds:[]});
+database.settleBotDamageWager=async () => new Map([['device',1000]]);
+
+test('fallback waits five seconds, then reserves a wager and starts a bot game',async()=>{
  const r=roomFor();let locks=0;r.lock=async()=>{locks++};r.setPhase=phase=>{r.state.phase=phase};
  await r.handleBotRequest(actor,true);assert.equal(locks,0);assert.equal(r.state.players.size,1);
  r.state.botAvailableAt=Date.now()-1;await r.handleBotRequest(actor,true);
- assert.equal(locks,1);assert.equal(r.state.phase,'starting');assert.equal(r.state.botPractice,true);assert.equal(r.state.damagePot,0);
+ assert.equal(locks,1);assert.equal(r.state.phase,'starting');assert.equal(r.state.botMatch,true);assert.equal(r.state.damagePot,1000);
  assert.equal([...r.state.players.values()][1].botSkill,'hard');
  await r.handleBotRequest(actor,true);assert.equal(r.state.players.size,2);
 });
 test('human arrival wins the race before fallback; bot fallback cannot replace them',async()=>{
  const r=roomFor();r.state.botAvailableAt=0;const p=new PlayerSchema();p.id='other';r.state.players.set(p.id,p);
- await r.handleBotRequest(actor,true);assert.equal(r.state.botPractice,false);assert.equal(r.state.players.size,2);
+ await r.handleBotRequest(actor,true);assert.equal(r.state.botMatch,false);assert.equal(r.state.players.size,2);
 });
 test('in-flight human admission is rejected during fallback lock',async()=>{
  const r=roomFor();r.state.botAvailableAt=0;let release;r.lock=()=>new Promise(resolve=>{release=resolve});r.setPhase=phase=>{r.state.phase=phase};
@@ -75,14 +80,44 @@ test('private hosts choose skills independently of avatar, guests/public/ranked 
  r.isPublic=true;await r.handleBotRequest(actor,false,'hard');assert.equal(r.state.players.size,2);
  const ranked=roomFor('ranked');await ranked.handleBotRequest(actor,false,'hard');assert.equal(ranked.state.players.size,1);
 });
-test('bot practice never reserves, settles, saves progression, or changes stars',async()=>{
- const db=require('../dist/database.js');const keys=['reserveDamageWager','settleDamageWager','saveCompletedMatch'];const old=keys.map(k=>db[k]);
+test('private bot matches persist normal completion rewards for humans only',async()=>{
+ const old=database.saveCompletedMatch;let recorded;
  try {
-  for(const k of keys)db[k]=()=>{throw new Error('Unexpected transaction '+k)};
-  const r=roomFor();r.addBot('normal');r.setPhase=phase=>{r.state.phase=phase};r.state.players.get('human').stars=42;
-  await r.handleStartGame(actor);assert.equal(r.state.phase,'starting');await r.persistFinalResults();await r.persistFinalResults();assert.equal(r.state.players.get('human').stars,42);
- }finally{keys.forEach((k,i)=>db[k]=old[i])}
+  database.saveCompletedMatch=async match=>{recorded=match;return new Map([['device',{stars:52,starsEarned:10,rewardedGamesToday:1}]])};
+  const r=roomFor('friends');r.addBot('normal');r.state.players.get('human').stars=42;
+  await r.persistFinalResults();await r.persistFinalResults();
+  assert.equal(recorded.players.length,1);assert.equal(recorded.players[0].deviceId,'device');
+  assert.equal(r.state.players.get('human').stars,52);assert.equal(r.state.players.get('human').starsEarnedThisGame,10);
+ }finally{database.saveCompletedMatch=old}
 });
+for(const outcome of ['win','loss','refund']) test('bot wager settlement handles '+outcome,async()=>{
+ const oldSettle=database.settleBotDamageWager,oldSave=database.saveCompletedMatch;let settled;let count=0;
+ try{
+  database.settleBotDamageWager=async (_id,result)=>{settled=result;count++;return new Map([['device',outcome==='win'?1500:outcome==='loss'?500:1000]])};
+  database.saveCompletedMatch=async()=>new Map();
+  const r=roomFor();r.addBot('hard');r.damageWagerReserved=true;r.botWagerReserved=true;
+  const bot=[...r.state.players.values()].find(p=>p.isBot);r.state.players.get('human').health=outcome==='win'?15:0;bot.health=outcome==='loss'?15:0;
+  await r.persistFinalResults();await r.persistFinalResults();assert.equal(settled,outcome);assert.equal(count,1);
+ }finally{database.settleBotDamageWager=oldSettle;database.saveCompletedMatch=oldSave}
+});
+test('failed bot stake reservation restores human matchmaking without starting',async()=>{
+ const old=database.reserveBotDamageWager;
+ try{
+  database.reserveBotDamageWager=async()=>({ok:false,balances:new Map(),insufficientPlayerIds:['device']});
+  const r=roomFor();r.state.botAvailableAt=0;let unlocked=false;r.unlock=async()=>{unlocked=true};
+  await r.handleBotRequest(actor,true);assert.equal(r.state.gameStarted,false);assert.equal(r.state.players.size,1);assert.equal(r.state.botMatch,false);assert.ok(unlocked);
+ }finally{database.reserveBotDamageWager=old}
+});
+test('disconnect during bot reservation refunds the stake',async()=>{
+ const oldReserve=database.reserveBotDamageWager,oldSettle=database.settleBotDamageWager;let refunded=false;
+ try{
+  const r=roomFor();r.state.botAvailableAt=0;
+  database.reserveBotDamageWager=async()=>{r.state.players.get('human').connected=false;return {ok:true,balances:new Map([['device',500]]),insufficientPlayerIds:[]}};
+  database.settleBotDamageWager=async (_id,result)=>{assert.equal(result,'refund');refunded=true;return new Map([['device',1000]])};
+  await r.handleBotRequest(actor,true);assert.ok(refunded);assert.equal(r.state.gameStarted,false);assert.equal(r.state.players.size,1);
+ }finally{database.reserveBotDamageWager=oldReserve;database.settleBotDamageWager=oldSettle}
+});
+
 test('bot timers submit through existing answer/confidence handlers and stop on dispose',t=>{
  t.mock.timers.enable({apis:['setTimeout','Date']});
  const r=roomFor('classic');r.addBot('normal');r.state.currentQuestion.id='q';r.state.currentQuestion.qType='multiple_choice';r.state.currentQuestion.options.push('a','b','c');r.state.currentQuestion.startedAt=Date.now();
@@ -114,3 +149,24 @@ test('bot match ends when its last human forfeits and clears timers',()=>{
  r.botTimers.add(setTimeout(()=>assert.fail('orphan bot timer'),5000));r.persistFinalResults=async()=>{};
  assert.ok(r.finishPlayerDeparture(r.state.players.get('human')));assert.equal(r.state.gameEnded,true);assert.equal(r.botTimers.size,0);
 });
+
+for (const type of ['estimate', 'closest_answer']) {
+  test(`${type} bot guesses use concise numbers while preserving exact known answers`, () => {
+    for (const target of [0, 1, -10, 2152, 3.14, -0.125, 0.0001]) {
+      const q = { ...question(type), correctAnswer: target };
+      const random = botRandom(`numeric:${type}:${target}`);
+      for (let i = 0; i < 1000; i++) {
+        // Force an incorrect decision, retaining seeded randomness afterward.
+        let first = true;
+        const value = decideBot(q, 'en', 'easy', () => {
+          if (first) { first = false; return 0.999; }
+          return random();
+        }).value;
+        assert.ok(Number.isFinite(value));
+        assert.notEqual(value, target);
+        assert.equal(value, Number(value.toFixed(Number.isInteger(target) ? 0 : 2)));
+      }
+      assert.equal(decideBot(q, 'en', 'hard', () => 0).value, target);
+    }
+  });
+}

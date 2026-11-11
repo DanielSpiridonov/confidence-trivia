@@ -14,4 +14,6 @@ ngrok.yml
 **/credentials.json
 .env
 .env.*
+**/.env
+**/.env.*
 npm-debug.log*
