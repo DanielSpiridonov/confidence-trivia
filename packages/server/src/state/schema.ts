@@ -5,6 +5,8 @@ import { RoundPhase } from "@confidence-trivia/shared";
  * (answers, side bet targets of others, etc. — those live server-side
  * only until reveal). */
 export class PlayerSchema extends Schema {
+  @type("boolean") isBot: boolean = false;
+  @type("string") botSkill: string = "";
   @type("string") id: string = "";
   @type("string") name: string = "";
   @type("string") nameColor: string = "#FFFFFF";
@@ -68,6 +70,8 @@ export class RevealEntrySchema extends Schema {
 }
 
 export class RoomStateSchema extends Schema {
+  @type("boolean") botPractice: boolean = false;
+  @type("number") botAvailableAt: number = 0;
   @type("number") serverNow: number = 0;
   @type("string") code: string = "";
   @type("string") gameMode: string = "classic";

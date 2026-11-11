@@ -10,6 +10,7 @@ const database_1 = require("../database");
 const auth_1 = require("../auth");
 const logging_1 = require("../logging");
 const options_1 = require("./options");
+const bots_1 = require("../bots");
 const PLAYER_NAME_PATTERN = /^[\p{L}\p{N} ]+$/u;
 const DEVICE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 function isValidPlayerName(name) {
@@ -59,9 +60,98 @@ class GameRoom extends colyseus_1.Room {
         this.visualReady = new Set();
         this.questionReadyClients = new Set();
         this.disposed = false;
+        this.botTimers = new Set();
+        this.botDecisions = new Map();
+    }
+    clearBotTimers() {
+        this.botTimers?.forEach(timer => clearTimeout(timer));
+        this.botTimers?.clear();
+    }
+    addBot(skill) {
+        const bot = new schema_1.PlayerSchema();
+        bot.id = `bot-${(0, crypto_1.randomUUID)()}`;
+        const identity = bots_1.BOT_IDENTITIES[this.state.players.size % bots_1.BOT_IDENTITIES.length];
+        bot.avatarId = identity[0];
+        bot.name = identity[1];
+        bot.isBot = true;
+        bot.botSkill = skill;
+        bot.ready = true;
+        if (this.state.friendsTeamMode === "duos") {
+            const a = [...this.state.players.values()].filter(p => p.team === "A").length;
+            const b = [...this.state.players.values()].filter(p => p.team === "B").length;
+            bot.team = a <= b ? "A" : "B";
+        }
+        this.state.players.set(bot.id, bot);
+        this.state.botPractice = true;
+        this.state.damagePot = 0;
+    }
+    async handleBotRequest(client, fallback, skill = "normal") {
+        if (client.sessionId !== this.state.hostId || this.state.phase !== "lobby" || this.state.gameStarted
+            || this.gameStartPending || this.state.isChallenge || !this.state.players.get(client.sessionId)?.connected)
+            return;
+        if (fallback) {
+            if (this.state.gameMode !== "damage" || this.state.players.size !== 1
+                || Date.now() < this.state.botAvailableAt)
+                return;
+            this.gameStartPending = true;
+            try {
+                await this.lock();
+                if (this.disposed || this.state.players.size !== 1 || !this.state.players.get(client.sessionId)?.connected)
+                    return;
+                this.addBot((0, bots_1.wagerBotSkill)(this.state.damageWager));
+                this.beginGame();
+            }
+            finally {
+                this.gameStartPending = false;
+                if (!this.disposed && !this.state.gameStarted)
+                    await this.unlock();
+            }
+        }
+        else {
+            if (this.isPublic || !["classic", "friends"].includes(this.state.gameMode)
+                || this.state.players.size >= this.maxClients || typeof skill !== "string"
+                || !Object.prototype.hasOwnProperty.call(bots_1.BOT_ACCURACY, skill))
+                return;
+            this.addBot(skill);
+        }
+        void this.updateLobbyMetadata();
+    }
+    scheduleBots(phase) {
+        this.clearBotTimers();
+        if (!["question", "confidence", "board_sidebet"].includes(phase))
+            return;
+        for (const bot of this.state.players.values()) {
+            if (!bot.isBot || bot.forfeited)
+                continue;
+            if (phase === "question" && !this.botDecisions.has(bot.id)) {
+                const record = this.questionSet[this.state.currentRoundIndex % this.questionSet.length];
+                this.botDecisions.set(bot.id, (0, bots_1.decideBot)(record, this.locale, bot.botSkill, (0, bots_1.botRandom)(`${this.matchId}:${this.state.currentRoundIndex}:${bot.id}`)));
+            }
+            const decision = this.botDecisions.get(bot.id);
+            if (!decision || (phase === "question" && this.roundAnswers.has(bot.id))
+                || (phase === "confidence" && this.roundConfidenceDecisions.has(bot.id))
+                || (phase === "board_sidebet" && this.roundSideBetDecisions.has(bot.id)))
+                continue;
+            const delay = phase === "question" ? Math.max(0, this.state.currentQuestion.startedAt + decision.responseMs - Date.now())
+                : phase === "confidence" ? decision.confidenceMs : 1000;
+            const timer = setTimeout(() => {
+                this.botTimers.delete(timer);
+                if (this.disposed || this.state.gameEnded || this.state.phase !== phase)
+                    return;
+                const actor = { sessionId: bot.id };
+                if (phase === "question")
+                    this.handleSubmitAnswer(actor, { value: decision.value, questionId: this.state.currentQuestion.id });
+                else if (phase === "confidence")
+                    this.handleSubmitConfidence(actor, { value: decision.confidence });
+                else
+                    this.handleSkipSideBet(actor);
+            }, Math.min(delay, Math.max(0, this.state.phaseEndsAt - Date.now() - 50)));
+            this.botTimers.add(timer);
+        }
     }
     onDispose() {
         this.disposed = true;
+        this.clearBotTimers();
         if (this.phaseTimeout)
             clearTimeout(this.phaseTimeout);
     }
@@ -129,6 +219,15 @@ class GameRoom extends colyseus_1.Room {
         const isMatchmade = this.state.gameMode === "ranked" || this.state.gameMode === "damage";
         await this.setPrivate(isMatchmade ? false : !this.isPublic);
         await this.updateLobbyMetadata();
+        this.onMessage("playVsBot", client => void this.handleBotRequest(client, true).catch(error => (0, logging_1.logServerError)("Bot fallback failed", error)));
+        this.onMessage("addBot", (client, msg) => void this.handleBotRequest(client, false, msg?.skill).catch(error => (0, logging_1.logServerError)("Adding bot failed", error)));
+        this.onMessage("removeBot", (client, msg) => {
+            if (client.sessionId !== this.state.hostId || this.state.phase !== "lobby" || this.gameStartPending)
+                return;
+            if (this.state.players.get(msg?.id)?.isBot)
+                this.state.players.delete(msg.id);
+            void this.updateLobbyMetadata();
+        });
         this.onMessage("toggleReady", (client) => this.handleToggleReady(client));
         this.onMessage("toggleRoomVisibility", (client) => void this.handleToggleRoomVisibility(client).catch((error) => (0, logging_1.logServerError)("Could not update room visibility", error)));
         this.onMessage("startGame", (client) => void this.handleStartGame(client).catch((error) => {
@@ -177,7 +276,8 @@ class GameRoom extends colyseus_1.Room {
     async onJoin(client, options = {}) {
         // Admission performs asynchronous authentication. Recheck synchronously so
         // concurrent sockets for one installation cannot occupy multiple seats.
-        if (this.state.gameStarted || !isValidDeviceId(options.deviceId)
+        if (this.state.gameStarted || this.gameStartPending || (this.state.botPractice && this.state.gameMode === "damage")
+            || this.state.players.size >= this.maxClients || !isValidDeviceId(options.deviceId)
             || [...this.deviceIds.values()].includes(options.deviceId.toLowerCase())) {
             this.challengeRoles.delete(client.sessionId);
             throw new colyseus_1.ServerError(403, "This player cannot join the room");
@@ -200,6 +300,8 @@ class GameRoom extends colyseus_1.Room {
             this.state.hostId = player.id;
         }
         this.state.players.set(client.sessionId, player);
+        if (this.state.gameMode === "damage" && this.state.players.size === 1)
+            this.state.botAvailableAt = Date.now() + 5000;
         if (options.supportsQuestionReady === true)
             this.questionReadyClients.add(client.sessionId);
         this.challengeRoles.delete(client.sessionId);
@@ -300,7 +402,7 @@ class GameRoom extends colyseus_1.Room {
     reassignHostIfNeeded() {
         if (this.state.players.has(this.state.hostId))
             return;
-        const next = [...this.state.players.values()][0];
+        const next = [...this.state.players.values()].find(p => !p.isBot);
         if (next) {
             next.isHost = true;
             this.state.hostId = next.id;
@@ -319,7 +421,7 @@ class GameRoom extends colyseus_1.Room {
             const remaining = [...this.state.players.values()].filter(candidate => !candidate.forfeited);
             const emptyTeam = this.state.gameMode === "friends" && this.state.friendsTeamMode === "duos"
                 && ["A", "B"].some(team => !remaining.some(candidate => candidate.team === team));
-            if (remaining.length < shared_1.MIN_PLAYERS_TO_START || emptyTeam)
+            if (remaining.length < shared_1.MIN_PLAYERS_TO_START || emptyTeam || !remaining.some(candidate => !candidate.isBot))
                 this.endGame();
         }
         // Keep departed seats and device IDs for authoritative final results.
@@ -350,7 +452,7 @@ class GameRoom extends colyseus_1.Room {
     async handleToggleRoomVisibility(client) {
         if (client.sessionId !== this.state.hostId || this.state.gameStarted || this.state.phase !== "lobby")
             return;
-        if (this.hasCustomQuestions)
+        if (this.hasCustomQuestions || this.state.botPractice)
             return;
         const nextIsPublic = !this.isPublic;
         await this.setPrivate(!nextIsPublic);
@@ -370,7 +472,7 @@ class GameRoom extends colyseus_1.Room {
             client.send("gameStartError", { code: "players_not_ready" });
             return;
         }
-        if (this.state.gameMode === "damage") {
+        if (this.state.gameMode === "damage" && !this.state.botPractice) {
             this.gameStartPending = true;
             const playerEntries = [...this.state.players.values()].flatMap((player) => {
                 const deviceId = this.deviceIds.get(player.id);
@@ -443,6 +545,7 @@ class GameRoom extends colyseus_1.Room {
         }
     }
     async cancelStarting() {
+        this.clearBotTimers();
         if (this.phaseTimeout)
             clearTimeout(this.phaseTimeout);
         this.gameStartPending = true;
@@ -465,6 +568,7 @@ class GameRoom extends colyseus_1.Room {
             this.endGame();
             return;
         }
+        this.botDecisions?.clear();
         this.roundAnswers.clear();
         this.roundAnswerDrafts.clear();
         this.roundConfidenceDecisions.clear();
@@ -501,7 +605,7 @@ class GameRoom extends colyseus_1.Room {
         // support from every connected player, including in mixed-version rooms.
         const connected = [...this.state.players.values()].filter(player => player.connected);
         const textReadySupported = connected.length > 0
-            && connected.every(player => this.questionReadyClients?.has(player.id));
+            && connected.every(player => player.isBot || this.questionReadyClients?.has(player.id));
         if (record.presentation || textReadySupported)
             this.setPhase("visual_loading", shared_1.VISUAL_READY_TIMEOUT_MS);
         else
@@ -524,7 +628,7 @@ class GameRoom extends colyseus_1.Room {
     }
     beginVisualIfReady() {
         const connected = [...this.state.players.values()].filter((p) => p.connected);
-        if (this.state.phase === "visual_loading" && connected.length && connected.every((p) => this.visualReady.has(p.id)))
+        if (this.state.phase === "visual_loading" && connected.length && connected.every((p) => p.isBot || this.visualReady.has(p.id)))
             this.beginQuestion();
     }
     replaceUnavailableVisual() {
@@ -545,6 +649,7 @@ class GameRoom extends colyseus_1.Room {
         if (this.phaseTimeout)
             clearTimeout(this.phaseTimeout);
         this.phaseTimeout = setTimeout(() => this.advancePhase(), durationMs);
+        this.scheduleBots(phase);
     }
     /** Server-driven phase transition — never triggered by a client message. */
     advancePhase() {
@@ -924,6 +1029,7 @@ class GameRoom extends colyseus_1.Room {
             return;
         this.state.phase = "final_results";
         this.state.gameEnded = true;
+        this.clearBotTimers();
         if (this.phaseTimeout)
             clearTimeout(this.phaseTimeout);
         void this.persistFinalResults();
@@ -933,7 +1039,7 @@ class GameRoom extends colyseus_1.Room {
             return;
         this.resultsPersisted = true;
         // Any solo practice session must not farm completion Stars or recorded wins.
-        if (this.practiceMatch)
+        if (this.practiceMatch || this.state.botPractice)
             return;
         const rankingValueFor = (player) => {
             if (this.state.gameMode === "friends" && this.state.friendsTeamMode === "duos") {

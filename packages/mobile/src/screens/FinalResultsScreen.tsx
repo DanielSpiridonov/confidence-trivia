@@ -93,7 +93,8 @@ export function FinalResultsScreen({ room, state, onExit }: { room: Room; state:
           <Text numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7} style={styles.winnerName}>{isDamageDraw ? t("final.bothDefeated") : tied ? t("final.sharedFirst", { count: leaders.length }) : winner?.name ?? "—"}</Text>
           <View style={styles.underline} />
         </View>
-        {state.gameMode === "damage" ? <View style={styles.wagerResult}>
+        {state.botPractice ? <View style={styles.wagerResult}><Text style={styles.wagerResultText}>{t("bots.practice")}</Text></View> : null}
+        {state.gameMode === "damage" && !state.botPractice ? <View style={styles.wagerResult}>
           <PointsIcon size={19} />
           <Text style={styles.wagerResultText}>{isDamageDraw ? t("final.wagerRefunded", { count: state.damageWager }) : wonDamagePot ? t("final.wagerWon", { count: state.damagePot }) : t("final.wagerLost", { count: state.damageWager })}</Text>
         </View> : null}

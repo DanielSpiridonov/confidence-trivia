@@ -3,7 +3,7 @@ import { AccessibilityInfo, Animated, Easing, Image, StyleSheet, Text, View } fr
 import Svg, { Defs, LinearGradient, Path, Rect, Stop } from "react-native-svg";
 import { useTranslation } from "react-i18next";
 import { FRAME_COSMETIC_COLORS } from "@confidence-trivia/shared";
-import { ANDROID_GAME_UI_SCALE, Screen, theme } from "../components/ui";
+import { ANDROID_GAME_UI_SCALE, Screen, BigButton, theme } from "../components/ui";
 import { PointsIcon } from "../components/PointsIcon";
 import { PlayerFrameEffect } from "../components/PlayerFrameEffect";
 
@@ -40,7 +40,10 @@ function useReducedMotion() {
   return reduced;
 }
 
-export function MatchmakingQueueScreen({ players, mySessionId, ranked, isStarting, countdownSeconds, wager, pot, error }: {
+export function MatchmakingQueueScreen({ players, mySessionId, ranked, isStarting, countdownSeconds, wager, pot, error, onPlayVsBot, botAvailableAt, botPractice }: {
+  onPlayVsBot: () => void;
+  botAvailableAt: number;
+  botPractice: boolean;
   players: QueuePlayer[];
   mySessionId: string;
   ranked: boolean;
@@ -144,11 +147,13 @@ export function MatchmakingQueueScreen({ players, mySessionId, ranked, isStartin
           <View>
             <Text style={styles.prizeLabel}>{t("queue.prize")}</Text>
             <Text style={styles.prizeAmount}>{t("queue.pot", { count: pot })}</Text>
-            <Text style={styles.stake}>{t("queue.stake", { count: wager })}</Text>
+            {!botPractice ? <Text style={styles.stake}>{t("queue.stake", { count: wager })}</Text> : null}
           </View>
         </View> : <View style={styles.rankedNote}><Text style={styles.rankedLabel}>{t("queue.rankedFormat")}</Text><Text style={styles.stake}>{t("queue.rankedRule")}</Text></View>}
       </View>
 
+      {!ranked && !isStarting && found === 1 && elapsed >= 5 && Date.now() >= botAvailableAt ? <View style={{ paddingHorizontal: 22 }}><BigButton label={t("bots.play")} onPress={onPlayVsBot} variant="secondary" /><Text style={styles.tip}>{t("bots.practice")}</Text></View> : null}
+      {botPractice ? <Text style={styles.tip}>{t("bots.practice")}</Text> : null}
       <View style={styles.tipRow}>
         <Text style={styles.tipLabel}>{t("queue.tipLabel")}</Text>
         <Text style={styles.tip}>{t(`queue.${ranked ? "rankedTip" : "damageTip"}${tipIndex}`)}</Text>

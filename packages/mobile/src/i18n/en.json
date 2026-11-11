@@ -1,4 +1,13 @@
 {
+  "bots": {
+    "play": "Play vs Bot",
+    "practice": "Bot practice: no Stars staked or earned; no progression.",
+    "add": "Add bot � {{skill}}",
+    "remove": "Remove bot",
+    "easy": "Easy",
+    "normal": "Normal",
+    "hard": "Hard"
+  },
   "home": {
     "title": "Confivia",
     "tagline": "Knowing the answer is only half the game.",

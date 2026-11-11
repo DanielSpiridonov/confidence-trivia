@@ -17,6 +17,8 @@ const schema_1 = require("@colyseus/schema");
 class PlayerSchema extends schema_1.Schema {
     constructor() {
         super(...arguments);
+        this.isBot = false;
+        this.botSkill = "";
         this.id = "";
         this.name = "";
         this.nameColor = "#FFFFFF";
@@ -40,6 +42,14 @@ class PlayerSchema extends schema_1.Schema {
     }
 }
 exports.PlayerSchema = PlayerSchema;
+__decorate([
+    (0, schema_1.type)("boolean"),
+    __metadata("design:type", Boolean)
+], PlayerSchema.prototype, "isBot", void 0);
+__decorate([
+    (0, schema_1.type)("string"),
+    __metadata("design:type", String)
+], PlayerSchema.prototype, "botSkill", void 0);
 __decorate([
     (0, schema_1.type)("string"),
     __metadata("design:type", String)
@@ -276,6 +286,8 @@ __decorate([
 class RoomStateSchema extends schema_1.Schema {
     constructor() {
         super(...arguments);
+        this.botPractice = false;
+        this.botAvailableAt = 0;
         this.serverNow = 0;
         this.code = "";
         this.gameMode = "classic";
@@ -301,6 +313,14 @@ class RoomStateSchema extends schema_1.Schema {
     }
 }
 exports.RoomStateSchema = RoomStateSchema;
+__decorate([
+    (0, schema_1.type)("boolean"),
+    __metadata("design:type", Boolean)
+], RoomStateSchema.prototype, "botPractice", void 0);
+__decorate([
+    (0, schema_1.type)("number"),
+    __metadata("design:type", Number)
+], RoomStateSchema.prototype, "botAvailableAt", void 0);
 __decorate([
     (0, schema_1.type)("number"),
     __metadata("design:type", Number)

@@ -22,6 +22,7 @@ interface PublicPlayerView {
   avatarId: string;
   frameId: string;
   team: string;
+  isBot: boolean;
 }
 
 export function LobbyScreen({ room, state, mySessionId }: { room: Room; state: any; mySessionId: string }) {
@@ -102,6 +103,7 @@ export function LobbyScreen({ room, state, mySessionId }: { room: Room; state: a
     avatarId: p.avatarId,
     frameId: p.frameId,
     team: p.team,
+    isBot: p.isBot,
   }));
 
   const me = players.find((p) => p.id === mySessionId);
@@ -142,7 +144,7 @@ export function LobbyScreen({ room, state, mySessionId }: { room: Room; state: a
   }
 
   if (isMatchmade) {
-    return <MatchmakingQueueScreen players={players} mySessionId={mySessionId} ranked={isRanked} isStarting={isStarting} countdownSeconds={countdownSeconds} wager={state.damageWager} pot={state.damagePot} error={startError} />;
+    return <MatchmakingQueueScreen players={players} mySessionId={mySessionId} ranked={isRanked} isStarting={isStarting} countdownSeconds={countdownSeconds} wager={state.damageWager} pot={state.damagePot} error={startError} botAvailableAt={state.botAvailableAt} botPractice={Boolean(state.botPractice)} onPlayVsBot={() => room.send("playVsBot")} />;
   }
 
   return (
@@ -163,6 +165,7 @@ export function LobbyScreen({ room, state, mySessionId }: { room: Room; state: a
                   <View style={styles.playerNameLine}><Text numberOfLines={1} style={[styles.playerName, { color: item.nameColor || theme.text }]}>{item.name}</Text>{item.id === mySessionId ? <Text style={styles.youLabel}>{t("common.you")}</Text> : null}</View>
                   {item.isHost ? <Text style={styles.hostLabel}>{t("lobby.host")}</Text> : null}
                 </View>
+                {item.isBot && isHost && !isStarting ? <Pressable accessibilityRole="button" onPress={() => room.send("removeBot", { id: item.id })}><Text style={styles.youLabel}>{t("bots.remove")}</Text></Pressable> : null}
                 {item.team ? <Text style={[styles.teamBadge, item.team === "B" && styles.teamBadgeB]}>{t("lobby.team", { team: item.team })}</Text> : null}
                 <View style={styles.playerStatus}><View style={[styles.statusDot, !item.connected ? styles.disconnectedDot : item.ready || item.isHost ? styles.readyDot : null]} /><Text numberOfLines={1} style={item.connected && (item.ready || item.isHost) ? styles.readyBadge : styles.notReadyBadge}>{!item.connected ? t("lobby.reconnecting") : item.isHost ? t("lobby.host") : item.ready ? t("lobby.ready") : t("lobby.notReady")}</Text></View>
               </View>
@@ -188,6 +191,8 @@ export function LobbyScreen({ room, state, mySessionId }: { room: Room; state: a
               <Text style={styles.visibilityLabel}>{state.isPublic ? t("lobby.partyPublic") : t("lobby.partyPrivate")}</Text>
               <View style={[styles.visibilityTrack, state.isPublic && styles.visibilityTrackEnabled]}><View style={[styles.visibilityThumb, state.isPublic && styles.visibilityThumbEnabled]} /></View>
             </Pressable> : null}
+            {state.botPractice ? <Text style={styles.waitingHint}>{t("bots.practice")}</Text> : null}
+            {isHost && !isStarting && !state.isPublic && !isChallenge && ["classic", "friends"].includes(state.gameMode) && players.length < 16 ? <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>{(["easy", "normal", "hard"] as const).map(skill => <Pressable key={skill} accessibilityRole="button" onPress={() => room.send("addBot", { skill })}><Text style={styles.youLabel}>{t("bots.add", { skill: t(`bots.${skill}`) })}</Text></Pressable>)}</View> : null}
             <View style={styles.actionArea}>
               {!isStarting ? <Text style={styles.waitingHint}>{connectedPlayerCount < requiredPlayers ? t("lobby.waitingForPlayers", { count: requiredPlayers - connectedPlayerCount }) : !validFriendsTeamSize ? t("lobby.evenTeamsHint") : !everyoneReady ? t("lobby.waitingForReady") : isHost ? t("lobby.hostCanStart") : t("lobby.waitingForHost")}</Text> : null}
               {!isStarting && (isHost ? <BigButton label={startPending ? "Starting…" : t("lobby.start")} onPress={() => void handleStart()} disabled={!canStart || startPending} lobbyHaptic /> : <BigButton label={me?.ready ? t("lobby.notReady") : t("lobby.ready")} onPress={() => room.send("toggleReady")} variant="secondary" lobbyHaptic />)}
